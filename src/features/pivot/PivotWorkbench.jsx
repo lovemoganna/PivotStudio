@@ -67,7 +67,7 @@ export default function PivotWorkbench() {
 
   const [pivotConfig, setPivotConfig] = useState(() => buildDefaultPivotConfig(RETAIL_TEST_DATASET));
 
-  const [viewMode, setViewMode] = useState('split');
+  const [viewMode, setViewMode] = useState(() => window.matchMedia('(max-width: 1023px)').matches ? 'table' : 'split');
   const [chartType, setChartType] = useState('bar');
   const [highlightedRowKey, setHighlightedRowKey] = useState(null);
   const [isChartFullscreen, setIsChartFullscreen] = useState(false);
@@ -1073,7 +1073,7 @@ export default function PivotWorkbench() {
 
   return (
     <div className={darkMode && !isPrintingReport ? 'dark' : ''}>
-      <div className={`h-[100dvh] min-h-[480px] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[12px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans select-none print:bg-white print:text-black apple-transition ${isPrintingReport ? 'h-auto overflow-visible' : 'overflow-hidden'}`}>
+      <div className={`h-[100dvh] min-h-[480px] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[12px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans select-none print:bg-white print:text-black apple-transition ${isPrintingReport ? 'h-auto overflow-visible' : 'overflow-y-auto lg:overflow-hidden'}`}>
         <div className="hidden print:block px-6 py-4 border-b border-black/15">
           <h1 className="text-base font-semibold tracking-tight text-black">PivotEngine Studio [Monokai Pro] 数据透视分析报告 — {currentDataset.name}</h1>
           <p className="text-[11px] text-[#75715E] mt-1">导出时间: {new Date().toLocaleString('zh-CN')} · 有效记录: {pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()} 行 · 导出人: {currentUser.name}</p>
@@ -1121,9 +1121,9 @@ export default function PivotWorkbench() {
 
         {/* Bento KPI Cards Strip with Mini Sparklines */}
         {unifiedChartSpec.kpiCards.length > 0 && (
-          <div className="bg-[#F7F6F0] dark:bg-[#1E1F1C] px-3 sm:px-4 pt-3 pb-2 grid grid-cols-2 lg:grid-cols-4 gap-2.5 shrink-0">
+          <div className={`bg-[#F7F6F0] dark:bg-[#1E1F1C] px-3 sm:px-4 pt-3 pb-2 flex sm:grid sm:grid-cols-2 ${unifiedChartSpec.kpiCards.length === 3 ? "lg:grid-cols-3" : unifiedChartSpec.kpiCards.length >= 4 ? "lg:grid-cols-4" : ""} gap-2.5 shrink-0 overflow-x-auto`}>
             {unifiedChartSpec.kpiCards.map((kpi) => (
-              <div key={kpi.id} className="px-4 py-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822] apple-specular-card flex items-center justify-between gap-3 apple-transition hover:border-[#66D9EF]/60">
+              <div key={kpi.id} className="min-w-[250px] sm:min-w-0 px-4 py-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822] apple-specular-card flex items-center justify-between gap-3 hover:border-[#66D9EF]/60">
                 <div className="min-w-0">
                   <div className="text-[11px] font-medium text-[#75715E] dark:text-[#908E80] flex items-center gap-1.5 truncate apple-font-mono">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: kpi.color }} />
@@ -1198,10 +1198,8 @@ export default function PivotWorkbench() {
         >
           {(viewMode !== 'chart' || isPrintingReport) && (
             <div
-              style={{
-                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%` } : {}),
-              }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'min-w-0 lg:min-w-0 lg:min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
+              style={{ "--split-table-basis": splitRatioPct + "%" }}
+              className={`pivot-split-table bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'min-w-0 min-h-[290px] lg:min-h-0 lg:min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
                 pivotResult={pivotResult}
@@ -1252,10 +1250,8 @@ export default function PivotWorkbench() {
           {(viewMode !== 'table' || isPrintingReport) && (
             <div
               id="pivot-chart-container"
-              style={{
-                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%` } : {}),
-              }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] monokai-grid-canvas rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'h-auto' : ''}`}
+              style={{ "--split-chart-basis": (100 - splitRatioPct) + "%" }}
+              className={`pivot-split-chart bg-[#FFFDF7] dark:bg-[#272822] monokai-grid-canvas rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'min-w-0 min-h-[290px] lg:min-h-0 lg:min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
               <ChartStudio
                 chartType={chartType}
