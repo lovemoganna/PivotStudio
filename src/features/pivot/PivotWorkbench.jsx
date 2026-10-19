@@ -953,7 +953,7 @@ export default function PivotWorkbench() {
     if (!rawInput || !rawInput.trim()) return false;
     try {
       const tokenPart = rawInput.includes('share_token=') ? rawInput.split('share_token=')[1].split('&')[0] : rawInput.trim();
-      const decoded = JSON.parse(decodeURIComponent(escape(atob(tokenPart))));
+      const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(tokenPart)))));
       if (decoded.fullConfig) setPivotConfig(decoded.fullConfig);
       if (decoded.cf) setCondFormat(decoded.cf);
       if (decoded.csc) setChartSpecConfig((p) => ({ ...p, ...decoded.csc }));
@@ -966,6 +966,11 @@ export default function PivotWorkbench() {
       return false;
     }
   }, [showToast]);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('share_token');
+    if (token) applyShareTokenPayload(token);
+  }, [applyShareTokenPayload]);
 
   // Spotlight Command Palette Actions
   const commandActions = useMemo(() => {
