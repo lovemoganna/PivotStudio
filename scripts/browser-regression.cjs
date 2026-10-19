@@ -33,6 +33,18 @@ async function run() {
       page.on('console', msg => { if (msg.type()==='error') exceptions.push('console: '+msg.text()); });
       await page.goto(URL, { waitUntil: 'networkidle', timeout: 30000 });
       await page.getByTestId('open-workspaces').waitFor({timeout:12000});
+      if(name==='desktop') {
+        await page.waitForFunction(() => Array.from(document.querySelectorAll('.recharts-bar-rectangle path, .recharts-bar-rectangle rect')).some(el => {
+          const r=el.getBoundingClientRect(); return r.height>3 && r.width>2;
+        }), {timeout:10000});
+      }
+      if(name==='mobile') {
+        await page.getByTestId('mobile-actions').locator('summary').click();
+        const downloadAction = page.getByRole('button',{name:'导出 Excel'});
+        assert.ok(await downloadAction.isVisible(),'mobile export operations reachable');
+        await page.getByTestId('mobile-actions').locator('summary').click();
+      }
+
       await page.screenshot({path:'test-artifacts/'+name+'-initial.png',fullPage:true});
       await page.getByRole('button', {name:'仅图表'}).click();
       const chartTab = page.getByRole('button', {name:'仅图表'});
@@ -46,6 +58,7 @@ async function run() {
         header:!!document.querySelector('[data-testid="workbench-header"]')
       }));
       console.log('viewport inspection',name,JSON.stringify(overflow),JSON.stringify(exceptions));
+      await page.waitForTimeout(480);
       await page.screenshot({path:'test-artifacts/'+name+'.png',fullPage:true});
       assert.ok(overflow.main && overflow.header, name+': missing main/header');
       console.log(name,JSON.stringify({horizontalOverflow:overflow.doc-overflow.viewport,bodyOverflow:overflow.body-overflow.viewport,exceptions}));
