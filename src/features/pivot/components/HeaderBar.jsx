@@ -99,17 +99,17 @@ export function HeaderBar({
             <span>time: <strong className="text-[#528000] dark:text-[#A6E22E] font-semibold">{pivotResult.elapsedMs}ms</strong></span>
           </div>
 
-          <button onClick={() => { soundEngine?.playClick(640); setShowTestSuiteModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-font-mono apple-transition">
+          <button onClick={() => { soundEngine?.playClick(640); setShowTestSuiteModal(true); }} className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-font-mono apple-transition">
             <CheckCircle2 className="w-3.5 h-3.5 text-[#A6E22E]" />
             <span>计算检查 {liveEngineTestResults.filter((r) => r.passed).length}/5</span>
           </button>
 
-          <button onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#FD971F] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-transition">
+          <button onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }} className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#FD971F] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-transition">
             <Palette className="w-3.5 h-3.5 text-[#FD971F]" />
             <span>格式与数值</span>
           </button>
 
-          <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 apple-font-mono">
+          <div className="hidden sm:flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 apple-font-mono">
             <button onClick={exportToExcelMerged} title="导出真正的 Excel 工作簿 (.xlsx)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLSX</span></button>
             <button onClick={exportToCSV} title="导出 CSV 数据表 (.csv)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
             <button
@@ -133,12 +133,33 @@ export function HeaderBar({
           </button>
 
 
-          <details className="relative group" data-testid="preferences-menu">
+          <details className="sm:hidden relative group" data-testid="mobile-actions">
+            <summary className="min-h-9 inline-flex cursor-pointer list-none items-center gap-2 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] px-3 py-2 text-xs font-semibold text-[#272822] dark:text-[#F8F8F2]">更多操作</summary>
+            <div className="absolute right-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-2rem))] rounded-xl border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] p-3 shadow-2xl">
+              <p className="mb-2 text-xs font-semibold text-[#75715E] dark:text-[#B8B5A8]">分析操作</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={() => setShowTestSuiteModal(true)}>计算检查</button>
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={() => setActiveFormatModal(true)}>格式与数值</button>
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={exportToExcelMerged}>导出 Excel</button>
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={exportToCSV}>导出 CSV</button>
+                <button disabled={viewMode === 'table'} className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs disabled:opacity-40" onClick={exportChartAsPNG}>导出图表</button>
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={exportPDFReport}>打印 / PDF</button>
+              </div>
+              <p className="mb-2 mt-3 border-t border-[#49483E] pt-3 text-xs font-semibold text-[#75715E] dark:text-[#B8B5A8]">演示与偏好</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={() => {const playing=!keynotePlaying;setKeynotePlaying(playing);if(playing)applyKeynoteShot(keynoteShotIdx);}}>{keynotePlaying?'结束分镜':'分镜演示'}</button>
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={() => setCinemaTheaterMode(v => !v)}>{cinemaTheaterMode?'退出沉浸':'沉浸模式'}</button>
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={() => setSoundEnabled(v => !v)}>{soundEnabled?'关闭声效':'开启声效'}</button>
+                <button className="rounded-lg border border-[#D6D4C8] dark:border-[#49483E] p-2 text-xs" onClick={() => setShowAwardBadgeModal(true)}>设计规范</button>
+              </div>
+            </div>
+          </details>
+          <details className="hidden sm:block relative group" data-testid="preferences-menu">
             <summary className="min-h-9 inline-flex cursor-pointer list-none items-center gap-2 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] px-3 py-2 text-xs font-semibold text-[#272822] dark:text-[#F8F8F2] hover:border-[#66D9EF]">
               <Film className="h-4 w-4 text-[#0088A3] dark:text-[#66D9EF]"/><span>演示与偏好</span>
             </summary>
             <div className="absolute right-0 top-full z-50 mt-2 w-[min(360px,calc(100vw-2rem))] rounded-xl border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] p-3 shadow-2xl">
-              <p className="mb-2 text-xs leading-relaxed text-[#75715E] dark:text-[#B8B5A8]">演示功能不会改变数据计算口径。</p>
+              <p className="mb-2 text-xs leading-relaxed text-[#75715E] dark:text-[#B8B5A8]">演示会切换分析配置和视图，但不会伪造数据。</p>
               <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5">
             <button
               onClick={() => {
@@ -203,7 +224,7 @@ export function HeaderBar({
               </div>
             </div>
           </details>
-          <button onClick={() => { soundEngine?.playClick(480); setDarkMode((prev) => !prev); }} title={darkMode ? '当前：Monokai Pro Dark (点击切换暖纸浅色)' : '当前：Monokai Light (点击切换经典暗色)'} className="p-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#E6DB74] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] transition" aria-label="切换主题">
+          <button onClick={() => { soundEngine?.playClick(480); setDarkMode((prev) => !prev); }} title={darkMode ? '当前：Monokai Pro Dark (点击切换暖纸浅色)' : '当前：Monokai Light (点击切换经典暗色)'} className="p-2.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#E6DB74] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] transition" aria-label="切换主题">
             {darkMode ? <Sun className="w-3.5 h-3.5 text-[#E6DB74]" /> : <Moon className="w-3.5 h-3.5 text-[#AE81FF]" />}
           </button>
         </div>
