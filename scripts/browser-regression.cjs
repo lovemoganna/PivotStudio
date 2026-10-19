@@ -33,6 +33,7 @@ async function run() {
       page.on('console', msg => { if (msg.type()==='error') exceptions.push('console: '+msg.text()); });
       await page.goto(URL, { waitUntil: 'networkidle', timeout: 30000 });
       await page.getByTestId('open-workspaces').waitFor({timeout:12000});
+      await page.screenshot({path:'test-artifacts/'+name+'-initial.png',fullPage:true});
       await page.getByRole('button', {name:'仅图表'}).click();
       const chartTab = page.getByRole('button', {name:'仅图表'});
       assert.equal(await chartTab.getAttribute('aria-pressed'),'true','view control feedback');
