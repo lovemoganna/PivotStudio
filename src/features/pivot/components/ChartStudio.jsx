@@ -46,8 +46,13 @@ export function ChartStudio({
               </span>
             )}
           </h3>
-          <p className="text-[10px] text-[#75715E] dark:text-[#908E80] mt-0.5 apple-font-mono">
-            dim: {unifiedChartSpec.xDimensionLabel} · series: {unifiedChartSpec.primarySeriesKey}
+          <p className="text-[10px] text-[#75715E] dark:text-[#908E80] mt-0.5 apple-font-mono flex items-center gap-2">
+            <span>dim: {unifiedChartSpec.xDimensionLabel} · series: {unifiedChartSpec.primarySeriesKey}</span>
+            {!unifiedChartSpec.canStack && (chartType === 'stacked_bar' || chartType === 'stacked_area') && (
+              <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-[#FD971F] border border-[#FD971F]/30 text-[9px]">
+                量纲不同已自动按分组呈现
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-1.5 relative apple-font-mono">
@@ -306,8 +311,13 @@ export function ChartStudio({
                   tickFormatter={(v) => formatAxisTickLabel(v, 14)}
                 />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
-                {unifiedChartSpec.derivedSeriesKey && (
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#E6DB74' }} />
+                {(unifiedChartSpec.hasDualAxis || unifiedChartSpec.derivedSeriesKey) && (
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 10, fill: '#A6E22E' }}
+                    tickFormatter={(v) => unifiedChartSpec.hasDualAxis ? UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true }) : v}
+                  />
                 )}
                 {chartSpecConfig.showAvgReferenceLine && unifiedChartSpec.primaryStats.mean > 0 && (
                   <ReferenceLine
@@ -323,7 +333,7 @@ export function ChartStudio({
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
                   <Line
                     key={sm.key}
-                    yAxisId="left"
+                    yAxisId={unifiedChartSpec.hasDualAxis ? (sm.yAxisId || 'left') : 'left'}
                     connectNulls={chartSpecConfig.missingValueMode !== 'connect'}
                     type="monotone"
                     dataKey={sm.key}
@@ -381,7 +391,7 @@ export function ChartStudio({
                     key={sm.key}
                     type="monotone"
                     dataKey={sm.key}
-                    stackId={chartType === 'area' ? undefined : 'stack_1'}
+                    stackId={chartType === 'area' || (!unifiedChartSpec.canStack && chartType !== 'pct_area') ? undefined : 'stack_1'}
                     stroke={sm.color}
                     strokeWidth={2}
                     fill={`url(#appleAreaGrad_${idx % CHART_COLORS.length})`}
@@ -634,7 +644,7 @@ export function ChartStudio({
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => {
-                  const isStacked = chartType === 'stacked_bar' || chartType === 'pct_stacked_bar';
+                  const isStacked = (chartType === 'stacked_bar' || chartType === 'pct_stacked_bar') && (unifiedChartSpec.canStack || chartType === 'pct_stacked_bar');
                   return (
                     <Bar
                       key={sm.key}

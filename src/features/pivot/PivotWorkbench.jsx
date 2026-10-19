@@ -680,34 +680,39 @@ export default function PivotWorkbench() {
     const rk = pointData?.rowKey || pointData?.payload?.rowKey;
     if (!rk || rk === '__GRAND_TOTAL_ROW__') return;
 
-    if (chartSpecConfig.clickLinkMode === 'filter' && pivotConfig.rows.length > 0) {
-      const firstDim = pivotConfig.rows[0];
+    if (chartSpecConfig.clickLinkMode === 'filter') {
+      const activeDim = pivotConfig.rows.length > 0 ? pivotConfig.rows[0] : (pivotConfig.columns.length > 0 ? pivotConfig.columns[0] : null);
+      if (!activeDim) return;
+
       const firstSeg = rk.split('||')[0];
-      const fMeta = currentDataset.fields.find((f) => f.name === firstDim.field);
+      const fMeta = currentDataset.fields.find((f) => f.name === activeDim.field);
       const matchingRawVals = Array.from(
         new Set(
           currentDataset.rows
-            .filter((r) => formatDimensionValue(r[firstDim.field], firstDim, fMeta) === firstSeg)
-            .map((r) => String(r[firstDim.field] ?? ''))
+            .filter((r) => formatDimensionValue(r[activeDim.field], activeDim, fMeta) === firstSeg)
+            .map((r) => String(r[activeDim.field] ?? ''))
         )
       );
+
       setPivotConfig((prev) => {
-        const existing = prev.filters.find((f) => f.field === firstDim.field);
-        if (existing && existing.selectedValues.length > 0) {
+        const existing = prev.filters.find((f) => f.field === activeDim.field);
+        const isSame = existing && existing.selectedValues.length === matchingRawVals.length && existing.selectedValues.every((v) => matchingRawVals.includes(v));
+        if (isSame) {
+          showToast(`已清除「${activeDim.field}」的联动筛选`);
           return {
             ...prev,
-            filters: prev.filters.filter((f) => f.field !== firstDim.field),
+            filters: prev.filters.filter((f) => f.field !== activeDim.field),
           };
         }
+        showToast(`已触发图表全局筛选联动: ${firstSeg}`);
         return {
           ...prev,
           filters: [
-            ...prev.filters.filter((f) => f.field !== firstDim.field),
-            { id: `f_link_${Date.now()}`, field: firstDim.field, selectedValues: matchingRawVals },
+            ...prev.filters.filter((f) => f.field !== activeDim.field),
+            { id: `f_link_${Date.now()}`, field: activeDim.field, selectedValues: matchingRawVals },
           ],
         };
       });
-      showToast(`已触发图表全局筛选联动: ${firstSeg}`);
     } else {
       setHighlightedRowKey((prev) => {
         const nextKey = prev === rk ? null : rk;

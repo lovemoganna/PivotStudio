@@ -471,10 +471,15 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     min: primaryValues.length > 0 ? Math.min(...primaryValues) : 0,
   };
 
+  const canStack = hasColGroups || (valConfigs.length > 1 && valConfigs.every((v) => UnifiedFormatter.inferUnit(v) === UnifiedFormatter.inferUnit(valConfigs[0])));
+  const hasDualAxis = !hasColGroups && valConfigs.length > 1;
+
   return {
     chartType,
     hasValues: true,
     isPercentMode,
+    canStack,
+    hasDualAxis,
     xDimensionLabel,
     primaryValCfg,
     secondaryValCfg,
