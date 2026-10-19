@@ -51,10 +51,10 @@ export function FieldShelf({
 }) {
   return (
     <>
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden relative">
         {/* Left Sidebar: Schema Field Palette & Data Ingestion (Step 5) */}
         {!cinemaTheaterMode && (
-          <aside className="w-full md:w-64 bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
+          <aside className="w-full max-h-[36vh] md:max-h-none md:w-64 md:min-h-0 bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-b md:border-b-0 md:border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono">
@@ -138,7 +138,7 @@ export function FieldShelf({
                 </button>
                 <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[10px] font-medium flex items-center justify-center gap-1 transition">
                   <Server className="w-3 h-3 text-[#FD971F]" />
-                  <span>SQL代理</span>
+                  <span>SQL（未接入）</span>
                 </button>
                 <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }} className="px-2 py-1.5 rounded-lg bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 hover:bg-[#AE81FF]/25 text-[10px] font-semibold flex items-center justify-center gap-1 transition">
                   <Zap className="w-3 h-3 text-[#AE81FF]" />
@@ -150,8 +150,8 @@ export function FieldShelf({
             {/* Schema Field List */}
             <div className="flex-1 flex flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold tracking-tight apple-font-mono">SCHEMA_FIELDS ({currentDataset.fields.length})</span>
-                <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">// drag or +add</span>
+                <span className="text-[11px] font-bold tracking-tight apple-font-mono">可用字段 ({currentDataset.fields.length})</span>
+                <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">拖拽或点击添加</span>
               </div>
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
                 {currentDataset.fields.map((field) => {
@@ -172,10 +172,10 @@ export function FieldShelf({
                         <span className="font-medium text-xs truncate">{field.name}</span>
                       </div>
                       <div className="flex items-center gap-0.5 opacity-85 group-hover:opacity-100 shrink-0 apple-font-mono">
-                        <button onClick={() => addFieldToZone('rows', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] text-[9px] font-semibold transition">+行</button>
-                        <button onClick={() => addFieldToZone('columns', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+列</button>
-                        <button onClick={() => addFieldToZone('values', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+值</button>
-                        <button onClick={() => addFieldToZone('filters', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+筛</button>
+                        <button aria-label={`将${field.name}添加为行维度`} onClick={() => addFieldToZone('rows', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] text-[9px] font-semibold transition">+行</button>
+                        <button aria-label={`将${field.name}添加为列维度`} onClick={() => addFieldToZone('columns', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+列</button>
+                        <button aria-label={`将${field.name}添加为数值指标`} onClick={() => addFieldToZone('values', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+值</button>
+                        <button aria-label={`将${field.name}添加为筛选条件`} onClick={() => addFieldToZone('filters', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+筛</button>
                       </div>
                     </div>
                   );
@@ -186,9 +186,9 @@ export function FieldShelf({
         )}
 
         {/* Main Work Area */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto lg:overflow-hidden">
+        <main className="flex-1 min-h-0 flex flex-col min-w-0 overflow-y-auto lg:overflow-hidden">
           {!cinemaTheaterMode && (
-            <section className="bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden">
+            <section className="bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 sm:px-4 py-2.5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 shrink-0 print:hidden">
               {[
                 { key: 'filters', label: 'FILTERS // 筛选器', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
                 { key: 'rows', label: 'ROWS // 行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
@@ -355,7 +355,8 @@ export function FieldShelf({
                   <button
                     key={m.id}
                     onClick={() => { soundEngine?.playClick(520); setViewMode(m.id); }}
-                    className={`px-3 py-1 rounded-md text-[10px] font-semibold transition ${viewMode === m.id ? 'bg-[#F92672] text-[#F8F8F2] shadow-sm' : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+                    aria-pressed={viewMode === m.id}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${viewMode === m.id ? 'bg-[#F92672] text-[#F8F8F2] shadow-sm' : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
                   >
                     {m.label}
                   </button>
@@ -363,6 +364,7 @@ export function FieldShelf({
               </div>
 
               <select
+                aria-label="选择图表类型"
                 value={chartType}
                 onChange={(e) => { soundEngine?.playClick(560); setChartType(e.target.value); }}
                 className="px-3 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#66D9EF] text-[10px] font-semibold apple-font-mono focus:outline-none focus:border-[#F92672]"

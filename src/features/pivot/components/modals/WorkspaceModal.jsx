@@ -64,7 +64,7 @@ export function WorkspaceModal({
                   key={u.role}
                   onClick={() => {
                     setCurrentUser(u);
-                    showToast?.(`已切换身份为：${u.name}`);
+                    showToast?.(`已切换本机演示角色：${u.name}；未执行身份验证`);
                   }}
                   className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold ${currentUser.role === u.role ? 'bg-[#F92672] text-[#F8F8F2] border-[#F92672]' : 'border-[#D6D4C8] dark:border-[#3E3D32]'}`}
                 >
@@ -121,7 +121,11 @@ export function WorkspaceModal({
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => {
-                        if (ws.datasetId && datasets.some((d) => d.id === ws.datasetId)) {
+                        if (ws.datasetId) {
+                          if (!datasets.some((d) => d.id === ws.datasetId)) {
+                            showToast?.("无法还原工作区：原数据集尚未加载。请先重新导入数据。", "error");
+                            return;
+                          }
                           setActiveDatasetId(ws.datasetId);
                         }
                         setViewMode(ws.viewMode || 'split');

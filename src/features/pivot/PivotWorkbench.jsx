@@ -40,7 +40,7 @@ import { CommandPaletteModal } from './components/modals/CommandPaletteModal';
 
 export default function PivotWorkbench() {
   const [darkMode, setDarkMode] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const [keynotePlaying, setKeynotePlaying] = useState(false);
   const [keynoteShotIdx, setKeynoteShotIdx] = useState(0);
   const [cinemaTheaterMode, setCinemaTheaterMode] = useState(false);
@@ -188,17 +188,29 @@ export default function PivotWorkbench() {
     toastTimerRef.current = setTimeout(() => { setToastMessage(null); }, 3200);
   }, []);
 
-  const copyTextToClipboard = useCallback((text, successMsg = '已复制到剪贴板') => {
+  const copyTextToClipboard = useCallback(async (text, successMsg = '已复制到剪贴板') => {
     try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const input = document.createElement('textarea');
+        input.value = text;
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.focus();
+        input.select();
+        try {
+          if (!document.execCommand('copy')) throw new Error('Copy rejected');
+        } finally {
+          input.remove();
+        }
+      }
       showToast(successMsg);
+      return true;
     } catch {
-      showToast(successMsg);
+      showToast('复制失败，请手动选择文本进行复制', 'error');
+      return false;
     }
   }, [showToast]);
 
@@ -1057,7 +1069,7 @@ export default function PivotWorkbench() {
 
   return (
     <div className={darkMode && !isPrintingReport ? 'dark' : ''}>
-      <div className={`h-screen bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans select-none print:bg-white print:text-black apple-transition ${isPrintingReport ? 'h-auto overflow-visible' : 'overflow-hidden'}`}>
+      <div className={`h-[100dvh] min-h-[480px] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[12px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans select-none print:bg-white print:text-black apple-transition ${isPrintingReport ? 'h-auto overflow-visible' : 'overflow-hidden'}`}>
         <div className="hidden print:block px-6 py-4 border-b border-black/15">
           <h1 className="text-base font-semibold tracking-tight text-black">PivotEngine Studio [Monokai Pro] 数据透视分析报告 — {currentDataset.name}</h1>
           <p className="text-[11px] text-[#75715E] mt-1">导出时间: {new Date().toLocaleString('zh-CN')} · 有效记录: {pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()} 行 · 导出人: {currentUser.name}</p>
@@ -1105,7 +1117,7 @@ export default function PivotWorkbench() {
 
         {/* Bento KPI Cards Strip with Mini Sparklines */}
         {unifiedChartSpec.kpiCards.length > 0 && (
-          <div className="bg-[#F7F6F0] dark:bg-[#1E1F1C] px-4 pt-3 pb-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 shrink-0">
+          <div className="bg-[#F7F6F0] dark:bg-[#1E1F1C] px-3 sm:px-4 pt-3 pb-2 grid grid-cols-2 lg:grid-cols-4 gap-2.5 shrink-0">
             {unifiedChartSpec.kpiCards.map((kpi) => (
               <div key={kpi.id} className="px-4 py-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822] apple-specular-card flex items-center justify-between gap-3 apple-transition hover:border-[#66D9EF]/60">
                 <div className="min-w-0">
@@ -1114,7 +1126,7 @@ export default function PivotWorkbench() {
                     <span className="truncate">{kpi.title}</span>
                     {kpi.unit && <span className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[#F92672] text-[10px] apple-font-mono shrink-0">{kpi.unit}</span>}
                   </div>
-                  <div className="text-base font-bold tracking-tight apple-font-mono text-[#272822] dark:text-[#F8F8F2] mt-0.5">{kpi.formattedCurrent}</div>
+                  <div className="text-lg font-bold tracking-tight apple-font-mono text-[#272822] dark:text-[#F8F8F2] mt-0.5">{kpi.formattedCurrent}</div>
                   {kpi.comparison && (
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold apple-font-mono ${kpi.comparison.isPositive ? 'bg-[#A6E22E]/15 text-[#4A7500] dark:text-[#A6E22E] border border-[#A6E22E]/30' : 'bg-[#F92672]/15 text-[#F92672] border border-[#F92672]/30'}`}>
@@ -1178,14 +1190,14 @@ export default function PivotWorkbench() {
         <div
           ref={splitContainerRef}
           key={`${viewMode}_${chartType}_${keynoteShotIdx}`}
-          className={`flex-1 flex flex-col lg:flex-row min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col min-h-0 h-auto' : 'overflow-hidden'}`}
+          className={`flex-1 flex flex-col lg:flex-row min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2 sm:p-3 lg:p-4 gap-2 ${isPrintingReport ? 'overflow-visible flex-col min-h-0 h-auto' : 'overflow-hidden'}`}
         >
           {(viewMode !== 'chart' || isPrintingReport) && (
             <div
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%` } : {}),
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'min-w-0 lg:min-w-0 lg:min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
                 pivotResult={pivotResult}
@@ -1224,7 +1236,9 @@ export default function PivotWorkbench() {
                 setSplitRatioPct(58);
                 showToast('已复位分栏比例为 58 : 42');
               }}
-              title="左右拖拽无级调节表图比例 · 双击复位 (58:42)"
+              role="separator" aria-label="调整表图宽度" aria-orientation="vertical" aria-valuemin={35} aria-valuemax={75} aria-valuenow={splitRatioPct} tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); setSplitRatioPct((p) => Math.min(75, Math.max(35, p + (e.key === "ArrowRight" ? 5 : -5)))); } else if (e.key === "Home") { e.preventDefault(); setSplitRatioPct(58); } }}
+              title="左右拖拽调整表图比例；方向键微调，Home 复位"
               className={`hidden lg:flex w-2.5 h-full rounded-full items-center justify-center cursor-col-resize select-none transition-colors shrink-0 group ${isResizingSplit ? 'bg-[#F92672]/30' : 'hover:bg-[#66D9EF]/20'}`}
             >
               <div className={`w-1 h-12 rounded-full transition-colors ${isResizingSplit ? 'bg-[#F92672]' : 'bg-[#D6D4C8] dark:bg-[#3E3D32] group-hover:bg-[#66D9EF]'}`} />
