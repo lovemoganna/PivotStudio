@@ -424,7 +424,7 @@ export function FieldShelf({
               <button
                 onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }}
                 className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[9px] text-[#75715E] dark:text-[#908E80] apple-font-mono transition"
-                title="查看实时 DuckDB GROUP BY ROLLUP SQL 下推语句"
+                title="查看 DuckDB SQL 模板（当前不执行）"
               >
                 <Code2 className="w-3 h-3 text-[#A6E22E]" />
                 <span>CUBE({pivotResult.rowConfigs.map((r) => r.field).join('×') || 'ALL'})</span>

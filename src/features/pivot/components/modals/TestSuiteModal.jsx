@@ -27,7 +27,7 @@ export function TestSuiteModal({
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#A6E22E]" />
             <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2]">
-              ENGINE_VERIFICATION // 步骤 2 透视计算引擎 5 大核心测试场景 ({liveEngineTestResults.filter((t) => t.passed).length}/5 通过)
+              内置演示数据计算校验（不替代自动化回归） ({liveEngineTestResults.filter((t) => t.passed).length}/5 通过)
             </h3>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">

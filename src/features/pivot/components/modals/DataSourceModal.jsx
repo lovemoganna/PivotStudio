@@ -1,238 +1,97 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Globe, Server, Zap, X } from 'lucide-react';
-import { RETAIL_TEST_DATASET } from '../../../../constants/pivotConstants';
+import { parseCSVTextToSheet } from '../../../../utils/csvParser';
 import { generateDuckDBPivotSQL } from '../../../../services/duckdbQuery';
 
 export function DataSourceModal({
-  activeDataSourceModal,
-  onClose,
-  gsheetAuthMode,
-  setGsheetAuthMode,
-  gsheetUrlInput,
-  setGsheetUrlInput,
-  gsheetOauthToken,
-  setGsheetOauthToken,
-  sqlFormState,
-  setSqlFormState,
-  duckdbThreshold,
-  currentDataset,
-  pivotConfig,
-  setDatasets,
-  setActiveDatasetId,
-  generate100kDataset,
-  copyTextToClipboard,
-  soundEngine,
-  showToast,
+  activeDataSourceModal, onClose, gsheetUrlInput, setGsheetUrlInput,
+  duckdbThreshold, currentDataset, pivotConfig,
+  setDatasets, setActiveDatasetId, setPivotConfig, generate100kDataset,
+  copyTextToClipboard, showToast
 }) {
+  const [loading, setLoading] = useState(false);
   if (!activeDataSourceModal) return null;
 
+  async function importPublicSheet() {
+    const match = gsheetUrlInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    if (!match) { showToast?.('请输入有效的 Google Sheets 链接', 'error'); return; }
+    const id = match[1];
+    const gid = gsheetUrlInput.match(/(?:[?#&]gid=)(\d+)/)?.[1] || '0';
+    setLoading(true);
+    try {
+      const url = 'https://docs.google.com/spreadsheets/d/' + encodeURIComponent(id) + '/export?format=csv&gid=' + encodeURIComponent(gid);
+      const res = await fetch(url, { credentials: 'omit' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const csv = await res.text();
+      if (/^\s*<!doctype html|^\s*<html/i.test(csv)) throw new Error('返回了登录或权限页面');
+      const sheet = parseCSVTextToSheet(csv, 'Google Sheets');
+      if (!sheet?.rows.length) throw new Error('未发现有效 CSV 数据');
+      const rows = sheet.rows.map((row) => {
+        const normalized = { ...row };
+        sheet.fields.forEach((field) => {
+          const raw = String(row[field.name] ?? '').trim();
+          if (field.type === 'number') normalized[field.name] = raw ? Number(raw.replace(/,/g, '')) : null;
+          if (field.type === 'boolean') normalized[field.name] = /^(true|1|是|yes)$/i.test(raw);
+        });
+        return normalized;
+      });
+      const ds = {
+        id: 'ds_google_' + Date.now(),
+        name: 'Google Sheets ' + id.slice(0, 8) + ' (' + rows.length + ' 行)',
+        fields: sheet.fields,
+        rows
+      };
+      setDatasets((prev) => [...prev, ds]);
+      setActiveDatasetId(ds.id);
+      setPivotConfig({
+        rows: sheet.fields.filter((f) => f.type === 'text').slice(0, 1).map((f) => ({id:'r_auto',field:f.name})),
+        columns: [],
+        values: sheet.fields.filter((f) => f.type === 'number').slice(0, 1).map((f) => ({id:'v_auto',field:f.name,agg:'sum',showAs:'normal'})),
+        filters: [], collapsedRowKeys: {}, collapsedColKeys: {}, showSubtotals: false
+      });
+      onClose();
+      showToast?.('已读取真实公开数据：' + rows.length + ' 行');
+    } catch (err) {
+      showToast?.('导入失败：' + err.message + '。请检查公开访问权限、CSV 导出及浏览器跨域限制', 'error');
+    } finally { setLoading(false); }
+  }
+
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden animate-apple-modal"
-      >
-        <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
-          <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
-            {activeDataSourceModal === 'gsheet' && <Globe className="w-4 h-4 text-[#66D9EF]" />}
-            {activeDataSourceModal === 'sql' && <Server className="w-4 h-4 text-[#FD971F]" />}
-            {activeDataSourceModal === 'bigdata' && <Zap className="w-4 h-4 text-[#AE81FF]" />}
-            <span>
-              {activeDataSourceModal === 'gsheet' && 'GSHEET_ADAPTER // Google Sheet 公开/私有云表格接入 (步骤10)'}
-              {activeDataSourceModal === 'sql' && 'SQL_PROXY // 轻量后端代理与数据库只读查询 (步骤11)'}
-              {activeDataSourceModal === 'bigdata' && 'DUCKDB_ENGINE // 10万行压测与 GROUP BY ROLLUP SQL 下推 (步骤12)'}
-            </span>
-          </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4 text-xs max-h-[78vh] overflow-y-auto apple-font-mono">
+    <div role="presentation" onClick={onClose} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <section role="dialog" aria-modal="true" aria-label="数据源管理" onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl text-xs">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-5 py-4 border-b border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822]">
+          <div className="flex items-center gap-2 font-bold">
+            {activeDataSourceModal === 'gsheet' ? <Globe className="w-4 h-4 text-[#66D9EF]"/> : activeDataSourceModal === 'sql' ? <Server className="w-4 h-4 text-[#FD971F]"/> : <Zap className="w-4 h-4 text-[#AE81FF]"/>}
+            {activeDataSourceModal === 'gsheet' ? 'Google Sheets 公开 CSV' : activeDataSourceModal === 'sql' ? 'SQL 数据库 · 未实现' : '本地合成数据 / SQL 模板'}
+          </div>
+          <button aria-label="关闭数据源" onClick={onClose} className="rounded-md p-1 hover:bg-black/10 dark:hover:bg-white/10"><X className="w-4 h-4"/></button>
+        </header>
+        <div className="p-5 space-y-4">
           {activeDataSourceModal === 'gsheet' && (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setGsheetAuthMode('public')}
-                  className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold ${gsheetAuthMode === 'public' ? 'bg-[#66D9EF]/20 border-[#66D9EF] text-[#0088A3] dark:text-[#66D9EF]' : 'border-[#D6D4C8] dark:border-[#3E3D32]'}`}
-                >
-                  第二优先级：公开分享链接
-                </button>
-                <button
-                  onClick={() => setGsheetAuthMode('oauth')}
-                  className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold ${gsheetAuthMode === 'oauth' ? 'bg-[#F92672]/20 border-[#F92672] text-[#F92672]' : 'border-[#D6D4C8] dark:border-[#3E3D32]'}`}
-                >
-                  第三优先级：私有表格 OAuth 授权
-                </button>
-              </div>
-              <div>
-                <label className="block text-[10px] text-[#75715E] dark:text-[#908E80] mb-1">Google Sheet 分享链接 (自动提取 spreadsheetId 与 gid):</label>
-                <input
-                  type="text"
-                  value={gsheetUrlInput}
-                  onChange={(e) => setGsheetUrlInput(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32]"
-                />
-              </div>
-              {gsheetAuthMode === 'oauth' && (
-                <div>
-                  <label className="block text-[10px] text-[#75715E] dark:text-[#908E80] mb-1">Google OAuth 2.0 Bearer Token:</label>
-                  <input
-                    type="password"
-                    value={gsheetOauthToken}
-                    onChange={(e) => setGsheetOauthToken(e.target.value)}
-                    placeholder="ya29.a0AfH6SMB..."
-                    className="w-full px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32]"
-                  />
-                </div>
-              )}
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={() => {
-                    const match = gsheetUrlInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-                    if (!match) {
-                      showToast?.('无效的 Google Sheet 链接，请包含 /spreadsheets/d/{ID}', 'error');
-                      return;
-                    }
-                    const sheetId = match[1].slice(0, 8);
-                    const gsheetDs = {
-                      id: `ds_gsheet_${Date.now()}`,
-                      name: `GSheet_${sheetId} (云端同步${RETAIL_TEST_DATASET.rows.length}行)`,
-                      fields: RETAIL_TEST_DATASET.fields,
-                      rows: RETAIL_TEST_DATASET.rows,
-                    };
-                    setDatasets((prev) => [...prev, gsheetDs]);
-                    setActiveDatasetId(gsheetDs.id);
-                    onClose();
-                    soundEngine?.playTransitionChord();
-                    showToast?.(`已成功解析 Google Sheet (${sheetId}) 并转换为统一数据格式`);
-                  }}
-                  className="px-4 py-1.5 rounded-lg bg-[#66D9EF] text-[#1E1F1C] font-bold"
-                >
-                  解析链接并载入透视工作台
-                </button>
-              </div>
-            </div>
+            <>
+              <p className="leading-relaxed text-[#75715E] dark:text-[#B8B5A8]">仅支持可公开导出 CSV 的工作表；私有 OAuth、定时同步和完整工作簿同步尚未实现。失败时不会使用演示数据替代。</p>
+              <label htmlFor="gsheet-url" className="block font-semibold">Google Sheets 链接（可指定 gid）</label>
+              <input id="gsheet-url" value={gsheetUrlInput} onChange={(e) => setGsheetUrlInput(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=0" className="w-full rounded-md px-3 py-2 border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C]"/>
+              <div className="flex justify-end"><button disabled={loading} onClick={importPublicSheet} className="rounded-md bg-[#66D9EF] px-4 py-2 text-[#1E1F1C] font-bold disabled:opacity-50">{loading ? '正在请求真实数据…' : '读取公开工作表'}</button></div>
+            </>
           )}
-
           {activeDataSourceModal === 'sql' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <div>
-                  <label className="block text-[10px] text-[#75715E] mb-0.5">主机 (Host)</label>
-                  <input value={sqlFormState.host} onChange={(e) => setSqlFormState((p) => ({ ...p, host: e.target.value }))} className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32]" />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-[#75715E] mb-0.5">端口 (Port)</label>
-                  <input value={sqlFormState.port} onChange={(e) => setSqlFormState((p) => ({ ...p, port: e.target.value }))} className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32]" />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-[#75715E] mb-0.5">用户名 (User)</label>
-                  <input value={sqlFormState.user} onChange={(e) => setSqlFormState((p) => ({ ...p, user: e.target.value }))} className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32]" />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-[#75715E] mb-0.5">数据表 (Table)</label>
-                  <select
-                    value={sqlFormState.selectedTable}
-                    onChange={(e) => {
-                      const tbl = e.target.value;
-                      setSqlFormState((p) => ({
-                        ...p,
-                        selectedTable: tbl,
-                        sql: `SELECT * FROM ${tbl} LIMIT 500;`,
-                      }));
-                    }}
-                    className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32]"
-                  >
-                    <option value="fact_sales_orders">fact_sales_orders (销售事实表)</option>
-                    <option value="dm_region_kpi_summary">dm_region_kpi_summary (大区汇总表)</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] text-[#75715E] mb-1">只读 SQL 查询语句 (内置防注入拦截):</label>
-                <textarea
-                  rows={3}
-                  value={sqlFormState.sql}
-                  onChange={(e) => setSqlFormState((p) => ({ ...p, sql: e.target.value }))}
-                  className="w-full p-2.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[#A6E22E]"
-                />
-              </div>
-              <div className="flex items-center justify-between pt-2">
-                <button
-                  onClick={() => {
-                    if (!sqlFormState.host.trim() || !sqlFormState.user.trim()) {
-                      showToast?.('请填写完整的主机地址与用户名', 'error');
-                      return;
-                    }
-                    setSqlFormState((p) => ({ ...p, connectionStatus: 'connected' }));
-                    showToast?.('数据库连接测试成功 (PostgreSQL 16.2 Read-Only)');
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] font-semibold"
-                >
-                  {sqlFormState.connectionStatus === 'connected' ? '✓ 已连接数据库' : '测试数据库连接'}
-                </button>
-                <button
-                  onClick={() => {
-                    if (/\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE)\b/i.test(sqlFormState.sql)) {
-                      showToast?.('安全拦截：检测到非只读 SQL 关键字，已拒绝执行', 'error');
-                      return;
-                    }
-                    const sqlDs = {
-                      id: `ds_sql_${Date.now()}`,
-                      name: `SQL_${sqlFormState.selectedTable} (${RETAIL_TEST_DATASET.rows.length}行)`,
-                      fields: RETAIL_TEST_DATASET.fields,
-                      rows: RETAIL_TEST_DATASET.rows,
-                    };
-                    setDatasets((prev) => [...prev, sqlDs]);
-                    setActiveDatasetId(sqlDs.id);
-                    onClose();
-                    soundEngine?.playTransitionChord();
-                    showToast?.(`已通过后端代理执行查询并载入「${sqlDs.name}」`);
-                  }}
-                  className="px-4 py-1.5 rounded-lg bg-[#FD971F] text-[#1E1F1C] font-bold"
-                >
-                  执行代理查询并导入
-                </button>
-              </div>
+            <div role="status" className="space-y-3 rounded-lg border border-[#FD971F]/40 bg-[#FD971F]/10 px-4 py-4 leading-relaxed">
+              <p className="font-bold text-[#C86400] dark:text-[#FD971F]">数据库连接及 SQL 查询尚未实现</p>
+              <p>当前仓库没有数据库代理、服务器认证或真实 SQL 执行。此界面不再提供伪连接按钮或返回内置数据冒充查询结果。</p>
+              <p>接入前须建立安全的只读服务端代理、SQL 校验、超时控制与错误处理。</p>
             </div>
           )}
-
           {activeDataSourceModal === 'bigdata' && (
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-[#AE81FF]">100,000 行大数据压测与虚拟滚动引擎</div>
-                  <div className="text-[10px] text-[#75715E] dark:text-[#908E80]">当数据量超过阈值 ({duckdbThreshold.toLocaleString()} 行) 时自动生成 DuckDB GROUP BY ROLLUP SQL</div>
-                </div>
-                <button
-                  onClick={() => generate100kDataset(100000)}
-                  className="px-3.5 py-1.5 rounded-lg bg-[#AE81FF] text-[#1E1F1C] font-bold shrink-0"
-                >
-                  生成 100,000 行压测数据
-                </button>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-[#A6E22E] font-bold">// 实时 DuckDB 聚合下推 SQL 语句</span>
-                  <button
-                    onClick={() => copyTextToClipboard(generateDuckDBPivotSQL(currentDataset, pivotConfig), '已复制 DuckDB SQL 语句')}
-                    className="px-2 py-0.5 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] text-[10px]"
-                  >
-                    复制 SQL
-                  </button>
-                </div>
-                <pre className="p-3 rounded-xl bg-[#191A17] text-[#E6DB74] border border-[#3E3D32] overflow-x-auto text-[10px] leading-relaxed">
-                  {generateDuckDBPivotSQL(currentDataset, pivotConfig)}
-                </pre>
-              </div>
-            </div>
+            <>
+              <p className="text-[#75715E] dark:text-[#B8B5A8] leading-relaxed">生成本地合成数据用于 UI 性能检查。超过 {duckdbThreshold.toLocaleString()} 行仍由 JavaScript 计算；未接入 DuckDB 运行时。</p>
+              <button onClick={() => generate100kDataset(100000)} className="rounded-md bg-[#AE81FF] text-[#1E1F1C] font-bold px-4 py-2">生成 100,000 行合成数据</button>
+              <div className="flex items-center justify-between gap-2"><span className="font-semibold">DuckDB SQL 模板（不执行）</span><button onClick={() => copyTextToClipboard(generateDuckDBPivotSQL(currentDataset, pivotConfig), 'SQL 模板已复制')} className="rounded-md border border-[#49483E] px-3 py-1.5 hover:border-[#66D9EF]">复制模板</button></div>
+              <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-md bg-[#191A17] text-[#E6DB74] p-3 text-[11px]">{generateDuckDBPivotSQL(currentDataset, pivotConfig)}</pre>
+            </>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

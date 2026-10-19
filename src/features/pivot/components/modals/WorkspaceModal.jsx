@@ -46,7 +46,7 @@ export function WorkspaceModal({
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-[#F92672]" />
-            <span>WORKSPACE_HUB // 用户角色、工作区快照与分享嵌入中心 (步骤13 & 14)</span>
+            <span>WORKSPACE_HUB // 本机快照与配置分享</span>
           </h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
@@ -54,7 +54,7 @@ export function WorkspaceModal({
         </div>
         <div className="p-5 space-y-4 overflow-y-auto text-xs apple-font-mono">
           <div className="p-3 rounded-xl bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] flex flex-wrap items-center justify-between gap-2">
-            <span>当前账户与权限角色:</span>
+            <span>本机角色演示（不是身份认证）:</span>
             <div className="flex gap-1.5">
               {[
                 { id: 'usr_admin', name: '张工 (BI架构师)', role: 'Admin' },
@@ -75,7 +75,7 @@ export function WorkspaceModal({
           </div>
 
           <div className="space-y-2">
-            <div className="font-bold text-[#A6E22E]">保存或切换工作区快照 ({savedWorkspaces.length})</div>
+            <div className="font-bold text-[#A6E22E]">保存或切换本机工作区快照 ({savedWorkspaces.length})</div>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -152,7 +152,8 @@ export function WorkspaceModal({
           </div>
 
           <div className="space-y-2 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
-            <div className="font-bold text-[#66D9EF]">分享链接与响应式 Iframe 嵌入代码</div>
+            <div className="font-bold text-[#66D9EF]">分享视图配置（不包含数据）</div>
+            <p className="text-[10px] leading-relaxed text-[#75715E] dark:text-[#908E80]">配置链接使用 Base64，不是加密或鉴权。同一数据集才可正确还原。工作区快照保存在本机浏览器，不同步到服务器。</p>
             {(() => {
               const tokenPayload = btoa(
                 unescape(
@@ -167,13 +168,13 @@ export function WorkspaceModal({
                   )
                 )
               );
-              const shareLink = `https://pivot-studio.bi.internal/?share_token=${tokenPayload}`;
+              const shareLink = `${window.location.origin}${window.location.pathname}?share_token=${encodeURIComponent(tokenPayload)}`;
               const iframeCode = `<iframe src="${shareLink}" width="100%" height="680" frameborder="0" style="border-radius:12px;border:1px solid #3E3D32;"></iframe>`;
               return (
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <input readOnly value={shareLink} className="flex-1 px-2.5 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px]" />
-                    <button onClick={() => copyTextToClipboard(shareLink, '已复制加密分享链接')} className="px-3 py-1 rounded bg-[#66D9EF] text-[#1E1F1C] font-bold text-[10px]">
+                    <button onClick={() => copyTextToClipboard(shareLink, '已复制 Base64 配置链接（非加密）')} className="px-3 py-1 rounded bg-[#66D9EF] text-[#1E1F1C] font-bold text-[10px]">
                       复制链接
                     </button>
                     <button onClick={() => copyTextToClipboard(iframeCode, '已复制 Iframe 嵌入代码')} className="px-3 py-1 rounded bg-[#AE81FF] text-[#1E1F1C] font-bold text-[10px]">

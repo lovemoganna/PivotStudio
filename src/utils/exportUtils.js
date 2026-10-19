@@ -1,4 +1,5 @@
 import { getDimDisplayLabel, formatCellNumber } from './formatters';
+import * as XLSX from 'xlsx';
 
 export function exportToCSV(dataset, pivotResult, showToast) {
   const headers = [
@@ -32,20 +33,15 @@ export function exportToCSV(dataset, pivotResult, showToast) {
 }
 
 export function exportToExcelMerged(dataset, pivotResult, showToast) {
-  const tableEl = document.getElementById('pivot-main-html-table');
-  if (!tableEl) {
-    exportToCSV(dataset, pivotResult, showToast);
-    return;
+  const table = document.getElementById('pivot-main-html-table');
+  if (!table) { showToast?.('当前没有可导出的透视表', 'error'); return; }
+  try {
+    const book = XLSX.utils.table_to_book(table, { sheet: '透视表' });
+    XLSX.writeFile(book, `${dataset.name}_透视表.xlsx`, { compression: true });
+    showToast?.('已导出 XLSX 工作簿');
+  } catch {
+    showToast?.('XLSX 导出失败，请检查当前透视表', 'error');
   }
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>${tableEl.outerHTML}</body></html>`;
-  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${dataset.name}_合并单元格透视表.xls`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast?.('已导出保留合并单元格结构的 Excel 文件');
 }
 
 export function exportChartAsPNG(dataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast) {

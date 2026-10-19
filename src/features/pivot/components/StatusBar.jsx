@@ -49,7 +49,7 @@ export function StatusBar({
       <div className="flex items-center gap-2.5 shrink-0">
         {pivotResult.totalCount >= duckdbThreshold && (
           <span className="px-1.5 py-0.2 rounded bg-[#A6E22E]/20 text-[#4A7500] dark:text-[#A6E22E] font-bold">
-            DUCKDB_PUSHDOWN: ON
+            JS_LOCAL: {pivotResult.totalCount.toLocaleString()} ROWS
           </span>
         )}
         <span className="hidden lg:inline text-[#75715E] dark:text-[#908E80]">
