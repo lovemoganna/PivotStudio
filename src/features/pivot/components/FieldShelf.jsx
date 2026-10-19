@@ -186,7 +186,7 @@ export function FieldShelf({
         )}
 
         {/* Main Work Area */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto lg:overflow-hidden">
           {!cinemaTheaterMode && (
             <section className="bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden">
               {[

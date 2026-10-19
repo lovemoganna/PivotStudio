@@ -1028,7 +1028,7 @@ export default function PivotWorkbench() {
     if (!isVirtualized) {
       return { startIndex: 0, endIndex: pivotResult.tableRows.length, topPadding: 0, bottomPadding: 0, rows: pivotResult.tableRows };
     }
-    const viewportHeight = Math.max(520, syncedTableHeight - 80);
+    const viewportHeight = tableContainerRef.current?.clientHeight || 560;
     const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 8);
     const endIdx = Math.min(pivotResult.tableRows.length, startIdx + Math.ceil(viewportHeight / ROW_HEIGHT) + 16);
     return {
@@ -1038,7 +1038,7 @@ export default function PivotWorkbench() {
       bottomPadding: Math.max(0, (pivotResult.tableRows.length - endIdx) * ROW_HEIGHT),
       rows: pivotResult.tableRows.slice(startIdx, endIdx),
     };
-  }, [isVirtualized, pivotResult.tableRows, scrollTop, syncedTableHeight]);
+  }, [isVirtualized, pivotResult.tableRows, scrollTop]);
 
   return (
     <div className={darkMode && !isPrintingReport ? 'dark' : ''}>
@@ -1157,16 +1157,14 @@ export default function PivotWorkbench() {
         <div
           ref={splitContainerRef}
           key={`${viewMode}_${chartType}_${keynoteShotIdx}`}
-          style={{ minHeight: isPrintingReport ? undefined : `${syncedTableHeight}px` }}
-          className={`flex-1 flex flex-col lg:flex-row min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col' : ''}`}
+          className={`flex-1 flex flex-col lg:flex-row min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col min-h-0 h-auto' : 'overflow-hidden'}`}
         >
           {(viewMode !== 'chart' || isPrintingReport) && (
             <div
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%` } : {}),
-                height: isPrintingReport ? 'auto' : `${syncedTableHeight}px`,
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'min-w-[280px] flex-1' : 'w-full flex-1'} ${isPrintingReport ? 'overflow-visible' : ''}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
                 pivotResult={pivotResult}
@@ -1206,8 +1204,7 @@ export default function PivotWorkbench() {
                 showToast('已复位分栏比例为 58 : 42');
               }}
               title="左右拖拽无级调节表图比例 · 双击复位 (58:42)"
-              style={{ height: `${syncedTableHeight}px` }}
-              className={`hidden lg:flex w-2.5 rounded-full items-center justify-center cursor-col-resize select-none transition-colors shrink-0 group ${isResizingSplit ? 'bg-[#F92672]/30' : 'hover:bg-[#66D9EF]/20'}`}
+              className={`hidden lg:flex w-2.5 h-full rounded-full items-center justify-center cursor-col-resize select-none transition-colors shrink-0 group ${isResizingSplit ? 'bg-[#F92672]/30' : 'hover:bg-[#66D9EF]/20'}`}
             >
               <div className={`w-1 h-12 rounded-full transition-colors ${isResizingSplit ? 'bg-[#F92672]' : 'bg-[#D6D4C8] dark:bg-[#3E3D32] group-hover:bg-[#66D9EF]'}`} />
             </div>
@@ -1218,9 +1215,8 @@ export default function PivotWorkbench() {
               id="pivot-chart-container"
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%` } : {}),
-                height: isChartFullscreen ? undefined : isPrintingReport ? 'auto' : `${syncedTableHeight}px`,
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] monokai-grid-canvas rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'min-w-[280px] flex-1' : 'w-full flex-1'}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] monokai-grid-canvas rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
               <ChartStudio
                 chartType={chartType}
