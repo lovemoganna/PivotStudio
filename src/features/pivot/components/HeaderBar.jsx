@@ -21,6 +21,7 @@ export function HeaderBar({
   pivotResult,
   currentUser,
   isReadOnly,
+  viewMode,
   isPrintingReport,
   setShowAwardBadgeModal,
   setShowCommandPalette,
@@ -156,10 +157,21 @@ export function HeaderBar({
           </button>
 
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 apple-font-mono">
-            <button onClick={exportToExcelMerged} title="导出保留合并单元格的 Excel" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLS</span></button>
-            <button onClick={exportToCSV} title="导出 CSV" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
-            <button onClick={exportChartAsPNG} title="导出图表图片" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#FD971F] font-semibold transition"><span>.SVG</span></button>
-            <button onClick={exportPDFReport} title="导出 PDF 报告" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#AE81FF] font-semibold transition"><span>.PDF</span></button>
+            <button onClick={exportToExcelMerged} title="导出保留合并单元格的 Excel (.xls)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLS</span></button>
+            <button onClick={exportToCSV} title="导出 CSV 数据表 (.csv)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
+            <button
+              disabled={viewMode === 'table'}
+              onClick={exportChartAsPNG}
+              title={viewMode === 'table' ? '当前为「仅透视表」模式，请切换至「表图并列」或「仅图表」视图导出图表' : '导出图表高清矢量图 (.SVG / .PNG)'}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition ${
+                viewMode === 'table'
+                  ? 'opacity-35 cursor-not-allowed text-[#75715E]'
+                  : 'hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[#272822] dark:text-[#FD971F]'
+              }`}
+            >
+              <span>.SVG</span>
+            </button>
+            <button onClick={exportPDFReport} title="导出 PDF 分析报告 (.pdf)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#AE81FF] font-semibold transition"><span>.PDF</span></button>
           </div>
 
           <button onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F92672] hover:bg-[#FF3B85] text-[#F8F8F2] text-[11px] font-semibold shadow-sm apple-transition" title="工作区快照、权限与分享嵌入">

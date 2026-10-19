@@ -1065,6 +1065,7 @@ export default function PivotWorkbench() {
           pivotResult={pivotResult}
           currentUser={currentUser}
           isReadOnly={isReadOnly}
+          viewMode={viewMode}
           isPrintingReport={isPrintingReport}
           setShowAwardBadgeModal={setShowAwardBadgeModal}
           setShowCommandPalette={setShowCommandPalette}
