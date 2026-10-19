@@ -148,7 +148,7 @@ export function HeaderBar({
 
           <button onClick={() => { soundEngine?.playClick(640); setShowTestSuiteModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-font-mono apple-transition">
             <CheckCircle2 className="w-3.5 h-3.5 text-[#A6E22E]" />
-            <span>验收({liveEngineTestResults.filter((r) => r.passed).length}/5)</span>
+            <span>内置校验({liveEngineTestResults.filter((r) => r.passed).length}/5)</span>
           </button>
 
           <button onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#FD971F] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-transition">
@@ -157,24 +157,24 @@ export function HeaderBar({
           </button>
 
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 apple-font-mono">
-            <button onClick={exportToExcelMerged} title="导出保留合并单元格的 Excel (.xls)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLS</span></button>
+            <button onClick={exportToExcelMerged} title="导出真正的 Excel 工作簿 (.xlsx)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLSX</span></button>
             <button onClick={exportToCSV} title="导出 CSV 数据表 (.csv)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
             <button
               disabled={viewMode === 'table'}
               onClick={exportChartAsPNG}
-              title={viewMode === 'table' ? '当前为「仅透视表」模式，请切换至「表图并列」或「仅图表」视图导出图表' : '导出图表高清矢量图 (.SVG / .PNG)'}
+              title={viewMode === 'table' ? '当前为「仅透视表」模式，请切换至「表图并列」或「仅图表」视图导出图表' : '导出图表：通常 SVG；漏斗图 PNG'}
               className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition ${
                 viewMode === 'table'
                   ? 'opacity-35 cursor-not-allowed text-[#75715E]'
                   : 'hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[#272822] dark:text-[#FD971F]'
               }`}
             >
-              <span>.SVG</span>
+              <span>图表</span>
             </button>
-            <button onClick={exportPDFReport} title="导出 PDF 分析报告 (.pdf)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#AE81FF] font-semibold transition"><span>.PDF</span></button>
+            <button onClick={exportPDFReport} title="打开打印窗口，可选择另存为 PDF" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#AE81FF] font-semibold transition"><span>.PDF</span></button>
           </div>
 
-          <button onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F92672] hover:bg-[#FF3B85] text-[#F8F8F2] text-[11px] font-semibold shadow-sm apple-transition" title="工作区快照、权限与分享嵌入">
+          <button onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F92672] hover:bg-[#FF3B85] text-[#F8F8F2] text-[11px] font-semibold shadow-sm apple-transition" title="本地工作区快照、演示角色与分享配置">
             <FolderOpen className="w-3.5 h-3.5" />
             <span>工作区 · {currentUser.name.split(' ')[0]}</span>
           </button>

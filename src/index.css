@@ -71,3 +71,7 @@
 .animate-apple-modal {
   animation: appleModalIn 0.25s var(--apple-spring) forwards;
 }
+
+/* Accessible focus styling, reduced-motion support. */
+:where(button,a,input,select,textarea):focus-visible { outline: 2px solid #66D9EF; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

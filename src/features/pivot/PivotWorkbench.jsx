@@ -131,7 +131,8 @@ export default function PivotWorkbench() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState('ws_default_1');
   const [newWorkspaceNameInput, setNewWorkspaceNameInput] = useState('');
   const [shareTokenInput, setShareTokenInput] = useState('');
-  const [savedWorkspaces, setSavedWorkspaces] = useState([
+  const [savedWorkspaces, setSavedWorkspaces] = useState(() => {
+    const defaultSnapshots = [
     {
       id: 'ws_default_1',
       name: '大区×品类全渠道销售透视 (预设)',
@@ -159,7 +160,15 @@ export default function PivotWorkbench() {
         showSubtotals: false,
       },
     },
-  ]);
+    ];
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('pivotstudio_workspaces_v1'));
+      return Array.isArray(saved) && saved.length ? saved : defaultSnapshots;
+    } catch { return defaultSnapshots; }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem('pivotstudio_workspaces_v1', JSON.stringify(savedWorkspaces)); } catch { /* memory-only fallback */ }
+  }, [savedWorkspaces]);
 
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimerRef = useRef(null);
@@ -836,8 +845,9 @@ export default function PivotWorkbench() {
       const next = { ...r };
       sheet.fields.forEach((f) => {
         if (f.type === 'number') {
-          const n = Number(String(r[f.name] ?? '').replace(/,/g, ''));
-          next[f.name] = Number.isNaN(n) ? 0 : n;
+          const raw = String(r[f.name] ?? '').trim();
+          const n = raw ? Number(raw.replace(/,/g, '')) : null;
+          next[f.name] = n === null || Number.isFinite(n) ? n : null;
         } else if (f.type === 'boolean') {
           next[f.name] = /^(true|1|是|yes)$/i.test(String(r[f.name] ?? '').trim());
         }
@@ -920,7 +930,7 @@ export default function PivotWorkbench() {
     switchDataset(bigDs.id, bigDs);
     setActiveDataSourceModal(null);
     soundEngine.playTransitionChord();
-    showToast(`已生成并载入 ${count.toLocaleString()} 行全渠道零售数据集，虚拟滚动与 DuckDB 下推已激活！`);
+    showToast(`已生成并载入 ${count.toLocaleString()} 行全渠道零售数据集，虚拟滚动已就绪，聚合仍由本地 JavaScript 执行。`);
   }, [showToast, switchDataset]);
 
   const exportToCSV = useCallback(() => {
@@ -978,9 +988,9 @@ export default function PivotWorkbench() {
         run: () => { setChartType(ct.value); if (viewMode === 'table') setViewMode('split'); },
       })),
       { id: 'cmd_100k', category: '性能与引擎验证', label: '一键生成 100,000 行大数据压测集 (激活虚拟滚动)', shortcut: '100K', run: () => generate100kDataset(100000) },
-      { id: 'cmd_testsuite', category: '性能与引擎验证', label: '打开步骤 2 核心引擎 5 大测试场景验收中心', shortcut: '5/5', run: () => setShowTestSuiteModal(true) },
+      { id: 'cmd_testsuite', category: '性能与引擎验证', label: '打开内置计算场景校验（非全量验收）', shortcut: '5/5', run: () => setShowTestSuiteModal(true) },
       { id: 'cmd_theme', category: '外观与导出', label: darkMode ? '切换为 Monokai Light 暖纸浅色主题' : '切换为 Monokai Pro 经典暗黑主题', shortcut: 'Theme', run: () => setDarkMode((p) => !p) },
-      { id: 'cmd_excel', category: '外观与导出', label: '导出保留合并单元格的 Excel 报表 (.xls)', shortcut: 'XLS', run: exportToExcelMerged },
+      { id: 'cmd_excel', category: '外观与导出', label: '导出 Excel 工作簿 (.xlsx)', shortcut: 'XLS', run: exportToExcelMerged },
       { id: 'cmd_csv', category: '外观与导出', label: '导出标准 UTF-8 CSV 数据表 (.csv)', shortcut: 'CSV', run: exportToCSV },
     ];
     if (!commandQuery.trim()) return list;
@@ -1082,6 +1092,11 @@ export default function PivotWorkbench() {
           toastMessage={toastMessage}
           setToastMessage={setToastMessage}
         />
+
+        <div role="status" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
+          <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#66D9EF]" />
+          <span className="truncate">数据来源：{currentDataset.id === RETAIL_TEST_DATASET.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()} 行 · 本地 JavaScript 计算</span>
+        </div>
 
         {/* Bento KPI Cards Strip with Mini Sparklines */}
         {unifiedChartSpec.kpiCards.length > 0 && (
@@ -1326,6 +1341,7 @@ export default function PivotWorkbench() {
           pivotConfig={pivotConfig}
           setDatasets={setDatasets}
           setActiveDatasetId={setActiveDatasetId}
+          setPivotConfig={setPivotConfig}
           generate100kDataset={generate100kDataset}
           copyTextToClipboard={copyTextToClipboard}
           soundEngine={soundEngine}
