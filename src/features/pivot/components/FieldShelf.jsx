@@ -49,18 +49,25 @@ export function FieldShelf({
   pivotResult,
   showToast,
 }) {
+  const [mobileToolsOpen, setMobileToolsOpen] = React.useState(false);
   return (
     <>
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden relative">
         {/* Left Sidebar: Schema Field Palette & Data Ingestion (Step 5) */}
         {!cinemaTheaterMode && (
-          <aside className="w-full md:w-64 bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
-            <div className="space-y-2">
+          <aside className="w-full max-h-[46vh] md:max-h-none md:w-64 md:min-h-0 bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-b md:border-b-0 md:border-r border-[#D6D4C8] dark:border-[#3E3D32] p-2.5 md:p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
+            <button type="button" className="md:hidden flex w-full items-center justify-between gap-3 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-3 py-2.5 text-xs text-left font-semibold"
+              aria-expanded={mobileToolsOpen} aria-controls="pivot-mobile-data-tools"
+              onClick={() => setMobileToolsOpen(p => !p)}>
+              <span className="truncate">数据与字段 · {currentDataset.name}</span>
+              <span className="shrink-0 text-[#0088A3] dark:text-[#66D9EF]">{mobileToolsOpen ? '收起' : '展开'}</span>
+            </button>
+            <div id="pivot-mobile-data-tools" className={`space-y-2 ${mobileToolsOpen ? '' : 'hidden md:block'}`}>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono">
+                <span className="text-[11px] font-bold text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
                   ACTIVE_DATASET
                 </span>
-                <span className="text-[10px] text-[#A6E22E] apple-font-mono">
+                <span className="text-[11px] text-[#A6E22E] apple-font-mono">
                   {currentDataset.rows.length.toLocaleString()} records
                 </span>
               </div>
@@ -112,7 +119,7 @@ export function FieldShelf({
                       });
                     }
                   }}
-                  className="px-2.5 py-2 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
+                  className="px-2.5 py-2 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[11px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
                   title="无需本地文件，一键体验步骤5文件解析与字段类型推断预览弹窗"
                 >
                   模拟预览
@@ -121,7 +128,7 @@ export function FieldShelf({
 
               {uploadProgress && (
                 <div className="p-2 rounded-lg bg-[#1E1F1C] border border-[#3E3D32] space-y-1 apple-font-mono">
-                  <div className="flex justify-between text-[9px] text-[#66D9EF]">
+                  <div className="flex justify-between text-[11px] text-[#66D9EF]">
                     <span>CHUNK {uploadProgress.currentChunk}/{uploadProgress.totalChunks}</span>
                     <span>{uploadProgress.pct}%</span>
                   </div>
@@ -132,15 +139,15 @@ export function FieldShelf({
               )}
 
               <div className="grid grid-cols-3 gap-1.5 apple-font-mono">
-                <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('gsheet'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-[10px] font-medium flex items-center justify-center gap-1 transition">
+                <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('gsheet'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-[11px] font-medium flex items-center justify-center gap-1 transition">
                   <Globe className="w-3 h-3 text-[#66D9EF]" />
                   <span>GSheet</span>
                 </button>
-                <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[10px] font-medium flex items-center justify-center gap-1 transition">
+                <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[11px] font-medium flex items-center justify-center gap-1 transition">
                   <Server className="w-3 h-3 text-[#FD971F]" />
-                  <span>SQL代理</span>
+                  <span>SQL（未接入）</span>
                 </button>
-                <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }} className="px-2 py-1.5 rounded-lg bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 hover:bg-[#AE81FF]/25 text-[10px] font-semibold flex items-center justify-center gap-1 transition">
+                <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }} className="px-2 py-1.5 rounded-lg bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 hover:bg-[#AE81FF]/25 text-[11px] font-semibold flex items-center justify-center gap-1 transition">
                   <Zap className="w-3 h-3 text-[#AE81FF]" />
                   <span>100K压测</span>
                 </button>
@@ -148,10 +155,10 @@ export function FieldShelf({
             </div>
 
             {/* Schema Field List */}
-            <div className="flex-1 flex flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
+            <div className={`flex-1 flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3 ${mobileToolsOpen ? "flex" : "hidden md:flex"}`}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold tracking-tight apple-font-mono">SCHEMA_FIELDS ({currentDataset.fields.length})</span>
-                <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">// drag or +add</span>
+                <span className="text-[11px] font-bold tracking-tight apple-font-mono">可用字段 ({currentDataset.fields.length})</span>
+                <span className="text-[11px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">拖拽或点击添加</span>
               </div>
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
                 {currentDataset.fields.map((field) => {
@@ -171,12 +178,17 @@ export function FieldShelf({
                         </span>
                         <span className="font-medium text-xs truncate">{field.name}</span>
                       </div>
-                      <div className="flex items-center gap-0.5 opacity-85 group-hover:opacity-100 shrink-0 apple-font-mono">
-                        <button onClick={() => addFieldToZone('rows', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] text-[9px] font-semibold transition">+行</button>
-                        <button onClick={() => addFieldToZone('columns', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+列</button>
-                        <button onClick={() => addFieldToZone('values', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+值</button>
-                        <button onClick={() => addFieldToZone('filters', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+筛</button>
-                      </div>
+                      <select aria-label={`添加${field.name}到分析区域`} title={`添加「${field.name}」到分析区域`}
+                        disabled={isReadOnly}
+                        value=""
+                        onChange={(event) => { if (event.target.value) addFieldToZone(event.target.value, field.name); }}
+                        className="max-w-[92px] min-h-8 shrink-0 cursor-pointer rounded-md border border-[#D6D4C8] bg-[#EFECE1] px-2 text-[11px] font-semibold text-[#272822] hover:border-[#66D9EF] focus-visible:outline focus-visible:outline-[#66D9EF] disabled:opacity-40 dark:border-[#49483E] dark:bg-[#272822] dark:text-[#F8F8F2]">
+                        <option value="">＋ 添加</option>
+                        <option value="rows">行维度</option>
+                        <option value="columns">列维度</option>
+                        <option value="values">数值指标</option>
+                        <option value="filters">筛选条件</option>
+                      </select>
                     </div>
                   );
                 })}
@@ -186,14 +198,14 @@ export function FieldShelf({
         )}
 
         {/* Main Work Area */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto lg:overflow-hidden">
+        <main className="flex-1 min-h-0 flex flex-col min-w-0 overflow-y-auto lg:overflow-hidden">
           {!cinemaTheaterMode && (
-            <section className="bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden">
+            <section className="bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 sm:px-4 py-2.5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 shrink-0 print:hidden">
               {[
-                { key: 'filters', label: 'FILTERS // 筛选器', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
-                { key: 'rows', label: 'ROWS // 行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
-                { key: 'columns', label: 'COLUMNS // 列维度', badgeColor: 'text-[#0088A3] dark:text-[#66D9EF]', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
-                { key: 'values', label: 'VALUES // 值指标', badgeColor: 'text-[#C86400] dark:text-[#FD971F]', borderAccent: 'border-l-2 border-l-[#FD971F]' },
+                { key: 'filters', label: '筛选条件', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
+                { key: 'rows', label: '行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
+                { key: 'columns', label: '列维度', badgeColor: 'text-[#0088A3] dark:text-[#66D9EF]', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
+                { key: 'values', label: '数值指标', badgeColor: 'text-[#C86400] dark:text-[#FD971F]', borderAccent: 'border-l-2 border-l-[#FD971F]' },
               ].map((z) => {
                 const items = pivotConfig[z.key] || [];
                 const isOver = dragOverZone === z.key;
@@ -224,13 +236,13 @@ export function FieldShelf({
                     }}
                     className={`min-h-[64px] p-2 rounded-lg border ${z.borderAccent} apple-specular-card apple-transition flex flex-col gap-1.5 ${isOver ? 'border-[#F92672] bg-[#F92672]/10 scale-[1.01]' : 'border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7]/90 dark:bg-[#1E1F1C]/90'}`}
                   >
-                    <div className="flex items-center justify-between text-[10px] font-bold apple-font-mono">
+                    <div className="flex items-center justify-between text-[11px] font-bold apple-font-mono">
                       <span className={z.badgeColor}>{z.label}</span>
-                      <span className="text-[#75715E] dark:text-[#908E80]">[{items.length}]</span>
+                      <span className="text-[#75715E] dark:text-[#B8B5A8]">[{items.length}]</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {items.length === 0 ? (
-                        <span className="text-[10px] text-[#75715E] italic py-1 apple-font-mono">/* 拖拽字段至此... */</span>
+                        <span className="text-[11px] text-[#75715E] italic py-1 apple-font-mono">/* 拖拽字段至此... */</span>
                       ) : (
                         items.map((it, itemIdx) => {
                           const fMeta = currentDataset.fields.find((f) => f.name === it.field);
@@ -250,7 +262,7 @@ export function FieldShelf({
                                 setDraggingPayload(null);
                                 setDragOverZone(null);
                               }}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-sm text-[10px] font-medium cursor-grab active:cursor-grabbing hover:border-[#F92672] transition"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-sm text-[11px] font-medium cursor-grab active:cursor-grabbing hover:border-[#F92672] transition"
                             >
                               <GripVertical className="w-2.5 h-2.5 text-[#75715E] shrink-0" />
                               <span className="text-[#272822] dark:text-[#F8F8F2]">{z.key === 'rows' || z.key === 'columns' ? getDimDisplayLabel(it) : it.field}</span>
@@ -260,7 +272,7 @@ export function FieldShelf({
                                     setHeaderFilterSearch('');
                                     setActiveHeaderFilterModal({ zone: 'filters', dim: it });
                                   }}
-                                  className={`px-1 rounded text-[9px] font-semibold apple-font-mono transition ${isFiltered ? 'bg-[#A6E22E]/20 text-[#4A7500] dark:text-[#A6E22E]' : 'bg-black/[0.05] dark:bg-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#66D9EF]'}`}
+                                  className={`px-1 rounded text-[11px] font-semibold apple-font-mono transition ${isFiltered ? 'bg-[#A6E22E]/20 text-[#4A7500] dark:text-[#A6E22E]' : 'bg-black/[0.05] dark:bg-[#3E3D32] text-[#75715E] dark:text-[#B8B5A8] hover:text-[#66D9EF]'}`}
                                   title="点击选择筛选值"
                                 >
                                   {isFiltered ? `已选${it.selectedValues.length}项` : 'ALL'}
@@ -291,7 +303,7 @@ export function FieldShelf({
                                     setBinFormState(it.numberBin || { start: 0, step: 50000 });
                                     setActiveBinModal({ zone: z.key, item: it, fieldType: fMeta.type });
                                   }}
-                                  className="px-1 rounded bg-[#66D9EF]/15 text-[#0088A3] dark:text-[#66D9EF] text-[9px] hover:underline disabled:opacity-40 apple-font-mono"
+                                  className="px-1 rounded bg-[#66D9EF]/15 text-[#0088A3] dark:text-[#66D9EF] text-[11px] hover:underline disabled:opacity-40 apple-font-mono"
                                 >
                                   分组
                                 </button>
@@ -318,7 +330,7 @@ export function FieldShelf({
                                 </button>
                               )}
                               {!isReadOnly && items.length > 1 && (
-                                <span className="inline-flex items-center gap-0.5 text-[9px] text-[#75715E]">
+                                <span className="inline-flex items-center gap-0.5 text-[11px] text-[#75715E]">
                                   {itemIdx > 0 && (
                                     <button onClick={() => moveZoneItem(z.key, itemIdx, -1)} className="hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="前移">←</button>
                                   )}
@@ -355,7 +367,8 @@ export function FieldShelf({
                   <button
                     key={m.id}
                     onClick={() => { soundEngine?.playClick(520); setViewMode(m.id); }}
-                    className={`px-3 py-1 rounded-md text-[10px] font-semibold transition ${viewMode === m.id ? 'bg-[#F92672] text-[#F8F8F2] shadow-sm' : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+                    aria-pressed={viewMode === m.id}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${viewMode === m.id ? 'bg-[#F92672] text-[#F8F8F2] shadow-sm' : 'text-[#75715E] dark:text-[#B8B5A8] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
                   >
                     {m.label}
                   </button>
@@ -363,16 +376,17 @@ export function FieldShelf({
               </div>
 
               <select
+                aria-label="选择图表类型"
                 value={chartType}
                 onChange={(e) => { soundEngine?.playClick(560); setChartType(e.target.value); }}
-                className="px-3 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#66D9EF] text-[10px] font-semibold apple-font-mono focus:outline-none focus:border-[#F92672]"
+                className="px-3 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#66D9EF] text-[11px] font-semibold apple-font-mono focus:outline-none focus:border-[#F92672]"
               >
                 {VISUAL_CHART_TYPES.map((t) => (
                   <option key={t.value} value={t.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t.label}</option>
                 ))}
               </select>
 
-              <label className="inline-flex items-center gap-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
+              <label className="inline-flex items-center gap-1.5 text-[11px] text-[#75715E] dark:text-[#B8B5A8] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
                 <input
                   type="checkbox"
                   checked={pivotConfig.showSubtotals}
@@ -382,7 +396,7 @@ export function FieldShelf({
                 <span>多级小计</span>
               </label>
 
-              <label className="inline-flex items-center gap-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
+              <label className="inline-flex items-center gap-1.5 text-[11px] text-[#75715E] dark:text-[#B8B5A8] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
                 <input
                   type="checkbox"
                   checked={chartSpecConfig.stickyRowHeaders}
@@ -395,7 +409,7 @@ export function FieldShelf({
               <button
                 disabled={isReadOnly}
                 onClick={transposeRowsAndColumns}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] hover:text-[#F92672] text-[10px] font-medium transition disabled:opacity-40"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] hover:text-[#F92672] text-[11px] font-medium transition disabled:opacity-40"
                 title="一键互换行维度与列维度 (快捷键: R)"
               >
                 <RotateCcw className="w-2.5 h-2.5 text-[#FD971F]" />
@@ -403,10 +417,10 @@ export function FieldShelf({
               </button>
 
               {unifiedChartSpec.executiveInsight && (
-                <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#E6DB74]/15 border border-[#E6DB74]/30 text-[#8A7900] dark:text-[#E6DB74] text-[10px] font-medium apple-font-mono">
+                <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#E6DB74]/15 border border-[#E6DB74]/30 text-[#8A7900] dark:text-[#E6DB74] text-[11px] font-medium apple-font-mono">
                   <Sparkles className="w-3 h-3 text-[#FD971F] shrink-0" />
                   <span>
-                    TOP_FOCUS: <strong>{unifiedChartSpec.executiveInsight.topName}</strong> ({unifiedChartSpec.executiveInsight.topFormatted} · {unifiedChartSpec.executiveInsight.sharePct}%)
+                    重点关注：<strong>{unifiedChartSpec.executiveInsight.topName}</strong> ({unifiedChartSpec.executiveInsight.topFormatted} · {unifiedChartSpec.executiveInsight.sharePct}%)
                   </span>
                 </div>
               )}
@@ -416,14 +430,14 @@ export function FieldShelf({
               {highlightedRowKey && (
                 <button
                   onClick={() => setHighlightedRowKey(null)}
-                  className="px-2.5 py-0.5 rounded-md bg-[#AE81FF]/20 border border-[#AE81FF]/40 text-[#6B38FB] dark:text-[#AE81FF] text-[10px] font-semibold apple-font-mono"
+                  className="px-2.5 py-0.5 rounded-md bg-[#AE81FF]/20 border border-[#AE81FF]/40 text-[#6B38FB] dark:text-[#AE81FF] text-[11px] font-semibold apple-font-mono"
                 >
                   CLEAR_FOCUS: {highlightedRowKey.replace(/\|\|/g, ' / ')} ×
                 </button>
               )}
               <button
                 onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }}
-                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[9px] text-[#75715E] dark:text-[#908E80] apple-font-mono transition"
+                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[11px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono transition"
                 title="查看 DuckDB SQL 模板（当前不执行）"
               >
                 <Code2 className="w-3 h-3 text-[#A6E22E]" />

@@ -19,3 +19,16 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Install browser for UI regression
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run real browser quality checks
+        run: node scripts/browser-regression.cjs
+      - name: Preserve viewport screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pivotstudio-viewport-screenshots
+          path: test-artifacts/
+          if-no-files-found: ignore

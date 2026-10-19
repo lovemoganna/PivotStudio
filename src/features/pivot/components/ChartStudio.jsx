@@ -219,15 +219,17 @@ export function ChartStudio({
       </div>
 
       {/* Quick Tactile Chart Switcher Pill Strip */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 apple-font-mono shrink-0">
+      <div role="group" aria-label="图表类型" className="flex items-center gap-1 overflow-x-auto pb-2 mb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 apple-font-mono shrink-0">
         {VISUAL_CHART_TYPES.map((ct) => (
           <button
             key={ct.value}
+            aria-label={`切换为${ct.label}`}
+            aria-pressed={chartType === ct.value}
             onClick={() => {
               soundEngine?.playClick(540);
               setChartType(ct.value);
             }}
-            className={`px-2 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap transition ${chartType === ct.value ? 'bg-[#F92672] text-[#F8F8F2]' : 'bg-[#EFECE1]/70 dark:bg-[#1E1F1C] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+            className={`px-3 py-1.5 rounded-md text-[11px] font-semibold whitespace-nowrap transition ${chartType === ct.value ? 'bg-[#F92672] text-[#F8F8F2]' : 'bg-[#EFECE1]/70 dark:bg-[#1E1F1C] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
           >
             {ct.short}
           </button>
@@ -618,7 +620,7 @@ export function ChartStudio({
                   <>
                     <XAxis
                       dataKey="name"
-                      interval={0}
+                      interval={unifiedChartSpec.items.length > 10 ? 1 : 0}
                       angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                       textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                       height={unifiedChartSpec.items.length > 5 ? 56 : 28}
@@ -649,6 +651,7 @@ export function ChartStudio({
                     <Bar
                       key={sm.key}
                       dataKey={sm.key}
+                      animationDuration={320}
                       stackId={isStacked ? 'stack_bar' : undefined}
                       fill={`url(#${sm.gradId})`}
                       radius={isStacked ? [0, 0, 0, 0] : chartType === 'horizontal_bar' ? [0, 5, 5, 0] : [5, 5, 0, 0]}
@@ -670,24 +673,9 @@ export function ChartStudio({
         )}
       </div>
 
-      {/* Quick Analytical Lens Strip inside Chart Footer */}
-      <div className="mt-2 pt-2 border-t border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 flex flex-wrap items-center justify-between gap-2 text-[10px] apple-font-mono shrink-0">
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          <span className="text-[#75715E] dark:text-[#908E80] shrink-0">LENS_PRESETS:</span>
-          {KEYNOTE_STORYBOARD_SHOTS.map((shot, idx) => (
-            <button
-              key={shot.id}
-              onClick={() => applyKeynoteShot(idx)}
-              className={`px-2 py-0.5 rounded border transition shrink-0 ${keynoteShotIdx === idx ? 'bg-[#A6E22E]/20 border-[#A6E22E]/50 text-[#4A7500] dark:text-[#A6E22E] font-bold' : 'bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
-            >
-              {shot.number}·{shot.title.slice(0, 4)}
-            </button>
-          ))}
-        </div>
-        <span className="text-[#75715E] dark:text-[#908E80] hidden sm:inline">
-          双击任意单元格或柱体可下钻原始明细
-        </span>
-      </div>
+      <p className="mt-2 shrink-0 border-t border-[#D6D4C8]/60 pt-2 text-[11px] leading-relaxed text-[#75715E] dark:border-[#3E3D32] dark:text-[#B8B5A8]">
+        单击图表数据可定位或筛选对应记录；使用左侧字段配置调整分析维度。
+      </p>
     </div>
   );
 }
