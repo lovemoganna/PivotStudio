@@ -52,8 +52,8 @@ export function HeaderBar({
       )}
 
       {/* Top Monokai Pro IDE Header Bar */}
-      <header className="min-h-13 py-2 bg-[#EFECE1]/90 dark:bg-[#272822]/95 backdrop-blur-2xl border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 flex flex-wrap items-center justify-between gap-2.5 shrink-0 print:hidden z-30 relative">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#F92672] via-[#FD971F] via-[#E6DB74] via-[#A6E22E] via-[#66D9EF] to-[#AE81FF]" />
+      <header className="min-h-[64px] py-3 bg-[#F5F3EC] dark:bg-[#24251F] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 sm:px-5 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden z-30 relative">
+        
 
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-[#1E1F1C] border border-[#3E3D32] flex items-center justify-center text-[#F92672] shadow-sm shrink-0 relative overflow-hidden">
@@ -61,21 +61,13 @@ export function HeaderBar({
             <Terminal className="w-4 h-4 text-[#F92672] relative z-10" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-[13px] font-bold tracking-tight apple-font-mono flex items-center gap-1">
-                <span className="text-[#F92672]">const</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-[18px] font-bold tracking-tight flex items-center gap-1">
+                
                 <span className="text-[#272822] dark:text-[#A6E22E]">PivotStudio</span>
-                <span className="text-[#75715E]">=</span>
-                <span className="text-[#948400] dark:text-[#E6DB74]">&quot;Monokai.Pro&quot;</span>
+                
+                
               </h1>
-              <button
-                onClick={() => { soundEngine?.playClick(620); setShowAwardBadgeModal(true); }}
-                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition"
-                title="查看 Awwwards / Webby / FWA 视觉架构与工程规范"
-              >
-                <Award className="w-3 h-3 text-[#FD971F]" />
-                <span>SOTD_SPEC</span>
-              </button>
               {isReadOnly && (
                 <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#FD971F]/15 text-[#FD971F] font-semibold border border-[#FD971F]/35 apple-font-mono">
                   <Lock className="w-2.5 h-2.5" />
@@ -83,8 +75,8 @@ export function HeaderBar({
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-[#75715E] dark:text-[#908E80] hidden sm:block leading-tight mt-0.5 apple-font-mono">
-              // #272822 Obsidian Canvas · Crosshair Telemetry · 96 BPM Keynote Stage
+            <p className="text-[11px] text-[#75715E] dark:text-[#B8B5A8] hidden sm:block leading-tight mt-0.5 apple-font-mono">
+              真实数据分析 · 多维透视 · 图表联动
             </p>
           </div>
         </div>
@@ -96,7 +88,7 @@ export function HeaderBar({
             title="打开全局指令面板 (⌘K / Ctrl+K)"
           >
             <Search className="w-3 h-3 text-[#66D9EF]" />
-            <span className="hidden md:inline apple-font-mono">cmd_palette()</span>
+            <span className="hidden md:inline">搜索操作</span>
             <kbd className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#272822] text-[9px] font-semibold text-[#F92672] border border-[#D6D4C8] dark:border-[#49483E] apple-font-mono">⌘K</kbd>
           </button>
 
@@ -107,48 +99,9 @@ export function HeaderBar({
             <span>time: <strong className="text-[#528000] dark:text-[#A6E22E] font-semibold">{pivotResult.elapsedMs}ms</strong></span>
           </div>
 
-          <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5">
-            <button
-              onClick={() => {
-                const nextState = !keynotePlaying;
-                setKeynotePlaying(nextState);
-                if (nextState) {
-                  applyKeynoteShot(keynoteShotIdx);
-                  showToast?.('已开启 Monokai Keynote 96 BPM 叙事运镜演示');
-                } else {
-                  soundEngine?.playClick(440);
-                  showToast?.('已暂停 Keynote 自动运镜，可自由交互');
-                }
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-semibold apple-font-mono apple-transition ${keynotePlaying ? 'bg-[#F92672] text-[#F8F8F2] shadow-sm' : 'text-[#272822] dark:text-[#F8F8F2] hover:bg-[#3E3D32]/30'}`}
-              title="开启 96 BPM 分镜运镜模式"
-            >
-              {keynotePlaying ? (
-                <span className="flex items-end gap-0.5 h-3 mr-0.5">
-                  <span className="w-0.5 bg-[#E6DB74] rounded-full" style={{ animation: 'eqPulse1 0.625s infinite ease-in-out' }} />
-                  <span className="w-0.5 bg-[#A6E22E] rounded-full" style={{ animation: 'eqPulse2 0.625s infinite ease-in-out' }} />
-                  <span className="w-0.5 bg-[#66D9EF] rounded-full" style={{ animation: 'eqPulse3 0.625s infinite ease-in-out' }} />
-                </span>
-              ) : (
-                <Film className="w-3 h-3 text-[#F92672]" />
-              )}
-              <span>{keynotePlaying ? `KEYNOTE [${activeKeynoteShot.number}]` : 'Keynote 演示'}</span>
-            </button>
-            <button
-              onClick={() => {
-                soundEngine?.playClick(560);
-                setCinemaTheaterMode((p) => !p);
-              }}
-              className={`px-2 py-1 rounded-md text-[10px] font-semibold apple-font-mono transition ${cinemaTheaterMode ? 'bg-[#A6E22E] text-[#1E1F1C]' : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
-              title="切换纯净剧院舞台模式 (快捷键: T)"
-            >
-              剧院舞台
-            </button>
-          </div>
-
           <button onClick={() => { soundEngine?.playClick(640); setShowTestSuiteModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-font-mono apple-transition">
             <CheckCircle2 className="w-3.5 h-3.5 text-[#A6E22E]" />
-            <span>内置校验({liveEngineTestResults.filter((r) => r.passed).length}/5)</span>
+            <span>计算检查 {liveEngineTestResults.filter((r) => r.passed).length}/5</span>
           </button>
 
           <button onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#FD971F] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-transition">
@@ -174,12 +127,58 @@ export function HeaderBar({
             <button onClick={exportPDFReport} title="打开打印窗口，可选择另存为 PDF" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#AE81FF] font-semibold transition"><span>.PDF</span></button>
           </div>
 
-          <button onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F92672] hover:bg-[#FF3B85] text-[#F8F8F2] text-[11px] font-semibold shadow-sm apple-transition" title="本地工作区快照、演示角色与分享配置">
+          <button onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); }} data-testid="open-workspaces" className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F92672] hover:bg-[#FF3B85] text-[#F8F8F2] text-[11px] font-semibold shadow-sm apple-transition" title="本地工作区快照、演示角色与分享配置">
             <FolderOpen className="w-3.5 h-3.5" />
-            <span>工作区 · {currentUser.name.split(' ')[0]}</span>
+            <span>工作区</span>
           </button>
 
-          <button
+
+          <details className="relative group" data-testid="preferences-menu">
+            <summary className="min-h-9 inline-flex cursor-pointer list-none items-center gap-2 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] px-3 py-2 text-xs font-semibold text-[#272822] dark:text-[#F8F8F2] hover:border-[#66D9EF]">
+              <Film className="h-4 w-4 text-[#0088A3] dark:text-[#66D9EF]"/><span>演示与偏好</span>
+            </summary>
+            <div className="absolute right-0 top-full z-50 mt-2 w-[min(360px,calc(100vw-2rem))] rounded-xl border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] p-3 shadow-2xl">
+              <p className="mb-2 text-xs leading-relaxed text-[#75715E] dark:text-[#B8B5A8]">演示功能不会改变数据计算口径。</p>
+              <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5">
+            <button
+              onClick={() => {
+                const nextState = !keynotePlaying;
+                setKeynotePlaying(nextState);
+                if (nextState) {
+                  applyKeynoteShot(keynoteShotIdx);
+                  showToast?.('已开启 Monokai Keynote 96 BPM 叙事运镜演示');
+                } else {
+                  soundEngine?.playClick(440);
+                  showToast?.('已暂停 Keynote 自动运镜，可自由交互');
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold apple-font-mono apple-transition ${keynotePlaying ? 'bg-[#F92672] text-[#F8F8F2] shadow-sm' : 'text-[#272822] dark:text-[#F8F8F2] hover:bg-[#3E3D32]/30'}`}
+              title="开启 96 BPM 分镜运镜模式"
+            >
+              {keynotePlaying ? (
+                <span className="flex items-end gap-0.5 h-3 mr-0.5">
+                  <span className="w-0.5 bg-[#E6DB74] rounded-full" style={{ animation: 'eqPulse1 0.625s infinite ease-in-out' }} />
+                  <span className="w-0.5 bg-[#A6E22E] rounded-full" style={{ animation: 'eqPulse2 0.625s infinite ease-in-out' }} />
+                  <span className="w-0.5 bg-[#66D9EF] rounded-full" style={{ animation: 'eqPulse3 0.625s infinite ease-in-out' }} />
+                </span>
+              ) : (
+                <Film className="w-3 h-3 text-[#F92672]" />
+              )}
+              <span>{keynotePlaying ? `KEYNOTE [${activeKeynoteShot.number}]` : 'Keynote 演示'}</span>
+            </button>
+            <button
+              onClick={() => {
+                soundEngine?.playClick(560);
+                setCinemaTheaterMode((p) => !p);
+              }}
+              className={`px-3 py-2 rounded-md text-xs font-semibold apple-font-mono transition ${cinemaTheaterMode ? 'bg-[#A6E22E] text-[#1E1F1C]' : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+              title="切换纯净剧院舞台模式 (快捷键: T)"
+            >
+              剧院舞台
+            </button>
+          </div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <button
             onClick={() => {
               const next = !soundEnabled;
               setSoundEnabled(next);
@@ -189,11 +188,21 @@ export function HeaderBar({
               }
             }}
             title={soundEnabled ? '微交互声效已开启 (点击静音)' : '微交互声效已静音 (点击开启)'}
-            className="p-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#66D9EF] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] transition"
+            className="p-2.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#66D9EF] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] transition"
           >
             {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-[#A6E22E]" /> : <VolumeX className="w-3.5 h-3.5 text-[#75715E]" />}
           </button>
-
+                <button
+                onClick={() => { soundEngine?.playClick(620); setShowAwardBadgeModal(true); }}
+                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition"
+                title="查看项目自身的设计规范说明；不代表获得任何设计奖项"
+              >
+                <Award className="w-3 h-3 text-[#FD971F]" />
+                <span>项目设计规范</span>
+              </button>
+              </div>
+            </div>
+          </details>
           <button onClick={() => { soundEngine?.playClick(480); setDarkMode((prev) => !prev); }} title={darkMode ? '当前：Monokai Pro Dark (点击切换暖纸浅色)' : '当前：Monokai Light (点击切换经典暗色)'} className="p-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#E6DB74] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] transition" aria-label="切换主题">
             {darkMode ? <Sun className="w-3.5 h-3.5 text-[#E6DB74]" /> : <Moon className="w-3.5 h-3.5 text-[#AE81FF]" />}
           </button>
