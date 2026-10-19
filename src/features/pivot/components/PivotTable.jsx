@@ -53,7 +53,14 @@ export function PivotTable({
               pivotResult.colHeaderRows.map((headerRow, levelIdx) => (
                 <tr key={`col_level_${levelIdx}`}>
                   {levelIdx === 0 && (
-                    <th colSpan={Math.max(1, pivotResult.rowConfigs.length)} rowSpan={pivotResult.colHeaderRows.length} className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-[#75715E] dark:text-[#908E80] apple-font-mono ${chartSpecConfig.stickyRowHeaders && pivotResult.rowConfigs.length <= 1 ? 'sticky left-0 z-30' : ''}`}>
+                    <th
+                      colSpan={Math.max(1, pivotResult.rowConfigs.length)}
+                      rowSpan={pivotResult.colHeaderRows.length}
+                      style={{ left: chartSpecConfig.stickyRowHeaders ? 0 : undefined }}
+                      className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-[#75715E] dark:text-[#908E80] apple-font-mono ${
+                        chartSpecConfig.stickyRowHeaders ? 'sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]' : ''
+                      }`}
+                    >
                       <div className="flex items-center justify-between gap-1">
                         <span>COL_DIM: {pivotResult.colConfigs.map((c) => getDimDisplayLabel(c)).join(' / ')}</span>
                       </div>
@@ -90,16 +97,38 @@ export function PivotTable({
             )}
             <tr>
               {pivotResult.rowConfigs.length > 0 ? (
-                pivotResult.rowConfigs.map((rDim, rIdx) => (
-                  <th key={rDim.id} onClick={() => toggleDimensionSort('rows', rDim.id)} className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-[#F92672] apple-font-mono whitespace-nowrap cursor-pointer hover:bg-black/[0.04] dark:hover:bg-[#2D2E27] transition ${chartSpecConfig.stickyRowHeaders && pivotResult.rowConfigs.length <= 1 && rIdx === 0 ? 'sticky left-0 z-30 shadow-[1px_0_0_0_rgba(62,61,50,0.6)]' : ''}`}>
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span>{getDimDisplayLabel(rDim)}</span>
-                      {rDim.sort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#A6E22E]" /> : rDim.sort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#F92672]" /> : <ArrowUpDown className="w-3 h-3 opacity-40" />}
-                    </div>
-                  </th>
-                ))
+                pivotResult.rowConfigs.map((rDim, rIdx) => {
+                  const isLastRowDim = rIdx === pivotResult.rowConfigs.length - 1;
+                  return (
+                    <th
+                      key={rDim.id}
+                      onClick={() => toggleDimensionSort('rows', rDim.id)}
+                      style={{
+                        left: chartSpecConfig.stickyRowHeaders ? `${rIdx * 136}px` : undefined,
+                        minWidth: '136px',
+                      }}
+                      className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-[#F92672] apple-font-mono whitespace-nowrap cursor-pointer hover:bg-black/[0.04] dark:hover:bg-[#2D2E27] transition ${
+                        chartSpecConfig.stickyRowHeaders
+                          ? `sticky z-30 ${isLastRowDim ? 'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]' : ''}`
+                          : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span>{getDimDisplayLabel(rDim)}</span>
+                        {rDim.sort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#A6E22E]" /> : rDim.sort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#F92672]" /> : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                      </div>
+                    </th>
+                  );
+                })
               ) : (
-                <th className="border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-[#F92672]">汇总维度</th>
+                <th
+                  style={{ left: chartSpecConfig.stickyRowHeaders ? 0 : undefined, minWidth: '136px' }}
+                  className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-[#F92672] ${
+                    chartSpecConfig.stickyRowHeaders ? 'sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]' : ''
+                  }`}
+                >
+                  汇总维度
+                </th>
               )}
               {pivotResult.allColGroups.map((cGroup) =>
                 pivotResult.valConfigs.map((vCfg) => {
@@ -128,8 +157,27 @@ export function PivotTable({
                   {!isVirtualized ? (
                     row.headerCells.map((hCell) => {
                       const isHeaderCellCrosshair = (hoveredCellTelemetry && hoveredCellTelemetry.rowKey.startsWith(hCell.key)) || (highlightedRowKey && highlightedRowKey.startsWith(hCell.key));
+                      const isStickyEdge = (hCell.level + hCell.colSpan) >= Math.max(1, pivotResult.rowConfigs.length);
                       return (
-                        <td key={hCell.key} rowSpan={hCell.rowSpan} colSpan={hCell.colSpan} onClick={() => { if (!row.isTotal && !row.isSubtotal) { soundEngine?.playClick(500); handleChartPointClick({ rowKey: row.rowKey, name: row.label }); } }} className={`border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 align-middle whitespace-nowrap cursor-pointer font-medium transition-colors ${isHeaderCellCrosshair ? 'text-[#F92672] font-semibold' : ''} ${chartSpecConfig.stickyRowHeaders && pivotResult.rowConfigs.length <= 1 && hCell.level === 0 ? 'sticky left-0 z-10 bg-[#FFFDF7]/95 dark:bg-[#272822]/95 backdrop-blur-sm shadow-[1px_0_0_0_rgba(62,61,50,0.5)]' : ''}`}>
+                        <td
+                          key={hCell.key}
+                          rowSpan={hCell.rowSpan}
+                          colSpan={hCell.colSpan}
+                          onClick={() => { if (!row.isTotal && !row.isSubtotal) { soundEngine?.playClick(500); handleChartPointClick({ rowKey: row.rowKey, name: row.label }); } }}
+                          style={{
+                            left: chartSpecConfig.stickyRowHeaders ? `${hCell.level * 136}px` : undefined,
+                            minWidth: `${hCell.colSpan * 136}px`,
+                          }}
+                          className={`border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 align-middle whitespace-nowrap cursor-pointer font-medium transition-colors ${
+                            isHeaderCellCrosshair ? 'text-[#F92672] font-semibold' : ''
+                          } ${
+                            chartSpecConfig.stickyRowHeaders
+                              ? `sticky z-10 bg-[#FFFDF7] dark:bg-[#272822] ${
+                                  isStickyEdge ? 'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.45)]' : ''
+                                }`
+                              : ''
+                          }`}
+                        >
                           <div className="flex items-center gap-1.5">
                             {hCell.hasChildren && (
                               <button onClick={(e) => { e.stopPropagation(); soundEngine?.playClick(600); toggleRowCollapse(hCell.key); }} className="w-4 h-4 rounded bg-black/[0.06] dark:bg-[#3E3D32] hover:bg-[#F92672] hover:text-[#F8F8F2] flex items-center justify-center text-[10px] apple-font-mono transition">
@@ -144,13 +192,46 @@ export function PivotTable({
                   ) : (
                     (() => {
                       const totalRowDimCols = Math.max(1, pivotResult.rowConfigs.length);
-                      if (row.isTotal) return <td colSpan={totalRowDimCols} className="border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 font-bold">总计</td>;
+                      if (row.isTotal) {
+                        return (
+                          <td
+                            colSpan={totalRowDimCols}
+                            style={{
+                              left: chartSpecConfig.stickyRowHeaders ? 0 : undefined,
+                              minWidth: `${totalRowDimCols * 136}px`,
+                            }}
+                            className={`border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 font-bold ${
+                              chartSpecConfig.stickyRowHeaders ? 'sticky left-0 z-10 bg-[#EFECE1] dark:bg-[#1E1F1C] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.45)]' : ''
+                            }`}
+                          >
+                            总计
+                          </td>
+                        );
+                      }
                       const segs = row.rowKey.replace('__SUBTOTAL__', '').split('||');
-                      return segs.map((seg, sIdx) => (
-                        <td key={`${row.rowKey}_${sIdx}`} colSpan={sIdx === segs.length - 1 ? totalRowDimCols - segs.length + 1 : 1} className="border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 whitespace-nowrap">
-                          {seg}
-                        </td>
-                      ));
+                      return segs.map((seg, sIdx) => {
+                        const isEdge = sIdx === segs.length - 1;
+                        const cSpan = isEdge ? totalRowDimCols - segs.length + 1 : 1;
+                        return (
+                          <td
+                            key={`${row.rowKey}_${sIdx}`}
+                            colSpan={cSpan}
+                            style={{
+                              left: chartSpecConfig.stickyRowHeaders ? `${sIdx * 136}px` : undefined,
+                              minWidth: `${cSpan * 136}px`,
+                            }}
+                            className={`border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 whitespace-nowrap ${
+                              chartSpecConfig.stickyRowHeaders
+                                ? `sticky z-10 bg-[#FFFDF7] dark:bg-[#272822] ${
+                                    isEdge ? 'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.45)]' : ''
+                                  }`
+                                : ''
+                            }`}
+                          >
+                            {seg}
+                          </td>
+                        );
+                      });
                     })()
                   )}
 
