@@ -178,12 +178,17 @@ export function FieldShelf({
                         </span>
                         <span className="font-medium text-xs truncate">{field.name}</span>
                       </div>
-                      <div className="flex items-center gap-0.5 opacity-85 group-hover:opacity-100 shrink-0 apple-font-mono">
-                        <button aria-label={`将${field.name}添加为行维度`} onClick={() => addFieldToZone('rows', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] text-[9px] font-semibold transition">+行</button>
-                        <button aria-label={`将${field.name}添加为列维度`} onClick={() => addFieldToZone('columns', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+列</button>
-                        <button aria-label={`将${field.name}添加为数值指标`} onClick={() => addFieldToZone('values', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+值</button>
-                        <button aria-label={`将${field.name}添加为筛选条件`} onClick={() => addFieldToZone('filters', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+筛</button>
-                      </div>
+                      <select aria-label={`添加${field.name}到分析区域`} title={`添加「${field.name}」到分析区域`}
+                        disabled={isReadOnly}
+                        value=""
+                        onChange={(event) => { if (event.target.value) addFieldToZone(event.target.value, field.name); }}
+                        className="max-w-[92px] min-h-8 shrink-0 cursor-pointer rounded-md border border-[#D6D4C8] bg-[#EFECE1] px-2 text-[11px] font-semibold text-[#272822] hover:border-[#66D9EF] focus-visible:outline focus-visible:outline-[#66D9EF] disabled:opacity-40 dark:border-[#49483E] dark:bg-[#272822] dark:text-[#F8F8F2]">
+                        <option value="">＋ 添加</option>
+                        <option value="rows">行维度</option>
+                        <option value="columns">列维度</option>
+                        <option value="values">数值指标</option>
+                        <option value="filters">筛选条件</option>
+                      </select>
                     </div>
                   );
                 })}
