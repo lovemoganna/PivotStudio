@@ -27,3 +27,16 @@ test('default retail chart uses the same values as the pivot cells', () => {
   }
   assert.ok(nonzero > 0, 'chart series must include visible non-zero bars');
 });
+
+test('KPI totals do not invent growth trends from unordered category rows', () => {
+  const ds = RETAIL_TEST_DATASET;
+  const pivot = calculatePivot(ds, buildDefaultPivotConfig(ds));
+  const spec = buildUnifiedChartSpec(ds, pivot, 'bar', {sortMode:'none', topN:0});
+  assert.ok(spec.kpiCards.length > 0);
+  for (const card of spec.kpiCards) {
+    assert.equal(card.comparison, null);
+    assert.equal(card.sparkValues.length, 0);
+    const config = pivot.valConfigs.find(v => v.id === card.id);
+    assert.ok(config, 'KPI must bind to an actual value configuration');
+  }
+});

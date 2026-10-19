@@ -73,22 +73,10 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     const grandVal = pivotResult.displayMatrix[`__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? 0;
     const aggLabel = AGG_METHODS.find((m) => m.value === vc.agg)?.short || vc.agg;
     const unit = UnifiedFormatter.inferUnit(vc);
-    let comparison = null;
-    if (dataRows.length >= 2) {
-      const firstRow = dataRows[0];
-      const secondRow = dataRows[1];
-      const v0 = pivotResult.displayMatrix[`${firstRow.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? 0;
-      const v1 = pivotResult.displayMatrix[`${secondRow.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? 0;
-      if (v1 !== 0) {
-        const diffPct = ((v0 - v1) / Math.abs(v1)) * 100;
-        comparison = {
-          isPositive: diffPct >= 0,
-          pctFormatted: `${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%`,
-          baselineLabel: `${firstRow.label} vs ${secondRow.label}`,
-        };
-      }
-    }
-    const sparkValues = dataRows.slice(0, 12).map((r) => pivotResult.displayMatrix[`${r.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? 0);
+    // Do not infer growth from arbitrary adjacent category rows.
+    // Explicit, validated period-over-period configuration is not available yet.
+    const comparison = null;
+    const sparkValues = [];
     return {
       id: vc.id,
       title: `${vc.field} (${aggLabel})`,
