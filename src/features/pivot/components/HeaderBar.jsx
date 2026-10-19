@@ -52,7 +52,7 @@ export function HeaderBar({
       )}
 
       {/* Top Monokai Pro IDE Header Bar */}
-      <header className="min-h-[64px] py-3 bg-[#F5F3EC] dark:bg-[#24251F] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 sm:px-5 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden z-30 relative">
+      <header data-testid="workbench-header" className="min-h-[64px] py-3 bg-[#F5F3EC] dark:bg-[#24251F] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 sm:px-5 flex flex-wrap items-center justify-between gap-3 shrink-0 print:hidden z-30 relative">
         
 
         <div className="flex items-center gap-3">

@@ -44,9 +44,10 @@ async function run() {
         main:!!document.querySelector('main'),
         header:!!document.querySelector('[data-testid="workbench-header"]')
       }));
+      console.log('viewport inspection',name,JSON.stringify(overflow),JSON.stringify(exceptions));
+      await page.screenshot({path:'test-artifacts/'+name+'.png',fullPage:true});
       assert.ok(overflow.main && overflow.header, name+': missing main/header');
       console.log(name,JSON.stringify({horizontalOverflow:overflow.doc-overflow.viewport,bodyOverflow:overflow.body-overflow.viewport,exceptions}));
-      await page.screenshot({path:'test-artifacts/'+name+'.png',fullPage:true});
       assert.ok(overflow.doc<=overflow.viewport+2,name+': document overflow '+JSON.stringify(overflow));
       if(name==='desktop') {
         const separator = page.getByRole('separator',{name:'调整表图宽度'});
