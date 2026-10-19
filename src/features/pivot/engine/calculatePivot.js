@@ -1,37 +1,23 @@
 import { formatDimensionValue } from '../../../utils/formatters.js';
 
 export function computeAggregation(records, fieldName, aggMethod) {
-  if (!records || records.length === 0) return 0;
-  if (aggMethod === 'count') return records.length;
-  if (aggMethod === 'count_distinct') {
-    const set = new Set();
-    for (let i = 0; i < records.length; i++) {
-      const v = records[i][fieldName];
-      if (v !== null && v !== undefined && v !== '') set.add(String(v));
-    }
-    return set.size;
+  if (!records?.length) return 0;
+  const meaningful = (v) => v !== null && v !== undefined && !(typeof v === 'string' && v.trim() === '');
+  if (aggMethod === 'count') return records.filter((r) => meaningful(r[fieldName])).length;
+  if (aggMethod === 'count_distinct') return new Set(records.map((r) => r[fieldName]).filter(meaningful).map(String)).size;
+  let sum=0,count=0,min=Infinity,max=-Infinity;
+  for (const row of records) {
+    const raw = row[fieldName];
+    if (!meaningful(raw)) continue;
+    const value = typeof raw === 'number' ? raw : Number(String(raw).replace(/,/g,''));
+    if (!Number.isFinite(value)) continue;
+    sum += value; count++;
+    min=Math.min(min,value); max=Math.max(max,value);
   }
-
-  let sum = 0;
-  let validCount = 0;
-  let max = -Infinity;
-  let min = Infinity;
-
-  for (let i = 0; i < records.length; i++) {
-    const num = Number(records[i][fieldName]);
-    if (!Number.isNaN(num)) {
-      sum += num;
-      validCount++;
-      if (num > max) max = num;
-      if (num < min) min = num;
-    }
-  }
-
-  if (validCount === 0) return 0;
-  if (aggMethod === 'sum') return sum;
-  if (aggMethod === 'avg') return sum / validCount;
-  if (aggMethod === 'max') return max;
+  if (!count) return 0;
+  if (aggMethod === 'avg') return sum/count;
   if (aggMethod === 'min') return min;
+  if (aggMethod === 'max') return max;
   return sum;
 }
 

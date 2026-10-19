@@ -1,75 +1,61 @@
-export function splitCSVLine(line) {
-  const res = [];
-  let cur = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+// Quoted commas, embedded newlines and escaped quotes are handled as one CSV record.
+export function parseCSVRecords(text) {
+  const records = [];
+  let row = [], cell = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (i === 0 && ch === '\uFEFF') continue;
     if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        cur += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (ch === ',' && !inQuotes) {
-      res.push(cur.trim());
-      cur = '';
-    } else {
-      cur += ch;
-    }
+      if (quoted && text[i+1] === '"') { cell += '"'; i++; }
+      else if (quoted) quoted = false;
+      else if (cell.length === 0) quoted = true;
+      else cell += ch;
+    } else if (ch === ',' && !quoted) { row.push(cell); cell = ''; }
+    else if ((ch === '\n' || ch === '\r') && !quoted) {
+      if (ch === '\r' && text[i+1] === '\n') i++;
+      row.push(cell);
+      if (row.some((v) => v.trim() !== '')) records.push(row);
+      row = []; cell = '';
+    } else cell += ch;
   }
-  res.push(cur.trim());
-  return res;
+  if (quoted) throw new Error('CSV 存在未闭合的引号');
+  if (cell.length || row.length) {
+    row.push(cell);
+    if (row.some((v) => v.trim() !== '')) records.push(row);
+  }
+  return records;
 }
 
+export function splitCSVLine(line) { return parseCSVRecords(line)[0] || []; }
+
 export function parseCSVTextToSheet(csvText, sheetName = 'Sheet1') {
-  if (!csvText || !csvText.trim()) return null;
-  const lines = csvText
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .split('\n')
-    .filter((l) => l.trim().length > 0);
-  if (lines.length < 2) return null;
-
-  const headers = splitCSVLine(lines[0]).map((h, i) => h || `字段_${i + 1}`);
-  const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = splitCSVLine(lines[i]);
-    const rowObj = {};
-    headers.forEach((h, idx) => {
-      rowObj[h] = cells[idx] ?? '';
-    });
-    rows.push(rowObj);
-  }
-
-  const sampleSize = Math.min(30, rows.length);
-  const fields = headers.map((h) => {
-    let numCount = 0;
-    let dateCount = 0;
-    let boolCount = 0;
-    let nonEmpty = 0;
-
-    for (let i = 0; i < sampleSize; i++) {
-      const raw = String(rows[i][h] ?? '').trim();
-      if (!raw) continue;
-      nonEmpty++;
-      if (/^(true|false|是|否)$/i.test(raw)) {
-        boolCount++;
-      } else if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(raw)) {
-        dateCount++;
-      } else if (!Number.isNaN(Number(raw.replace(/,/g, '')))) {
-        numCount++;
-      }
-    }
-
-    let type = 'text';
-    if (nonEmpty > 0) {
-      if (boolCount / nonEmpty >= 0.7) type = 'boolean';
-      else if (dateCount / nonEmpty >= 0.7) type = 'date';
-      else if (numCount / nonEmpty >= 0.7) type = 'number';
-    }
-    return { name: h, type };
+  if (!csvText?.trim()) return null;
+  const records = parseCSVRecords(csvText);
+  if (records.length < 2) return null;
+  const headers = records[0].map((h,i) => h.trim() || `字段_${i+1}`);
+  if (new Set(headers).size !== headers.length) throw new Error('CSV 表头存在重复字段');
+  const rows = records.slice(1).map((cells) => {
+    const row = {};
+    headers.forEach((h,i) => { row[h] = cells[i] ?? ''; });
+    return row;
   });
-
-  return { name: sheetName, fields, rows };
+  const fields = headers.map((name) => {
+    let number=0,date=0,boolean=0,nonempty=0;
+    for (const row of rows.slice(0,30)) {
+      const raw = String(row[name] ?? '').trim();
+      if (!raw) continue;
+      nonempty++;
+      if (/^(true|false|是|否)$/i.test(raw)) boolean++;
+      else if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(raw)) date++;
+      else if (Number.isFinite(Number(raw.replace(/,/g,'')))) number++;
+    }
+    let type='text';
+    if (nonempty) {
+      if (boolean/nonempty >= 0.7) type='boolean';
+      else if (date/nonempty >= 0.7) type='date';
+      else if (number/nonempty >= 0.7) type='number';
+    }
+    return {name,type};
+  });
+  return {name:sheetName,fields,rows};
 }

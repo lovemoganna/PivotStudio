@@ -1,29 +1,31 @@
-export function generateDuckDBPivotSQL(dataset, pivotConfig) {
-  const tbl = dataset?.id || 'fact_sales_orders';
-  const rowDims = (pivotConfig?.rows || []).map((r) => {
-    if (r.dateGranularity === 'year') return `EXTRACT(YEAR FROM CAST("${r.field}" AS DATE)) AS "${r.field}_year"`;
-    if (r.dateGranularity === 'quarter') return `CONCAT(EXTRACT(YEAR FROM CAST("${r.field}" AS DATE)), '-Q', EXTRACT(QUARTER FROM CAST("${r.field}" AS DATE))) AS "${r.field}_quarter"`;
-    if (r.dateGranularity === 'month') return `STRFTIME(CAST("${r.field}" AS DATE), '%Y-%m') AS "${r.field}_month"`;
-    if (r.numberBin && r.numberBin.step > 0) return `FLOOR(("${r.field}" - ${r.numberBin.start || 0}) / ${r.numberBin.step}) * ${r.numberBin.step} AS "${r.field}_bin"`;
-    return `"${r.field}"`;
+// This module exports a SQL template; it does NOT execute DuckDB.
+const identifier = (x) => '"' + String(x).replace(/"/g,'""') + '"';
+export function generateDuckDBPivotSQL(dataset,pivotConfig) {
+  const dims=[...(pivotConfig?.rows || []),...(pivotConfig?.columns || [])];
+  const expression=(dim)=>{
+    const field=identifier(dim.field);
+    if (dim.dateGranularity==='year') return `EXTRACT(YEAR FROM TRY_CAST(${field} AS DATE))`;
+    if (['quarter','month','week'].includes(dim.dateGranularity)) return `DATE_TRUNC('${dim.dateGranularity}', TRY_CAST(${field} AS DATE))`;
+    if (dim.dateGranularity==='day') return `TRY_CAST(${field} AS DATE)`;
+    if (dim.numberBin?.step>0) {
+      const start=Number(dim.numberBin.start)||0, step=Number(dim.numberBin.step);
+      return `FLOOR((${field} - ${start}) / ${step}) * ${step} + ${start}`;
+    }
+    return field;
+  };
+  const groups=dims.map(expression);
+  const selects=groups.map((exp,i)=>`${exp} AS ${identifier('dim_'+(i+1))}`);
+  const aggs=(pivotConfig?.values || []).map((v,i)=>{
+    const fn=({sum:'SUM',count:'COUNT',count_distinct:'COUNT',avg:'AVG',min:'MIN',max:'MAX'})[v.agg]||'SUM';
+    const field=identifier(v.field);
+    return `${fn}(${v.agg==='count_distinct'?'DISTINCT ':''}${field}) AS ${identifier('measure_'+(i+1))}`;
   });
-
-  const colDims = (pivotConfig?.columns || []).map((c) => {
-    if (c.dateGranularity === 'year') return `EXTRACT(YEAR FROM CAST("${c.field}" AS DATE)) AS "${c.field}_year"`;
-    if (c.dateGranularity === 'quarter') return `CONCAT(EXTRACT(YEAR FROM CAST("${c.field}" AS DATE)), '-Q', EXTRACT(QUARTER FROM CAST("${c.field}" AS DATE))) AS "${c.field}_quarter"`;
-    if (c.dateGranularity === 'month') return `STRFTIME(CAST("${c.field}" AS DATE), '%Y-%m') AS "${c.field}_month"`;
-    if (c.numberBin && c.numberBin.step > 0) return `FLOOR(("${c.field}" - ${c.numberBin.start || 0}) / ${c.numberBin.step}) * ${c.numberBin.step} AS "${c.field}_bin"`;
-    return `"${c.field}"`;
-  });
-
-  const groupCols = [...(pivotConfig?.rows || []).map((r) => `"${r.field}"`), ...(pivotConfig?.columns || []).map((c) => `"${c.field}"`)];
-  const aggExprs = (pivotConfig?.values || []).map((v) => {
-    if (v.agg === 'count') return `COUNT("${v.field}") AS "${v.field}_count"`;
-    if (v.agg === 'count_distinct') return `COUNT(DISTINCT "${v.field}") AS "${v.field}_distinct"`;
-    return `${v.agg.toUpperCase()}("${v.field}") AS "${v.field}_${v.agg}"`;
-  });
-
-  const selectList = [...rowDims, ...colDims, ...(aggExprs.length > 0 ? aggExprs : ['COUNT(*) AS "total_count"'])];
-  const groupByClause = groupCols.length > 0 ? `\nGROUP BY ROLLUP(${groupCols.join(', ')})` : '';
-  return `-- DuckDB In-Memory Analytical Push-down Query\nSELECT\n  ${selectList.join(',\n  ')}\nFROM ${tbl}${groupByClause}\nORDER BY 1 ASC;`;
+  return [
+    '-- SQL TEMPLATE ONLY. No DuckDB runtime is connected in this app.',
+    '-- Import the dataset under the named table before running this SQL.',
+    'SELECT '+[...selects,...(aggs.length?aggs:['COUNT(*) AS "total_count"'])].join(',\n       '),
+    'FROM '+identifier(dataset?.id||'imported_dataset'),
+    ...(groups.length?['GROUP BY ROLLUP('+groups.join(', ')+')']:[]),
+    'ORDER BY 1 ASC;'
+  ].join('\n');
 }
