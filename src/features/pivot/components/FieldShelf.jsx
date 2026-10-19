@@ -49,13 +49,20 @@ export function FieldShelf({
   pivotResult,
   showToast,
 }) {
+  const [mobileToolsOpen, setMobileToolsOpen] = React.useState(false);
   return (
     <>
       <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden relative">
         {/* Left Sidebar: Schema Field Palette & Data Ingestion (Step 5) */}
         {!cinemaTheaterMode && (
-          <aside className="w-full max-h-[36vh] md:max-h-none md:w-64 md:min-h-0 bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-b md:border-b-0 md:border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
-            <div className="space-y-2">
+          <aside className="w-full max-h-[46vh] md:max-h-none md:w-64 md:min-h-0 bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-b md:border-b-0 md:border-r border-[#D6D4C8] dark:border-[#3E3D32] p-2.5 md:p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
+            <button type="button" className="md:hidden flex w-full items-center justify-between gap-3 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-3 py-2.5 text-xs text-left font-semibold"
+              aria-expanded={mobileToolsOpen} aria-controls="pivot-mobile-data-tools"
+              onClick={() => setMobileToolsOpen(p => !p)}>
+              <span className="truncate">数据与字段 · {currentDataset.name}</span>
+              <span className="shrink-0 text-[#0088A3] dark:text-[#66D9EF]">{mobileToolsOpen ? '收起' : '展开'}</span>
+            </button>
+            <div id="pivot-mobile-data-tools" className={`space-y-2 ${mobileToolsOpen ? '' : 'hidden md:block'}`}>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono">
                   ACTIVE_DATASET
@@ -148,7 +155,7 @@ export function FieldShelf({
             </div>
 
             {/* Schema Field List */}
-            <div className="flex-1 flex flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
+            <div className={`flex-1 flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3 ${mobileToolsOpen ? "flex" : "hidden md:flex"}`}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold tracking-tight apple-font-mono">可用字段 ({currentDataset.fields.length})</span>
                 <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">拖拽或点击添加</span>
@@ -190,10 +197,10 @@ export function FieldShelf({
           {!cinemaTheaterMode && (
             <section className="bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 sm:px-4 py-2.5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 shrink-0 print:hidden">
               {[
-                { key: 'filters', label: 'FILTERS // 筛选器', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
-                { key: 'rows', label: 'ROWS // 行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
-                { key: 'columns', label: 'COLUMNS // 列维度', badgeColor: 'text-[#0088A3] dark:text-[#66D9EF]', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
-                { key: 'values', label: 'VALUES // 值指标', badgeColor: 'text-[#C86400] dark:text-[#FD971F]', borderAccent: 'border-l-2 border-l-[#FD971F]' },
+                { key: 'filters', label: '筛选条件', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
+                { key: 'rows', label: '行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
+                { key: 'columns', label: '列维度', badgeColor: 'text-[#0088A3] dark:text-[#66D9EF]', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
+                { key: 'values', label: '数值指标', badgeColor: 'text-[#C86400] dark:text-[#FD971F]', borderAccent: 'border-l-2 border-l-[#FD971F]' },
               ].map((z) => {
                 const items = pivotConfig[z.key] || [];
                 const isOver = dragOverZone === z.key;
@@ -408,7 +415,7 @@ export function FieldShelf({
                 <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#E6DB74]/15 border border-[#E6DB74]/30 text-[#8A7900] dark:text-[#E6DB74] text-[10px] font-medium apple-font-mono">
                   <Sparkles className="w-3 h-3 text-[#FD971F] shrink-0" />
                   <span>
-                    TOP_FOCUS: <strong>{unifiedChartSpec.executiveInsight.topName}</strong> ({unifiedChartSpec.executiveInsight.topFormatted} · {unifiedChartSpec.executiveInsight.sharePct}%)
+                    重点关注：<strong>{unifiedChartSpec.executiveInsight.topName}</strong> ({unifiedChartSpec.executiveInsight.topFormatted} · {unifiedChartSpec.executiveInsight.sharePct}%)
                   </span>
                 </div>
               )}
