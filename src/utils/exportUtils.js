@@ -1,5 +1,6 @@
 import { getDimDisplayLabel, formatCellNumber } from './formatters';
 import * as XLSX from 'xlsx';
+import { escapeCsvField } from './safeCsv.js';
 
 export function exportToCSV(dataset, pivotResult, showToast) {
   const headers = [
@@ -8,7 +9,7 @@ export function exportToCSV(dataset, pivotResult, showToast) {
       pivotResult.valConfigs.map((vc) => `${cg.pathLabels.join('/')}_${vc.field}(${vc.agg})`)
     ),
   ];
-  const lines = [headers.join(',')];
+  const lines = [headers.map((h) => escapeCsvField(h)).join(',')];
   pivotResult.tableRows.forEach((r) => {
     const rowLabels = r.isTotal
       ? ['总计', ...new Array(Math.max(0, pivotResult.rowConfigs.length - 1)).fill('')]
@@ -17,10 +18,10 @@ export function exportToCSV(dataset, pivotResult, showToast) {
     const vals = pivotResult.allColGroups.flatMap((cg) =>
       pivotResult.valConfigs.map((vc) => {
         const cellObj = pivotResult.displayMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`];
-        return `"${String(formatCellNumber(cellObj, vc)).replace(/"/g, '""')}"`;
+        return escapeCsvField(formatCellNumber(cellObj, vc), { untrusted:false });
       })
     );
-    lines.push([...rowLabels.map((l) => `"${String(l).replace(/"/g, '""')}"`), ...vals].join(','));
+    lines.push([...rowLabels.map((label) => escapeCsvField(label)), ...vals].join(','));
   });
   const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -29,7 +30,7 @@ export function exportToCSV(dataset, pivotResult, showToast) {
   a.download = `${dataset.name}_透视表.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast?.('已导出 CSV 文件');
+  showToast?.('CSV 下载已启动');
 }
 
 export function exportToExcelMerged(dataset, pivotResult, showToast) {

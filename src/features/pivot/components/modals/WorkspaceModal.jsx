@@ -163,6 +163,7 @@ export function WorkspaceModal({
                 unescape(
                   encodeURIComponent(
                     JSON.stringify({
+                      ds: activeDatasetId,
                       vm: viewMode,
                       ct: chartType,
                       cf: condFormat,
