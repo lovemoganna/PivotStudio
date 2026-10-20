@@ -1,12 +1,15 @@
 // Chromium integration smoke: DOM interactions and responsive geometry.
 import {spawn} from 'node:child_process';
-import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,writeFile,readdir,readFile} from 'node:fs/promises';
+import * as XLSX from 'xlsx';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const profile=await mkdtemp(join(tmpdir(),'pivotstudio-chrome-'));
+const downloadDir=join(process.cwd(),'artifacts/browser/downloads');
+await mkdir(downloadDir,{recursive:true});
 await mkdir('artifacts/browser',{recursive:true});
 const vite=spawn('npm',['run','dev','--','--host','127.0.0.1'],{stdio:'ignore'});
 let chrome,ws;
@@ -50,6 +53,7 @@ try{
   const clickText=(label)=>evaluate('(() => { const b=[...document.querySelectorAll("button")].find(x=>x.textContent.trim().includes('+JSON.stringify(label)+')); if(!b)return false; b.click(); return true; })()');
   await send('Page.enable');
   await send('Runtime.enable');
+  await send('Page.setDownloadBehavior',{behavior:'allow',downloadPath:downloadDir});
   const navigation=await send('Page.navigate',{url:'http://127.0.0.1:5173/'});
   console.log('BROWSER_NAVIGATION',JSON.stringify(navigation));
   await sleep(2500);
@@ -165,6 +169,24 @@ try{
     const importShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     await writeFile('artifacts/browser/real-csv-import.png',Buffer.from(importShot.data,'base64'));
     console.log('REAL_CSV_IMPORT',JSON.stringify({datasetVisible:importedState.text,pivotHasExpectedTotal:importedState.total.includes('300')}));
+    assert.equal(await clickText('.XLSX'),true,'Excel export button');
+    const xlsxName=await waitFor(async()=>{
+      const files=await readdir(downloadDir);
+      return files.find(name=>name.endsWith('.xlsx'));
+    },'browser XLSX download',15000);
+    const workbook=XLSX.read(await readFile(join(downloadDir,xlsxName)),{type:'buffer'});
+    const exportedRows=XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]],{header:1,defval:''});
+    if(!exportedRows.some(row=>row.some(cell=>Number(cell)===300)))errors.push('downloaded XLSX has no expected total 300');
+    if(!exportedRows.some(row=>row.some(cell=>String(cell)==='华东')))errors.push('downloaded XLSX has no imported Chinese dimension');
+
+    assert.equal(await clickText('.CSV'),true,'CSV export button');
+    const csvName=await waitFor(async()=>{
+      const files=await readdir(downloadDir);
+      return files.find(name=>name.endsWith('.csv'));
+    },'browser CSV download',15000);
+    const csvText=(await readFile(join(downloadDir,csvName))).toString('utf8');
+    if(!csvText.includes('300') || !csvText.includes('华南'))errors.push('downloaded CSV does not preserve imported rows/totals');
+    console.log('REAL_DOWNLOAD_ROUNDTRIP',JSON.stringify({xlsx:xlsxName,xlsxRows:exportedRows.length,csv:csvName,csvBytes:csvText.length}));
   }
   // Read-only preview must not expose active editing affordances.
   assert.equal(await clickText('工作区 ·'),true,'workspace access');

@@ -36,5 +36,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pivotstudio-browser-evidence
-          path: artifacts/browser/*.png
+          path: |
+            artifacts/browser/*.png
+            artifacts/browser/downloads/*.xlsx
+            artifacts/browser/downloads/*.csv
           if-no-files-found: ignore
