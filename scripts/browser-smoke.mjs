@@ -56,18 +56,22 @@ try{
   console.log('BROWSER_BOOT',JSON.stringify(await evaluate('({url:location.href,ready:document.readyState,title:document.title,body:document.body?.innerText.slice(0,500),html:document.documentElement?.outerHTML.slice(0,800)})')));
   await waitFor(async()=>await evaluate("Array.from(document.querySelectorAll('h1')).some(h => h.textContent.includes('PivotStudio'))"),'React app',12000);
   const errors=[];
-  for(const [name,width,height] of [['mobile',390,844],['tablet',768,900],['desktop',1440,900]]){
+  for(const [name,width,height] of [['small-mobile',320,720],['mobile',390,844],['tablet',768,900],['laptop',1024,768],['desktop',1440,900],['wide',1920,1080]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
     await sleep(400);
     const result=await evaluate('(() => { const ch=document.getElementById("pivot-chart-container"); const tb=document.getElementById("pivot-main-html-table"); const sidebar=document.querySelector("aside"); return {pageWidth:document.documentElement.scrollWidth, viewportWidth:innerWidth, chartVisible:!!ch&&ch.getBoundingClientRect().height>0, tableVisible:!!tb&&tb.getBoundingClientRect().height>0, sidebarHeight:sidebar?.getBoundingClientRect().height || 0, datasetLabel:document.body.textContent.includes("数据来源："), appTitle:Array.from(document.querySelectorAll("h1")).find(h=>h.offsetParent!==null)?.textContent||""}; })()');
     if(result.pageWidth>result.viewportWidth+2)errors.push(name+': horizontal overflow '+JSON.stringify(result));
-    if(name==='mobile' && result.sidebarHeight>235)errors.push('mobile sidebar exceeds compact height: '+result.sidebarHeight);
-    if(name==='mobile') {
+    if((name==='mobile'||name==='small-mobile') && result.sidebarHeight>235)errors.push('mobile sidebar exceeds compact height: '+result.sidebarHeight);
+    if(name==='mobile'||name==='small-mobile') {
       const toolbar=await evaluate('(() => { const t=document.querySelector("[role=toolbar]"); if(!t)return null; return {height:t.getBoundingClientRect().height,clientWidth:t.clientWidth,scrollWidth:t.scrollWidth}; })()');
       if(!toolbar || toolbar.height>65)errors.push('mobile toolbar not compact: '+JSON.stringify(toolbar));
       else console.log('MOBILE_TOOLBAR',JSON.stringify(toolbar));
     }
     if(!result.tableVisible||!result.chartVisible||!result.datasetLabel)errors.push(name+': missing work surface '+JSON.stringify(result));
+    const focusIssue=await evaluate('(() => { const nodes=[...document.querySelectorAll("button,select,input")].filter(e=>e.getClientRects().length && !e.disabled); return {count:nodes.length,unnamed:nodes.filter(e=>!((e.getAttribute("aria-label")||e.getAttribute("title")||e.textContent||"").trim())).length}; })()');
+    console.log('VISIBLE_CONTROLS',name,JSON.stringify(focusIssue));
+    if(focusIssue.count===0)errors.push(name+': no accessible controls');
+
     const img=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     await writeFile('artifacts/browser/'+name+'.png',Buffer.from(img.data,'base64'));
     if(name==='mobile') {
