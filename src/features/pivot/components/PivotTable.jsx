@@ -102,6 +102,15 @@ export function PivotTable({
                   return (
                     <th
                       key={rDim.id}
+                      tabIndex={0}
+                      aria-sort={rDim.sort === 'asc' ? 'ascending' : rDim.sort === 'desc' ? 'descending' : 'none'}
+                      title="点击或按 Enter 切换行维度排序"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          toggleDimensionSort('rows', rDim.id);
+                        }
+                      }}
                       onClick={() => toggleDimensionSort('rows', rDim.id)}
                       style={{
                         left: chartSpecConfig.stickyRowHeaders ? `${rIdx * 136}px` : undefined,
@@ -136,7 +145,17 @@ export function PivotTable({
                   const isSortedCol = pivotConfig.valueSort?.colKey === cGroup.key && pivotConfig.valueSort?.valueId === vCfg.id && pivotConfig.valueSort?.direction !== 'none';
                   const isColAxisHovered = hoveredCellTelemetry?.colKey === cGroup.key && hoveredCellTelemetry?.valId === vCfg.id;
                   return (
-                    <th key={`${cGroup.key}_${vCfg.id}`} onClick={() => { soundEngine?.playClick(540); cycleValueColSort(cGroup.key, vCfg.id); }} className={`border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 text-right font-semibold apple-font-mono whitespace-nowrap cursor-pointer transition ${isColAxisHovered ? 'bg-[#FD971F]/20 text-[#C86400] dark:text-[#FD971F]' : 'bg-[#F7F6F0] dark:bg-[#22231E] text-[#C86400] dark:text-[#FD971F] hover:bg-black/[0.03] dark:hover:bg-[#2D2E27]'}`}>
+                    <th key={`${cGroup.key}_${vCfg.id}`}
+                      tabIndex={0}
+                      aria-sort={isSortedCol ? (pivotConfig.valueSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      title="点击或按 Enter 切换指标排序"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          cycleValueColSort(cGroup.key, vCfg.id);
+                        }
+                      }}
+                      onClick={() => { soundEngine?.playClick(540); cycleValueColSort(cGroup.key, vCfg.id); }} className={`border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 text-right font-semibold apple-font-mono whitespace-nowrap cursor-pointer transition ${isColAxisHovered ? 'bg-[#FD971F]/20 text-[#C86400] dark:text-[#FD971F]' : 'bg-[#F7F6F0] dark:bg-[#22231E] text-[#C86400] dark:text-[#FD971F] hover:bg-black/[0.03] dark:hover:bg-[#2D2E27]'}`}>
                       <span className="inline-flex items-center gap-1 justify-end">
                         <span>{vCfg.field} ({aggShort})</span>
                         {isSortedCol && (pivotConfig.valueSort.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-[#A6E22E]" /> : <ArrowDown className="w-3 h-3 text-[#F92672]" />)}
@@ -252,10 +271,35 @@ export function PivotTable({
                       );
                       const isColCrosshair = hoveredCellTelemetry?.colKey === cGroup.key && hoveredCellTelemetry?.valId === vCfg.id;
                       const isExactHovered = isRowCrosshair && isColCrosshair;
+                      const isKeyboardDrill = !row.isTotal && !row.isSubtotal &&
+                        cGroup.key === pivotResult.allColGroups[0]?.key &&
+                        vCfg.id === pivotResult.valConfigs[0]?.id;
+                      const openCellDetail = () => {
+                        soundEngine?.playTransitionChord();
+                        const effectiveRowKey = row.isSubtotal ? row.rowKey.replace('__SUBTOTAL__', '') : row.rowKey;
+                        const rawRecs = pivotResult.cellRecordsMap.get(`${effectiveRowKey}@@${cGroup.key}`) || [];
+                        setDrillSearch?.('');
+                        setDrillPage?.(1);
+                        setDrillDownModal?.({
+                          rowLabel: row.isTotal ? '总计' : row.label,
+                          colLabel: cGroup.isTotal ? '总计' : cGroup.pathLabels.join(' / '),
+                          valLabel: `${vCfg.field} (${vCfg.agg})`,
+                          valueFormatted: formatCellNumber(cellObj, vCfg),
+                          records: rawRecs,
+                        });
+                      };
 
                       return (
                         <td
                           key={cellKey}
+                          tabIndex={isKeyboardDrill ? 0 : undefined}
+                          aria-label={isKeyboardDrill ? `${row.label}，${vCfg.field}，${formatCellNumber(cellObj, vCfg)}。按 Enter 查看原始明细` : undefined}
+                          onKeyDown={isKeyboardDrill ? (event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              openCellDetail();
+                            }
+                          } : undefined}
                           style={colorScaleStyle}
                           onMouseEnter={() => {
                             setHoveredCellTelemetry?.({
@@ -272,14 +316,7 @@ export function PivotTable({
                             });
                           }}
                           onClick={() => { if (!row.isTotal && !row.isSubtotal) { soundEngine?.playClick(520); handleChartPointClick({ rowKey: row.rowKey, name: row.label }); } }}
-                          onDoubleClick={() => {
-                            soundEngine?.playTransitionChord();
-                            const effectiveRowKey = row.isSubtotal ? row.rowKey.replace('__SUBTOTAL__', '') : row.rowKey;
-                            const rawRecs = pivotResult.cellRecordsMap.get(`${effectiveRowKey}@@${cGroup.key}`) || [];
-                            setDrillSearch?.('');
-                            setDrillPage?.(1);
-                            setDrillDownModal?.({ rowLabel: row.isTotal ? '总计' : row.label, colLabel: cGroup.isTotal ? '总计' : cGroup.pathLabels.join(' / '), valLabel: `${vCfg.field} (${vCfg.agg})`, valueFormatted: formatCellNumber(cellObj, vCfg), records: rawRecs });
-                          }}
+                          onDoubleClick={openCellDetail}
                           className={`relative border border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-2 align-middle text-right apple-font-mono whitespace-nowrap cursor-pointer transition-colors ${isTotalCell ? 'font-bold bg-[#EFECE1]/80 dark:bg-[#1E1F1C]/85 text-[#6B38FB] dark:text-[#AE81FF]' : ''} ${isColCrosshair && !isTotalCell ? 'bg-[#66D9EF]/[0.05] dark:bg-[#66D9EF]/[0.07]' : ''} ${isExactHovered ? 'ring-1 ring-inset ring-[#F92672]' : ''} ${isCustomHit ? 'text-[#F92672] font-bold underline decoration-[#F92672]' : ''}`}
                         >
                           {barPct > 0 && (
