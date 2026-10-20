@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Upload, Globe, Server, Zap, GripVertical, ArrowUp, ArrowDown,
-  ArrowUpDown, Filter, RotateCcw, Sparkles, Code2, X
+  ArrowUpDown, Filter, RotateCcw, Sparkles, Code2, X, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { FIELD_TYPES, AGG_METHODS, VISUAL_CHART_TYPES } from '../../../constants/pivotConstants';
 import { parseCSVTextToSheet } from '../../../utils/csvParser';
@@ -51,6 +51,25 @@ export function FieldShelf({
 }) {
   const [showMobileSchema, setShowMobileSchema] = useState(false);
   const [showMobileConfig, setShowMobileConfig] = useState(false);
+  const [isShelfCollapsed, setIsShelfCollapsed] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B')) {
+        const targetTag = e.target?.tagName?.toLowerCase();
+        if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select') return;
+        e.preventDefault();
+        setIsShelfCollapsed((prev) => {
+          const next = !prev;
+          soundEngine?.playClick?.(520);
+          showToast?.(next ? '已收起字段配置架，为表格释放纵向空间 (⌘B)' : '已展开字段配置架 (⌘B)');
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [soundEngine, showToast]);
 
   return (
     <>
@@ -215,7 +234,46 @@ export function FieldShelf({
                 <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileConfig ? '收起' : '展开'}</span>
               </button>
             </div>
-            <section id="pivot-analysis-config" className={`${showMobileConfig ? 'grid' : 'hidden'} lg:grid bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden`}>
+
+            {/* Desktop Collapsed Compact Overview Pill */}
+            {isShelfCollapsed && (
+              <div className="hidden lg:flex bg-[#EFECE1]/85 dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-1.5 items-center justify-between text-xs apple-font-mono shrink-0 select-none animate-apple-modal">
+                <div className="flex items-center gap-2 overflow-x-auto min-w-0 pr-2">
+                  <span className="text-[10px] text-[#75715E] dark:text-[#908E80] font-bold shrink-0">模型结构:</span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#A6E22E]/15 border border-[#A6E22E]/30 text-[#4A7500] dark:text-[#A6E22E] text-[10px] shrink-0 font-semibold">
+                    筛选: {pivotConfig.filters?.length || 0}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#F92672]/15 border border-[#F92672]/30 text-[#F92672] text-[10px] shrink-0 font-semibold truncate max-w-[200px]" title={pivotConfig.rows?.map(r => getDimDisplayLabel(r)).join(' / ') || '无'}>
+                    行: {pivotConfig.rows?.map(r => getDimDisplayLabel(r)).join(' / ') || '无'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-[#0088A3] dark:text-[#66D9EF] text-[10px] shrink-0 font-semibold truncate max-w-[180px]" title={pivotConfig.columns?.map(c => getDimDisplayLabel(c)).join(' / ') || '汇总'}>
+                    列: {pivotConfig.columns?.map(c => getDimDisplayLabel(c)).join(' / ') || '汇总'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[#FD971F]/15 border border-[#FD971F]/30 text-[#C86400] dark:text-[#FD971F] text-[10px] shrink-0 font-semibold truncate max-w-[240px]" title={pivotConfig.values?.map(v => `${v.field}(${v.agg})`).join(' · ') || '无'}>
+                    值: {pivotConfig.values?.map(v => `${v.field}(${v.agg})`).join(' · ') || '无'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => { soundEngine?.playClick(500); setIsShelfCollapsed(false); }}
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-[10px] font-semibold text-[#0088A3] dark:text-[#66D9EF] transition shrink-0 ml-2 shadow-xs"
+                  title="展开字段配置架 (快捷键: ⌘B / Ctrl+B)"
+                >
+                  <ChevronDown className="w-3 h-3" />
+                  <span>展开字段架 (⌘B)</span>
+                </button>
+              </div>
+            )}
+
+            <section id="pivot-analysis-config" className={`${showMobileConfig ? 'grid' : 'hidden'} ${isShelfCollapsed ? 'lg:hidden' : 'lg:grid'} bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden relative`}>
+              {/* Collapse button pinned in upper zone */}
+              <button
+                onClick={() => { soundEngine?.playClick(500); setIsShelfCollapsed(true); }}
+                className="hidden lg:flex items-center gap-1 absolute top-1.5 right-3 px-2 py-0.5 rounded-md bg-[#FFFDF7]/90 dark:bg-[#1E1F1C]/90 border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] text-[9.5px] font-semibold text-[#75715E] dark:text-[#908E80] hover:text-[#F92672] transition z-10 shadow-xs"
+                title="收起字段配置区，为表格释放 150px+ 纵向高度 (快捷键: ⌘B / Ctrl+B)"
+              >
+                <ChevronUp className="w-2.5 h-2.5" />
+                <span>收起配置架 (⌘B)</span>
+              </button>
               {[
                 { key: 'filters', label: '筛选条件', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
                 { key: 'rows', label: '行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },

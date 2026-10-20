@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   ArrowUp, ArrowDown, ArrowUpDown, Sparkles, StretchHorizontal,
-  RotateCcw, Columns, Rows, AlignCenter, AlignLeft, AlignRight, Copy, Check
+  RotateCcw, Columns, Rows, AlignCenter, AlignLeft, AlignRight, Copy, Check,
+  Maximize2, Minimize2
 } from 'lucide-react';
 import { AGG_METHODS } from '../../../constants/pivotConstants';
 import { getColorScaleStyle, formatCellNumber, getDimDisplayLabel } from '../../../utils/formatters';
@@ -33,6 +34,8 @@ export function PivotTable({
   soundEngine,
   tableSettings: propTableSettings,
   setTableSettings: propSetTableSettings,
+  viewMode,
+  setViewMode,
   copyTextToClipboard,
   showToast,
 }) {
@@ -42,21 +45,49 @@ export function PivotTable({
     dataAlignment: 'center', // 'center' | 'left' | 'right' (Default: Centered)
     showZebra: true,
     wrapText: false,
+    showExtremes: true,
     customColWidths: {},
   });
 
   const tableSettings = propTableSettings || localTableSettings;
   const setTableSettings = propSetTableSettings || setLocalTableSettings;
 
-  // Dragging state for column resizing
+  // Dragging state for column resizing & full-height ghost guideline
   const [resizingCol, setResizingCol] = useState(null); // { colKey, startX, startWidth }
+  const [dragClientX, setDragClientX] = useState(null);
   const [copiedCellKey, setCopiedCellKey] = useState(null);
+
+  // Horizontal scroll state for dynamic shadow masks
+  const [scrollState, setScrollState] = useState({ hasLeft: false, hasRight: false });
+
+  const updateScrollState = useCallback(() => {
+    const el = tableContainerRef?.current;
+    if (!el) return;
+    const hasLeft = el.scrollLeft > 4;
+    const hasRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 6;
+    setScrollState((prev) => {
+      if (prev.hasLeft !== hasLeft || prev.hasRight !== hasRight) {
+        return { hasLeft, hasRight };
+      }
+      return prev;
+    });
+  }, [tableContainerRef]);
+
+  useEffect(() => {
+    updateScrollState();
+    const el = tableContainerRef?.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => updateScrollState());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [updateScrollState, tableContainerRef, pivotResult]);
 
   // Global mouse event listeners during column resizing
   useEffect(() => {
     if (!resizingCol) return;
 
     const handleMouseMove = (e) => {
+      setDragClientX(e.clientX);
       const delta = e.clientX - resizingCol.startX;
       const nextWidth = Math.max(64, Math.min(600, resizingCol.startWidth + delta));
       setTableSettings((prev) => ({
@@ -70,7 +101,9 @@ export function PivotTable({
 
     const handleMouseUp = () => {
       setResizingCol(null);
+      setDragClientX(null);
       soundEngine?.playClick?.(480);
+      updateScrollState();
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -79,7 +112,7 @@ export function PivotTable({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [resizingCol, setTableSettings, soundEngine]);
+  }, [resizingCol, setTableSettings, soundEngine, updateScrollState]);
 
   // Width accessor helpers
   const defaultRowColWidth = 136;
@@ -119,6 +152,47 @@ export function PivotTable({
     return tableSettings.customColWidths?.[colKey] || defaultValColWidth;
   };
 
+  // Grand Total Row separation: pinned to sticky tfoot
+  const grandTotalRow = useMemo(() => {
+    return pivotResult.tableRows.find((r) => r.isTotal);
+  }, [pivotResult.tableRows]);
+
+  // Regular body rows (excluding total row which sits pinned in tfoot)
+  const bodyRows = useMemo(() => {
+    return visibleRowWindow.rows.filter((r) => !r.isTotal);
+  }, [visibleRowWindow.rows]);
+
+  // Compute column max & min values across non-total data rows for visual anchors
+  const colExtremesMap = useMemo(() => {
+    const map = {};
+    if (!tableSettings.showExtremes) return map;
+
+    for (const cGroup of pivotResult.allColGroups) {
+      for (const vCfg of pivotResult.valConfigs) {
+        const colKey = `${cGroup.key}_${vCfg.id}`;
+        let maxVal = -Infinity;
+        let minVal = Infinity;
+        let validCount = 0;
+
+        for (const row of pivotResult.tableRows) {
+          if (row.isTotal || row.isSubtotal) continue;
+          const cellKey = `${row.rowKey}@@${cGroup.key}@@${vCfg.id}`;
+          const val = pivotResult.displayMatrix[cellKey]?.display;
+          if (typeof val === 'number' && Number.isFinite(val)) {
+            validCount++;
+            if (val > maxVal) maxVal = val;
+            if (val < minVal) minVal = val;
+          }
+        }
+
+        if (validCount > 1) {
+          map[colKey] = { maxVal, minVal };
+        }
+      }
+    }
+    return map;
+  }, [pivotResult.allColGroups, pivotResult.valConfigs, pivotResult.tableRows, pivotResult.displayMatrix, tableSettings.showExtremes]);
+
   // Resize start handler
   const handleResizeStart = (e, colKey, currentWidth) => {
     e.preventDefault();
@@ -128,6 +202,7 @@ export function PivotTable({
       startX: e.clientX,
       startWidth: currentWidth,
     });
+    setDragClientX(e.clientX);
   };
 
   // Auto-fit all columns
@@ -138,6 +213,7 @@ export function PivotTable({
       ...prev,
       customColWidths: newWidths,
     }));
+    setTimeout(updateScrollState, 50);
     showToast?.('已自动计算并自适应优化全部行高与列宽');
   };
 
@@ -152,6 +228,7 @@ export function PivotTable({
         [colKey]: fitWidth,
       },
     }));
+    setTimeout(updateScrollState, 50);
     showToast?.(`已将该列宽自动调整为 ${fitWidth}px`);
   };
 
@@ -174,6 +251,7 @@ export function PivotTable({
       ...prev,
       customColWidths: nextWidths,
     }));
+    setTimeout(updateScrollState, 50);
     showToast?.(`已均分各指标列宽 (${equalW}px)`);
   };
 
@@ -184,7 +262,22 @@ export function PivotTable({
       ...prev,
       customColWidths: {},
     }));
+    setTimeout(updateScrollState, 50);
     showToast?.('已恢复默认列宽配置');
+  };
+
+  // Toggle table fullscreen / focus mode
+  const handleToggleTableFocus = () => {
+    soundEngine?.playClick?.(560);
+    if (setViewMode) {
+      if (viewMode === 'table') {
+        setViewMode('split');
+        showToast?.('已恢复「表图并列」模式');
+      } else {
+        setViewMode('table');
+        showToast?.('已切换至「全屏专注表格」模式');
+      }
+    }
   };
 
   // Density & Alignment CSS classes
@@ -213,7 +306,7 @@ export function PivotTable({
   }[currentAlignment];
 
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden select-text">
+    <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden select-text relative">
       {/* 0 matching records alert */}
       {pivotResult.filteredCount === 0 && (
         <div className="bg-[#FD971F]/15 border-b border-[#FD971F]/30 px-4 py-2 flex items-center justify-between text-xs shrink-0">
@@ -240,7 +333,7 @@ export function PivotTable({
         </div>
       )}
 
-      {/* 透视表增强控制工具条 (自适应列宽、行高密度、数据居中对齐、斑马纹) */}
+      {/* 透视表增强控制工具条 (自适应列宽、行高密度、数据居中对齐、斑马纹、专注全屏) */}
       <div className="bg-[#EFECE1]/90 dark:bg-[#1E1F1C]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] apple-font-mono shrink-0 select-none">
         {/* Left: Column Width & Row Height & Alignment */}
         <div className="flex flex-wrap items-center gap-2">
@@ -361,8 +454,18 @@ export function PivotTable({
           </div>
         </div>
 
-        {/* Right: Quick Options (Zebra stripes, hints, stats) */}
+        {/* Right: Quick Options (Zebra, Extremes, Focus table toggle) */}
         <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="标注每列最高值(●)与负数语义色">
+            <input
+              type="checkbox"
+              checked={Boolean(tableSettings.showExtremes)}
+              onChange={(e) => setTableSettings((p) => ({ ...p, showExtremes: e.target.checked }))}
+              className="rounded accent-[#A6E22E]"
+            />
+            <span>极值锚点</span>
+          </label>
+
           <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]">
             <input
               type="checkbox"
@@ -372,22 +475,61 @@ export function PivotTable({
             />
             <span>斑马纹</span>
           </label>
-          <span className="text-[10px] text-[#75715E] dark:text-[#908E80] hidden lg:inline">
-            拖拽分界线调宽 · 双击自适应
-          </span>
+
+          {/* Table Focus / Maximize Button */}
+          {setViewMode && (
+            <button
+              onClick={handleToggleTableFocus}
+              className={`p-1 rounded-md border text-[10px] font-semibold transition ${
+                viewMode === 'table'
+                  ? 'bg-[#F92672] text-[#F8F8F2] border-[#F92672]'
+                  : 'bg-[#FFFDF7] dark:bg-[#272822] border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+              }`}
+              title={viewMode === 'table' ? '还原为表图并列模式' : '一键最大化透视表 (全屏专注模式)'}
+            >
+              {viewMode === 'table' ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+            </button>
+          )}
+
           <span className="px-1.5 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.05] text-[9px] text-[#75715E] dark:text-[#908E80]">
             {pivotResult.tableRows.length}行 × {pivotResult.allColGroups.length * Math.max(1, pivotResult.valConfigs.length)}列
           </span>
         </div>
       </div>
 
-      {/* Main Table Container */}
+      {/* Main Table Container with Horizontal Scroll Tracking */}
       <div
         ref={tableContainerRef}
-        onScroll={(e) => setScrollTop?.(e.currentTarget.scrollTop)}
+        onScroll={(e) => {
+          setScrollTop?.(e.currentTarget.scrollTop);
+          updateScrollState();
+        }}
         className="flex-1 h-full min-h-0 overflow-auto relative"
       >
-        <table id="pivot-main-html-table" role="table" aria-label="多维数据透视矩阵表" className="border-separate border-spacing-0 text-[11px] select-text tabular-nums min-w-full">
+        {/* Horizontal Scroll Shadow Masks */}
+        {scrollState.hasLeft && chartSpecConfig.stickyRowHeaders && (
+          <div
+            style={{ left: `${totalRowHeaderWidth}px` }}
+            className="absolute top-0 bottom-0 w-4 pointer-events-none z-25 bg-gradient-to-r from-black/20 dark:from-black/45 to-transparent transition-opacity"
+          />
+        )}
+        {scrollState.hasRight && (
+          <div
+            className="absolute top-0 bottom-0 right-0 w-4 pointer-events-none z-25 bg-gradient-to-l from-black/15 dark:from-black/35 to-transparent transition-opacity"
+          />
+        )}
+
+        {/* Full-height Ghost Guide Line during Column Resizing */}
+        {resizingCol && dragClientX && (
+          <div
+            style={{
+              left: `${dragClientX - (tableContainerRef.current?.getBoundingClientRect().left || 0) + (tableContainerRef.current?.scrollLeft || 0)}px`,
+            }}
+            className="absolute top-0 bottom-0 w-[2px] bg-[#F92672] z-50 pointer-events-none shadow-[0_0_8px_#F92672]"
+          />
+        )}
+
+        <table id="pivot-main-html-table" role="table" className="border-separate border-spacing-0 text-[11px] select-text tabular-nums min-w-full">
           <thead role="rowgroup" className="sticky top-0 z-20 bg-[#EFECE1]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-md text-[#272822] dark:text-[#F8F8F2] shadow-sm">
             {/* Top-level Column Group Headers */}
             {pivotResult.colConfigs.length > 0 && pivotResult.colHeaderRows.length > 0 && (
@@ -395,6 +537,7 @@ export function PivotTable({
                 <tr role="row" key={`col_level_${levelIdx}`}>
                   {levelIdx === 0 && (
                     <th
+                      role="columnheader"
                       colSpan={Math.max(1, pivotResult.rowConfigs.length)}
                       rowSpan={pivotResult.colHeaderRows.length}
                       style={{
@@ -417,6 +560,7 @@ export function PivotTable({
                     const isColCrosshair = hoveredCellTelemetry && hoveredCellTelemetry.colKey.startsWith(hCell.key);
                     return (
                       <th
+                        role="columnheader"
                         key={hCell.key}
                         colSpan={hCell.colSpan}
                         rowSpan={hCell.rowSpan}
@@ -447,6 +591,7 @@ export function PivotTable({
                   })}
                   {levelIdx === 0 && (
                     <th
+                      role="columnheader"
                       colSpan={pivotResult.valConfigs.length}
                       rowSpan={pivotResult.colHeaderRows.length}
                       className="border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#E5E2D5] dark:bg-[#2D2E27] px-3.5 py-2 text-center font-bold text-[#6B38FB] dark:text-[#AE81FF] apple-font-mono whitespace-nowrap"
@@ -469,6 +614,7 @@ export function PivotTable({
 
                   return (
                     <th
+                      role="columnheader"
                       key={rDim.id}
                       tabIndex={0}
                       aria-sort={rDim.sort === 'asc' ? 'ascending' : rDim.sort === 'desc' ? 'descending' : 'none'}
@@ -522,6 +668,7 @@ export function PivotTable({
                 })
               ) : (
                 <th
+                  role="columnheader"
                   style={{
                     width: `${tableSettings.customColWidths?.['row_summary'] || defaultRowColWidth}px`,
                     minWidth: `${tableSettings.customColWidths?.['row_summary'] || defaultRowColWidth}px`,
@@ -546,6 +693,7 @@ export function PivotTable({
 
                   return (
                     <th
+                      role="columnheader"
                       key={valColKey}
                       tabIndex={0}
                       aria-sort={isSortedCol ? (pivotConfig.valueSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
@@ -607,18 +755,17 @@ export function PivotTable({
             {visibleRowWindow.topPadding > 0 && (
               <tr style={{ height: visibleRowWindow.topPadding }}><td colSpan={999} /></tr>
             )}
-            {visibleRowWindow.rows.map((row, rowIdx) => {
+            {bodyRows.map((row, rowIdx) => {
               const isHighlighted = highlightedRowKey === row.rowKey;
               const isRowCrosshair = hoveredCellTelemetry?.rowKey === row.rowKey;
-              const isZebraRow = tableSettings.showZebra && (rowIdx % 2 === 1) && !row.isTotal && !row.isSubtotal && !isHighlighted && !isRowCrosshair;
+              const isZebraRow = tableSettings.showZebra && (rowIdx % 2 === 1) && !row.isSubtotal && !isHighlighted && !isRowCrosshair;
 
               return (
                 <tr
+                  role="row"
                   key={row.isSubtotal ? `${row.rowKey}__sub` : row.rowKey}
                   className={`${
-                    row.isTotal
-                      ? 'bg-[#EFECE1] dark:bg-[#1E1F1C] font-bold text-[#6B38FB] dark:text-[#AE81FF] border-t border-[#ACA99A] dark:border-[#49483E]'
-                      : row.isSubtotal
+                    row.isSubtotal
                       ? 'bg-[#66D9EF]/10 font-semibold text-[#0088A3] dark:text-[#66D9EF]'
                       : isHighlighted
                       ? 'bg-[#AE81FF]/20 dark:bg-[#AE81FF]/25'
@@ -644,7 +791,7 @@ export function PivotTable({
                           rowSpan={hCell.rowSpan}
                           colSpan={hCell.colSpan}
                           onClick={() => {
-                            if (!row.isTotal && !row.isSubtotal) {
+                            if (!row.isSubtotal) {
                               soundEngine?.playClick(500);
                               handleChartPointClick({ rowKey: row.rowKey, name: row.label });
                             }
@@ -659,9 +806,7 @@ export function PivotTable({
                           } ${
                             chartSpecConfig.stickyRowHeaders
                               ? `sticky z-10 ${
-                                  row.isTotal
-                                    ? 'bg-[#EFECE1] dark:bg-[#1E1F1C]'
-                                    : row.isSubtotal
+                                  row.isSubtotal
                                     ? 'bg-[#EDF8FA] dark:bg-[#202728]'
                                     : isHighlighted
                                     ? 'bg-[#F1ECFB] dark:bg-[#2C273A]'
@@ -693,25 +838,6 @@ export function PivotTable({
                   ) : (
                     (() => {
                       const totalRowDimCols = Math.max(1, pivotResult.rowConfigs.length);
-                      if (row.isTotal) {
-                        return (
-                          <td role="rowheader"
-                            colSpan={totalRowDimCols}
-                            style={{
-                              width: `${totalRowHeaderWidth}px`,
-                              minWidth: `${totalRowHeaderWidth}px`,
-                              left: chartSpecConfig.stickyRowHeaders ? 0 : undefined,
-                            }}
-                            className={`border border-[#D6D4C8] dark:border-[#3E3D32] ${densityCellPadding} font-bold ${
-                              chartSpecConfig.stickyRowHeaders
-                                ? 'sticky left-0 z-10 bg-[#EFECE1] dark:bg-[#1E1F1C] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.15)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.45)]'
-                                : ''
-                            }`}
-                          >
-                            总计
-                          </td>
-                        );
-                      }
                       const segs = row.rowKey.replace('__SUBTOTAL__', '').split('||');
                       return segs.map((seg, sIdx) => {
                         const isEdge = sIdx === segs.length - 1;
@@ -721,6 +847,7 @@ export function PivotTable({
 
                         return (
                           <td
+                            role="rowheader"
                             key={`${row.rowKey}_${sIdx}`}
                             colSpan={cSpan}
                             style={{
@@ -752,23 +879,28 @@ export function PivotTable({
                       const cellObj = pivotResult.displayMatrix[cellKey];
                       const stats = pivotResult.statsByValId[vCfg.id] || { min: 0, max: 100 };
                       const val = cellObj?.display ?? 0;
-                      const isTotalCell = row.isTotal || row.isSubtotal || cGroup.isTotal;
+                      const isSubtotalCell = row.isSubtotal || cGroup.isTotal;
                       const isBaseline = cellObj?.isBaseline;
-                      const colorScaleStyle = !isTotalCell && !isBaseline ? getColorScaleStyle(val, stats.min, stats.max, condFormat.colorScale, darkMode) : {};
-                      const barPct = !isTotalCell && !isBaseline && condFormat.showDataBar && stats.max > 0 ? Math.min(100, Math.max(0, (Math.abs(val) / Math.max(Math.abs(stats.max), Math.abs(stats.min) || 1)) * 100)) : 0;
-                      const isCustomHit = !isTotalCell && !isBaseline && condFormat.customRuleEnabled && (
+                      const colorScaleStyle = !isSubtotalCell && !isBaseline ? getColorScaleStyle(val, stats.min, stats.max, condFormat.colorScale, darkMode) : {};
+                      const barPct = !isSubtotalCell && !isBaseline && condFormat.showDataBar && stats.max > 0 ? Math.min(100, Math.max(0, (Math.abs(val) / Math.max(Math.abs(stats.max), Math.abs(stats.min) || 1)) * 100)) : 0;
+                      const isCustomHit = !isSubtotalCell && !isBaseline && condFormat.customRuleEnabled && (
                         (condFormat.customRuleOp === 'gt' && val > Number(condFormat.customRuleValue)) ||
                         (condFormat.customRuleOp === 'lt' && val < Number(condFormat.customRuleValue)) ||
                         (condFormat.customRuleOp === 'eq' && val === Number(condFormat.customRuleValue))
                       );
                       const isColCrosshair = hoveredCellTelemetry?.colKey === cGroup.key && hoveredCellTelemetry?.valId === vCfg.id;
                       const isExactHovered = isRowCrosshair && isColCrosshair;
-                      const isKeyboardDrill = !row.isTotal && !row.isSubtotal &&
+                      const isKeyboardDrill = !row.isSubtotal &&
                         cGroup.key === pivotResult.allColGroups[0]?.key &&
                         vCfg.id === pivotResult.valConfigs[0]?.id;
 
                       const colW = getValColWidth(cGroup.key, vCfg.id);
                       const formattedText = formatCellNumber(cellObj, vCfg);
+
+                      // Column extremes & negative value semantic styling
+                      const extremes = colExtremesMap[`${cGroup.key}_${vCfg.id}`];
+                      const isColMax = extremes && val === extremes.maxVal && val > 0 && !isSubtotalCell;
+                      const isNegative = typeof val === 'number' && val < 0;
 
                       const openCellDetail = () => {
                         soundEngine?.playTransitionChord();
@@ -777,7 +909,7 @@ export function PivotTable({
                         setDrillSearch?.('');
                         setDrillPage?.(1);
                         setDrillDownModal?.({
-                          rowLabel: row.isTotal ? '总计' : row.label,
+                          rowLabel: row.label,
                           colLabel: cGroup.isTotal ? '总计' : cGroup.pathLabels.join(' / '),
                           valLabel: `${vCfg.field} (${vCfg.agg})`,
                           valueFormatted: formattedText,
@@ -790,7 +922,7 @@ export function PivotTable({
                           role="cell"
                           key={cellKey}
                           tabIndex={isKeyboardDrill ? 0 : undefined}
-                          aria-label={`${row.isTotal ? '总计' : row.label}，${cGroup.isTotal ? '行总计' : cGroup.pathLabels.join(' / ')}，${vCfg.field}(${vCfg.agg})：${formattedText}${isKeyboardDrill ? '。双击或按 Enter 查看明细，Alt+单击复制' : ''}`}
+                          aria-label={`${row.label}，${cGroup.isTotal ? '行总计' : cGroup.pathLabels.join(' / ')}，${vCfg.field}(${vCfg.agg})：${formattedText}${isKeyboardDrill ? '。双击查看明细，Alt+单击复制' : ''}`}
                           onKeyDown={isKeyboardDrill ? (event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
@@ -827,16 +959,18 @@ export function PivotTable({
                               }
                               return;
                             }
-                            if (!row.isTotal && !row.isSubtotal) {
+                            if (!row.isSubtotal) {
                               soundEngine?.playClick(520);
                               handleChartPointClick({ rowKey: row.rowKey, name: row.label });
                             }
                           }}
                           onDoubleClick={openCellDetail}
                           className={`relative border border-[#D6D4C8] dark:border-[#3E3D32] ${densityCellPadding} align-middle ${dataTextAlignCls} apple-font-mono ${cellWrapCls} cursor-pointer transition-colors ${
-                            isTotalCell ? 'font-bold bg-[#EFECE1]/80 dark:bg-[#1E1F1C]/85 text-[#6B38FB] dark:text-[#AE81FF]' : ''
+                            isSubtotalCell ? 'font-semibold bg-[#66D9EF]/10 text-[#0088A3] dark:text-[#66D9EF]' : ''
                           } ${
-                            isColCrosshair && !isTotalCell ? 'bg-[#66D9EF]/[0.05] dark:bg-[#66D9EF]/[0.07]' : ''
+                            isNegative ? 'text-[#F92672] dark:text-[#FF5C8A] font-medium' : ''
+                          } ${
+                            isColCrosshair && !isSubtotalCell ? 'bg-[#66D9EF]/[0.05] dark:bg-[#66D9EF]/[0.07]' : ''
                           } ${
                             isExactHovered ? 'ring-2 ring-inset ring-[#F92672]' : ''
                           } ${
@@ -853,9 +987,15 @@ export function PivotTable({
                             />
                           )}
 
-                          {/* Centered Number Label */}
-                          <span className={`relative z-10 inline-block w-full ${dataTextAlignCls} ${isWrapMode ? 'break-words' : 'truncate'}`}>
-                            {formattedText}
+                          {/* Number Label with Column Max Indicator */}
+                          <span className={`relative z-10 inline-flex items-center ${dataFlexAlignCls} w-full ${isWrapMode ? 'break-words' : 'truncate'}`}>
+                            {isColMax && (
+                              <span
+                                className="inline-block w-1.5 h-1.5 rounded-full bg-[#A6E22E] shadow-[0_0_6px_#A6E22E] mr-1 shrink-0"
+                                title="该指标列当前最高峰值 (Max)"
+                              />
+                            )}
+                            <span>{formattedText}</span>
                           </span>
 
                           {/* Instant Feedback on Copy */}
@@ -875,6 +1015,57 @@ export function PivotTable({
               <tr style={{ height: visibleRowWindow.bottomPadding }}><td colSpan={999} /></tr>
             )}
           </tbody>
+
+          {/* Sticky Bottom Grand Total Foot */}
+          {grandTotalRow && (
+            <tfoot role="rowgroup" className="sticky bottom-0 z-20 bg-[#EFECE1] dark:bg-[#1E1F1C] border-t-2 border-[#ACA99A] dark:border-[#49483E] shadow-[0_-3px_8px_rgba(0,0,0,0.12)] dark:shadow-[0_-3px_8px_rgba(0,0,0,0.4)]">
+              <tr role="row" className="font-bold text-[#6B38FB] dark:text-[#AE81FF]">
+                <td
+                  role="rowheader"
+                  colSpan={Math.max(1, pivotResult.rowConfigs.length)}
+                  style={{
+                    width: `${totalRowHeaderWidth}px`,
+                    minWidth: `${totalRowHeaderWidth}px`,
+                    left: chartSpecConfig.stickyRowHeaders ? 0 : undefined,
+                  }}
+                  className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] ${densityCellPadding} ${
+                    chartSpecConfig.stickyRowHeaders
+                      ? 'sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]'
+                      : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>总计 (Grand Total)</span>
+                    <span className="text-[9px] text-[#75715E] dark:text-[#908E80] font-normal font-mono">全量聚合</span>
+                  </div>
+                </td>
+                {pivotResult.allColGroups.map((cGroup) =>
+                  pivotResult.valConfigs.map((vCfg) => {
+                    const cellKey = `${grandTotalRow.rowKey}@@${cGroup.key}@@${vCfg.id}`;
+                    const cellObj = pivotResult.displayMatrix[cellKey];
+                    const colW = getValColWidth(cGroup.key, vCfg.id);
+                    const formattedText = formatCellNumber(cellObj, vCfg);
+
+                    return (
+                      <td
+                        role="cell"
+                        key={`foot_${cellKey}`}
+                        style={{
+                          width: `${colW}px`,
+                          minWidth: `${colW}px`,
+                        }}
+                        className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] ${densityCellPadding} ${dataTextAlignCls} apple-font-mono font-bold text-[#6B38FB] dark:text-[#AE81FF]`}
+                      >
+                        <span className={`block w-full ${dataTextAlignCls} truncate`}>
+                          {formattedText}
+                        </span>
+                      </td>
+                    );
+                  })
+                )}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </div>

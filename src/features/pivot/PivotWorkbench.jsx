@@ -1309,6 +1309,8 @@ export default function PivotWorkbench() {
                 soundEngine={soundEngine}
                 tableSettings={tableSettings}
                 setTableSettings={setTableSettings}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
                 copyTextToClipboard={copyTextToClipboard}
                 showToast={showToast}
               />
