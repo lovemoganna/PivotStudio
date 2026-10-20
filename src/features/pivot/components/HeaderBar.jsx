@@ -52,10 +52,10 @@ export function HeaderBar({
       )}
 
       {/* Top Monokai Pro IDE Header Bar */}
-      <header className="min-h-13 py-2 bg-[#EFECE1]/90 dark:bg-[#272822]/95 backdrop-blur-2xl border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 flex flex-wrap items-center justify-between gap-2.5 shrink-0 print:hidden z-30 relative">
+      <header className="min-h-13 py-2 bg-[#EFECE1]/90 dark:bg-[#272822]/95 backdrop-blur-2xl border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 sm:px-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 lg:gap-2.5 shrink-0 print:hidden z-30 relative">
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#F92672] via-[#FD971F] via-[#E6DB74] via-[#A6E22E] via-[#66D9EF] to-[#AE81FF]" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-[#1E1F1C] border border-[#3E3D32] flex items-center justify-center text-[#F92672] shadow-sm shrink-0 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-[#F92672]/20 via-transparent to-[#66D9EF]/20" />
             <Terminal className="w-4 h-4 text-[#F92672] relative z-10" />
@@ -87,7 +87,7 @@ export function HeaderBar({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div role="toolbar" aria-label="分析工作台工具栏，可横向滚动" className="flex flex-nowrap items-center gap-2 overflow-x-auto lg:overflow-visible max-w-full min-w-0 pb-1 lg:pb-0 [&>*]:shrink-0">
           <button
             onClick={() => { soundEngine?.playClick(640); setShowCommandPalette(true); setCommandQuery(''); }}
             className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#66D9EF] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2] apple-transition"

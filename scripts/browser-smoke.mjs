@@ -62,6 +62,11 @@ try{
     const result=await evaluate('(() => { const ch=document.getElementById("pivot-chart-container"); const tb=document.getElementById("pivot-main-html-table"); const sidebar=document.querySelector("aside"); return {pageWidth:document.documentElement.scrollWidth, viewportWidth:innerWidth, chartVisible:!!ch&&ch.getBoundingClientRect().height>0, tableVisible:!!tb&&tb.getBoundingClientRect().height>0, sidebarHeight:sidebar?.getBoundingClientRect().height || 0, datasetLabel:document.body.textContent.includes("数据来源："), appTitle:Array.from(document.querySelectorAll("h1")).find(h=>h.offsetParent!==null)?.textContent||""}; })()');
     if(result.pageWidth>result.viewportWidth+2)errors.push(name+': horizontal overflow '+JSON.stringify(result));
     if(name==='mobile' && result.sidebarHeight>235)errors.push('mobile sidebar exceeds compact height: '+result.sidebarHeight);
+    if(name==='mobile') {
+      const toolbar=await evaluate('(() => { const t=document.querySelector("[role=toolbar]"); if(!t)return null; return {height:t.getBoundingClientRect().height,clientWidth:t.clientWidth,scrollWidth:t.scrollWidth}; })()');
+      if(!toolbar || toolbar.height>65)errors.push('mobile toolbar not compact: '+JSON.stringify(toolbar));
+      else console.log('MOBILE_TOOLBAR',JSON.stringify(toolbar));
+    }
     if(!result.tableVisible||!result.chartVisible||!result.datasetLabel)errors.push(name+': missing work surface '+JSON.stringify(result));
     const img=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     await writeFile('artifacts/browser/'+name+'.png',Buffer.from(img.data,'base64'));
