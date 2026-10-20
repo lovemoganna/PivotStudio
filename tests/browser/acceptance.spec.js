@@ -77,7 +77,7 @@ test('R3 four-zone drag/drop, aggregations, history and 100k refresh budget',asy
   await page.getByRole('button',{name:'重做',exact:true}).click();
   await expect(page.getByLabel('快捷表计算',{exact:true}).first()).toHaveValue('pct_grand');
   await ready(page);
-  await page.getByTestId('zone-columns').locator('[draggable=true]').first().dragTo(page.getByTestId('zone-rows'));
+  await page.getByTestId('zone-columns').locator('[draggable=true]').first().dragTo(page.getByTestId('zone-rows'),{sourcePosition:{x:8,y:10},targetPosition:{x:8,y:8}});
   await expect(page.getByTestId('zone-rows')).toContainText('渠道');
   await expect(page.getByTestId('zone-columns')).not.toContainText('渠道');
   await page.getByRole('button',{name:'撤销',exact:true}).click();

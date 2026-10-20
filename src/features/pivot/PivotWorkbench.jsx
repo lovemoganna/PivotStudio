@@ -767,7 +767,7 @@ export default function PivotWorkbench() {
           const nextGran = nextGranOrder.find((g) => !usedGrans.has(g));
           if (!nextGran) {
             showToast(`「${fieldName}」的所有日期粒度均已添加`, 'error');
-            return prev;
+            return previous;
           }
           const id = `${zone[0]}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
           showToast(`已添加多级日期分组：「${fieldName} (${nextGran})」`);
@@ -779,7 +779,7 @@ export default function PivotWorkbench() {
           };
         }
         showToast(`「${fieldName}」已存在于该区域`, 'error');
-        return prev;
+        return previous;
       }
 
       const id = `${zone[0]}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;

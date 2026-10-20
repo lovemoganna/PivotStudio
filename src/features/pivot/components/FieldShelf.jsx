@@ -385,7 +385,13 @@ export function FieldShelf({
                           key={field.name}
                           data-testid={`field-${field.name}`}
                           draggable={!isReadOnly}
-                          onDragStart={() => setDraggingPayload({ source: 'fieldList', field: field.name })}
+                          onDragStart={(event) => {
+                            const payload = { source: 'fieldList', field: field.name };
+                            event.dataTransfer.effectAllowed = 'copyMove';
+                            event.dataTransfer.setData('application/x-pivot-field',JSON.stringify(payload));
+                            event.dataTransfer.setData('text/plain',field.name);
+                            setDraggingPayload(payload);
+                          }}
                           onDragEnd={() => { setDraggingPayload(null); setDragOverZone(null); }}
                           onClick={(e) => {
                             if (e.target.tagName.toLowerCase() !== 'button') {
@@ -483,18 +489,21 @@ export function FieldShelf({
                         onDrop={(e) => {
                           e.preventDefault();
                           setDragOverZone(null);
-                          if (draggingPayload?.field) {
-                            if (draggingPayload.source && draggingPayload.source !== 'fieldList' && draggingPayload.source !== z.key && draggingPayload.itemId) {
+                          let payload = draggingPayload;
+                          try { const serialized = e.dataTransfer.getData('application/x-pivot-field'); if (serialized) payload = JSON.parse(serialized); } catch { /* Ignore unrelated external drags. */ }
+                          if (!currentDataset?.fields?.some((field) => field.name === payload?.field)) return;
+                          if (payload?.field) {
+                            if (payload.source && payload.source !== 'fieldList' && payload.source !== z.key && payload.itemId) {
                               const targetList = pivotConfig[z.key] || [];
-                              const fMeta = currentDataset?.fields?.find((f) => f.name === draggingPayload.field);
-                              if (z.key !== 'values' && fMeta?.type !== 'date' && targetList.some((it) => it.field === draggingPayload.field)) {
-                                showToast?.(`目标区域已存在「${draggingPayload.field}」`, 'error');
+                              const fMeta = currentDataset?.fields?.find((f) => f.name === payload.field);
+                              if (z.key !== 'values' && fMeta?.type !== 'date' && targetList.some((it) => it.field === payload.field)) {
+                                showToast?.(`目标区域已存在「${payload.field}」`, 'error');
                                 setDraggingPayload(null);
                                 return;
                               }
                             }
-                            if (draggingPayload.source !== z.key) {
-                              addFieldToZone(z.key, draggingPayload.field, draggingPayload);
+                            if (payload.source !== z.key) {
+                              addFieldToZone(z.key, payload.field, payload);
                             }
                           }
                           setDraggingPayload(null);
@@ -526,7 +535,11 @@ export function FieldShelf({
                                   draggable={!isReadOnly}
                                   onDragStart={(e) => {
                                     e.stopPropagation();
-                                    setDraggingPayload({ source: z.key, field: it.field, itemId: it.id, index: itemIdx });
+                                    const payload = { source: z.key, field: it.field, itemId: it.id, index: itemIdx };
+                                    e.dataTransfer.effectAllowed = 'move';
+                                    e.dataTransfer.setData('application/x-pivot-field',JSON.stringify(payload));
+                                    e.dataTransfer.setData('text/plain',it.field);
+                                    setDraggingPayload(payload);
                                   }}
                                   onDragEnd={() => {
                                     setDraggingPayload(null);
