@@ -162,7 +162,7 @@ export function FieldShelf({
             </aside>
           ) : (
             /* Expanded Full Sidebar */
-            <aside className="w-full md:w-80 lg:w-84 max-h-[310px] md:max-h-none md:h-full bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-2 sm:p-2.5 md:p-3 flex flex-col gap-1.5 md:gap-2.5 shrink-0 print:hidden overflow-y-auto transition-all duration-200">
+            <aside className="w-full md:w-80 lg:w-84 max-h-[310px] md:max-h-none md:h-full bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-1.5 md:p-3 flex flex-col gap-1 md:gap-2.5 shrink-0 print:hidden overflow-y-auto transition-all duration-200">
               {/* Header: Title + Collapse Action (Hidden on mobile to keep compact) */}
               <div className="hidden md:flex items-center justify-between pb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/60">
                 <div className="flex items-center gap-1.5">
@@ -193,7 +193,7 @@ export function FieldShelf({
               </div>
 
               {/* Dataset Ingestion & Selection */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
                   <select
                     aria-label="选择当前数据集"
@@ -215,7 +215,7 @@ export function FieldShelf({
                         setActiveDatasetId(nextId);
                       }
                     }}
-                    className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-xs font-medium text-[#272822] dark:text-[#E6DB74] apple-font-mono focus:outline-none focus:border-[#F92672]"
+                    className="flex-1 min-w-0 px-2 py-1 md:py-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-xs font-medium text-[#272822] dark:text-[#E6DB74] apple-font-mono focus:outline-none focus:border-[#F92672]"
                   >
                     {datasets.length === 0 && (
                       <option value="">-- 暂无数据集 --</option>
@@ -246,7 +246,7 @@ export function FieldShelf({
                 </div>
 
                 <div className="flex gap-1.5">
-                  <label className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg focus-within:ring-2 focus-within:ring-[#66D9EF] border border-dashed border-[#ACA99A] dark:border-[#75715E] bg-[#FFFDF7]/60 dark:bg-[#1E1F1C]/70 hover:border-[#F92672] dark:hover:border-[#F92672] cursor-pointer text-[10.5px] font-medium transition ${isReadOnly ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <label className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1 md:py-1.5 rounded-lg focus-within:ring-2 focus-within:ring-[#66D9EF] border border-dashed border-[#ACA99A] dark:border-[#75715E] bg-[#FFFDF7]/60 dark:bg-[#1E1F1C]/70 hover:border-[#F92672] dark:hover:border-[#F92672] cursor-pointer text-[10.5px] font-medium transition ${isReadOnly ? 'opacity-40 pointer-events-none' : ''}`}>
                     <Upload className="w-3.5 h-3.5 text-[#F92672] shrink-0" />
                     <span className="truncate">上传 CSV / Excel</span>
                     <input type="file" accept=".csv,.txt,.xls,.xlsx" onChange={handleFileUpload} className="hidden" disabled={isReadOnly} />
@@ -272,7 +272,7 @@ export function FieldShelf({
                         });
                       }
                     }}
-                    className="px-2 py-1.5 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
+                    className="px-2 py-1 md:py-1.5 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
                     title="无需本地文件，一键加载内置零售样例以体验字段类型推断与预览"
                   >
                     样例预览
@@ -308,13 +308,13 @@ export function FieldShelf({
               </div>
 
               {/* Mobile Accordion Toggle for Field Schema */}
-              <div className="md:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-1">
+              <div className="md:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-0.5">
                 <button
                   type="button"
                   aria-expanded={showMobileSchema}
                   aria-controls="pivot-schema-fields"
                   onClick={() => setShowMobileSchema((expanded) => !expanded)}
-                  className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-3 py-1.5 text-left text-[11px] font-semibold flex items-center justify-between"
+                  className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 text-left text-[11px] font-semibold flex items-center justify-between"
                 >
                   <span>字段列表（{currentDataset?.fields?.length || 0}）</span>
                   <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileSchema ? '收起' : '展开'}</span>
@@ -453,13 +453,13 @@ export function FieldShelf({
               </div>
 
               {/* Mobile Accordion Toggle for Pivot Analysis Config */}
-              <div className="md:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-1">
+              <div className="md:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-0.5">
                 <button
                   type="button"
                   aria-expanded={showMobileConfig}
                   aria-controls="pivot-analysis-config"
                   onClick={() => setShowMobileConfig((expanded) => !expanded)}
-                  className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-3 py-1.5 text-left text-[11px] font-semibold flex items-center justify-between"
+                  className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 text-left text-[11px] font-semibold flex items-center justify-between"
                 >
                   <span>分析配置 · 行 / 列 / 值 / 筛选</span>
                   <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileConfig ? '收起' : '展开'}</span>
