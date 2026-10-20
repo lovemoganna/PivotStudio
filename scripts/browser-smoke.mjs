@@ -246,9 +246,19 @@ try{
   if(!perf.rows || !perf.chartVisible)errors.push('100k browser workbench not ready');
   console.log('BROWSER_100K_MEASUREMENT',JSON.stringify({wallTimeMs:largeWallMs,...perf,note:'Synthetic records, CI Chromium only; no performance SLA'}));
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    try {
+      await writeFile(process.env.GITHUB_STEP_SUMMARY, `## Smoke Test Summary\n\nErrors (${errors.length}):\n${errors.map(e => '- ' + e).join('\n')}\n`);
+    } catch {}
+  }
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){
   console.error('BROWSER_SMOKE_ERROR',error);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    try {
+      await writeFile(process.env.GITHUB_STEP_SUMMARY, `## Smoke Test Exception\n\n\`\`\`\n${error?.stack || error}\n\`\`\`\n\nErrors list (${errors?.length || 0}):\n${(errors||[]).join('\n')}\n`);
+    } catch {}
+  }
   throw error;
 }finally{
   try{ws?.close()}catch{}
