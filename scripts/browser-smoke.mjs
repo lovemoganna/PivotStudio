@@ -176,7 +176,7 @@ try{
     },'browser XLSX download',15000);
     const workbook=XLSX.read(await readFile(join(downloadDir,xlsxName)),{type:'buffer'});
     const exportedRows=XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]],{header:1,defval:''});
-    if(!exportedRows.some(row=>row.some(cell=>Number(cell)===300)))errors.push('downloaded XLSX has no expected total 300');
+    if(!exportedRows.some(row=>row.some(cell=>cell===300 && typeof cell==='number')))errors.push('downloaded XLSX lacks a real numeric total cell of 300');
     if(!exportedRows.some(row=>row.some(cell=>String(cell)==='华东')))errors.push('downloaded XLSX has no imported Chinese dimension');
 
     assert.equal(await clickText('.CSV'),true,'CSV export button');
