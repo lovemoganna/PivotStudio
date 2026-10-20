@@ -256,7 +256,7 @@ export function ChartStudio({
       </div>}
 
       {/* Main Chart Canvas */}
-      <div className="flex-1 w-full h-full min-h-[260px] flex items-center justify-center overflow-hidden">
+      <div className="flex-1 w-full h-full min-h-0 flex items-center justify-center overflow-hidden">
         {!unifiedChartSpec.hasValues ? (
           <div className="flex flex-col items-center justify-center p-8 text-center apple-font-mono animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-[#FD971F]/10 border border-[#FD971F]/30 flex items-center justify-center mb-3 text-[#FD971F] shadow-sm">
@@ -269,7 +269,7 @@ export function ChartStudio({
               当前透视配置中缺少度量值。请在左侧字段架中点击或拖拽数值字段至【指标 / 值 (Values)】区域以生成图表。
             </p>
             <div className="px-3 py-1 rounded-full bg-[#3E3D32]/40 text-[10px] text-[#A6E22E] border border-[#A6E22E]/30">
-              提示: 可拖入销售额、数量或将任意维度设为计数(COUNT)
+              提示: 可在左侧点击或拖入数值指标，或将任意维度加入值区域设为计数 (COUNT)
             </div>
           </div>
         ) : unifiedChartSpec.items.length === 0 ? (
@@ -318,7 +318,7 @@ export function ChartStudio({
             })}
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%" minHeight={260}>
+          <ResponsiveContainer width="100%" height="100%" minHeight={160}>
             {chartType === 'line' ? (
               <LineChart data={unifiedChartSpec.items} margin={{ top: 24, right: 24, left: 10, bottom: unifiedChartSpec.items.length > 5 ? 44 : 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />

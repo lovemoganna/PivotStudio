@@ -9,6 +9,7 @@ export function TestSuiteModal({
   liveEngineTestResults,
   isReadOnly,
   setActiveDatasetId,
+  setDatasets,
   setPivotConfig,
   soundEngine,
   showToast,
@@ -54,6 +55,12 @@ export function TestSuiteModal({
               <button
                 disabled={isReadOnly}
                 onClick={() => {
+                  if (setDatasets) {
+                    setDatasets((prev) => {
+                      if (prev.some((d) => d.id === RETAIL_TEST_DATASET.id)) return prev;
+                      return [RETAIL_TEST_DATASET, ...prev];
+                    });
+                  }
                   setActiveDatasetId(RETAIL_TEST_DATASET.id);
                   setPivotConfig((prev) => ({
                     ...prev,

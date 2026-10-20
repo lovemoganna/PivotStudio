@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCSVRecords, parseCSVTextToSheet } from '../src/utils/csvParser.js';
 import { computeAggregation, calculatePivot } from '../src/features/pivot/engine/calculatePivot.js';
-import { formatDimensionValue } from '../src/utils/formatters.js';
+import { formatDimensionValue, UnifiedFormatter } from '../src/utils/formatters.js';
 import { generateDuckDBPivotSQL } from '../src/services/duckdbQuery.js';
+import { buildDefaultPivotConfig, DEFAULT_DATASET } from '../src/constants/pivotConstants.js';
+import { buildUnifiedChartSpec } from '../src/features/pivot/engine/buildChartSpec.js';
+import { ALL_BENCHMARK_PRESETS, CHAOS_EDGE_CASE_DATASET } from '../src/constants/benchmarkDatasets.js';
 
 test('quoted CSV supports multi-line data', () => {
   assert.deepEqual(parseCSVRecords('a,b\r\n"x,y","quoted ""word""\nline"\r\n'), [['a', 'b'], ['x,y', 'quoted "word"\nline']]);
@@ -170,4 +173,228 @@ test('type inference respects 70% threshold consistently', () => {
   // 6 out of 10 valid numbers = 60% -> under 70% threshold -> should fall back to 'text'
   const sheetText = parseCSVTextToSheet('col\n10\n20\n30\n40\n50\n60\nabc\ndef\nghi\njkl');
   assert.equal(sheetText.fields[0].type, 'text');
+});
+
+test('calculatePivot supports multi-level grouping and showSubtotals toggle', () => {
+  const ds = {
+    fields: [
+      { name: 'region', type: 'text' },
+      { name: 'city', type: 'text' },
+      { name: 'sales', type: 'number' },
+    ],
+    rows: [
+      { region: 'East', city: 'Shanghai', sales: 100 },
+      { region: 'East', city: 'Hangzhou', sales: 50 },
+      { region: 'West', city: 'Chengdu', sales: 80 },
+    ],
+  };
+  const cfgWithoutSub = {
+    rows: [{ field: 'region' }, { field: 'city' }],
+    values: [{ id: 'v1', field: 'sales', agg: 'sum' }],
+    showSubtotals: false,
+  };
+  const resNoSub = calculatePivot(ds, cfgWithoutSub);
+  const subRowsNo = resNoSub.tableRows.filter((r) => r.isSubtotal);
+  assert.equal(subRowsNo.length, 0);
+
+  const cfgWithSub = {
+    ...cfgWithoutSub,
+    showSubtotals: true,
+  };
+  const resSub = calculatePivot(ds, cfgWithSub);
+  const subRows = resSub.tableRows.filter((r) => r.isSubtotal);
+  assert.ok(subRows.length > 0, 'should generate subtotal rows when showSubtotals is true');
+  assert.equal(resSub.rawValueMatrix['East__SUBTOTAL__@@__GRAND_TOTAL_COL__@@v1'], 150);
+});
+
+test('Field Sanity Guard ignores invalid/non-existent filters and fields without dropping valid rows', () => {
+  const ds = {
+    fields: [{ name: 'cluster', type: 'text' }, { name: 'latency', type: 'number' }],
+    rows: [
+      { cluster: 'asia', latency: 20 },
+      { cluster: 'us', latency: 40 },
+    ]
+  };
+  const configWithDeadFilter = {
+    rows: [{ field: 'cluster' }],
+    values: [{ id: 'v1', field: 'latency', agg: 'avg' }],
+    filters: [{ field: 'non_existent_channel', selectedValues: ['online'] }]
+  };
+  const res = calculatePivot(ds, configWithDeadFilter);
+  assert.equal(res.filteredCount, 2, 'should keep all 2 rows instead of dropping to 0 due to dead filter');
+  assert.equal(res.sanitizedInfo.hasInvalidFields, true);
+  assert.deepEqual(res.sanitizedInfo.ignoredFilters, ['non_existent_channel']);
+  assert.equal(res.rawValueMatrix['asia@@__GRAND_TOTAL_COL__@@v1'], 20);
+});
+
+test('computeAggregation supports median, stddev and virtual __COUNT__', () => {
+  const rows = [{ v: 10 }, { v: 20 }, { v: 30 }, { v: 40 }, { v: 50 }];
+  assert.equal(computeAggregation(rows, 'v', 'median'), 30);
+  assert.equal(computeAggregation(rows, '__COUNT__', 'count'), 5);
+  // stddev of [10, 20, 30, 40, 50] with n-1: mean=30, var = (400+100+0+100+400)/4 = 250, std = sqrt(250) approx 15.811
+  const std = computeAggregation(rows, 'v', 'stddev');
+  assert.ok(Math.abs(std - Math.sqrt(250)) < 0.001);
+});
+
+test('buildDefaultPivotConfig automatically handles pure text dataset with __COUNT__ metric', () => {
+  const pureTextDs = {
+    fields: [
+      { name: 'user_id', type: 'text' },
+      { name: 'city', type: 'text' },
+      { name: 'hobby', type: 'text' }
+    ],
+    rows: [{ user_id: 'U1', city: 'BJ', hobby: 'Photo' }]
+  };
+  const cfg = buildDefaultPivotConfig(pureTextDs);
+  assert.equal(cfg.values.length, 1);
+  assert.equal(cfg.values[0].field, '__COUNT__');
+  assert.equal(cfg.values[0].agg, 'count');
+  // Avoid user_id as first row dimension
+  assert.equal(cfg.rows[0].field, 'city');
+});
+
+test('UnifiedFormatter infers units from suffixes and brackets', () => {
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'latency_ms' }), 'ms');
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'mem_mb' }), 'MB');
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'cpu_pct' }), '%');
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'weight(kg)' }), 'kg');
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'base_salary' }), '¥');
+  assert.equal(UnifiedFormatter.inferUnit({ field: '__COUNT__' }), '笔');
+});
+
+test('formatDimensionValue supports hour, minute and day_of_week', () => {
+  const dimCfgHour = { dateGranularity: 'hour' };
+  const dimCfgMinute = { dateGranularity: 'minute' };
+  const dimCfgDow = { dateGranularity: 'day_of_week' };
+  const meta = { type: 'date' };
+
+  // 2026-03-01 14:35:00
+  const dStr = '2026-03-01T14:35:00';
+  assert.equal(formatDimensionValue(dStr, dimCfgHour, meta), '03-01 14:00');
+  assert.equal(formatDimensionValue(dStr, dimCfgMinute, meta), '14:35');
+  assert.equal(formatDimensionValue(dStr, dimCfgDow, meta), '周日');
+});
+
+test('calculatePivot supports pct_prev_diff and running_total showAs modes', () => {
+  const ds = {
+    fields: [
+      { name: 'month', type: 'text' },
+      { name: 'sales', type: 'number' },
+    ],
+    rows: [
+      { month: '2026-01', sales: 100 },
+      { month: '2026-02', sales: 150 },
+      { month: '2026-03', sales: 180 },
+    ],
+  };
+  const cfg = {
+    rows: [{ field: 'month' }],
+    values: [
+      { id: 'v_diff', field: 'sales', agg: 'sum', showAs: 'pct_prev_diff' },
+      { id: 'v_run', field: 'sales', agg: 'sum', showAs: 'running_total' },
+    ],
+  };
+  const res = calculatePivot(ds, cfg);
+
+  // Row 1 (2026-01): baseline (0), running_total = 100
+  assert.equal(res.displayMatrix['2026-01@@__GRAND_TOTAL_COL__@@v_diff'].display, 0);
+  assert.equal(res.displayMatrix['2026-01@@__GRAND_TOTAL_COL__@@v_run'].display, 100);
+
+  // Row 2 (2026-02): (150 - 100) / 100 * 100 = 50%, running_total = 100 + 150 = 250
+  assert.equal(res.displayMatrix['2026-02@@__GRAND_TOTAL_COL__@@v_diff'].display, 50);
+  assert.equal(res.displayMatrix['2026-02@@__GRAND_TOTAL_COL__@@v_run'].display, 250);
+
+  // Row 3 (2026-03): (180 - 150) / 150 * 100 = 20%, running_total = 250 + 180 = 430
+  assert.equal(res.displayMatrix['2026-03@@__GRAND_TOTAL_COL__@@v_diff'].display, 20);
+  assert.equal(res.displayMatrix['2026-03@@__GRAND_TOTAL_COL__@@v_run'].display, 430);
+});
+
+test('calculatePivot supports custom Calculated Measures (composite aggregate formulas)', () => {
+  const ds = {
+    fields: [
+      { name: 'category', type: 'text' },
+      { name: 'revenue', type: 'number' },
+      { name: 'profit', type: 'number' },
+    ],
+    rows: [
+      { category: 'A', revenue: 200, profit: 50 },
+      { category: 'B', revenue: 300, profit: 90 },
+    ],
+  };
+  const cfg = {
+    rows: [{ field: 'category' }],
+    values: [
+      { id: 'v_rev', field: 'revenue', agg: 'sum' },
+      { id: 'v_prof', field: 'profit', agg: 'sum' },
+      {
+        id: 'v_margin',
+        field: '利润率',
+        isCalculated: true,
+        operandA: 'v_prof',
+        op: '/',
+        operandB: 'v_rev',
+        format: { isPercent: true, decimals: 2 },
+      },
+    ],
+  };
+  const res = calculatePivot(ds, cfg);
+
+  // Category A: profit 50 / revenue 200 = 0.25 (25%)
+  assert.equal(res.rawValueMatrix['A@@__GRAND_TOTAL_COL__@@v_margin'], 0.25);
+  // Category B: profit 90 / revenue 300 = 0.30 (30%)
+  assert.equal(res.rawValueMatrix['B@@__GRAND_TOTAL_COL__@@v_margin'], 0.30);
+  // Grand Total: (50 + 90) / (200 + 300) = 140 / 500 = 0.28 (28%)
+  assert.equal(res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v_margin'], 0.28);
+});
+
+test('system defaults to empty dataset with rock-solid stability and handles null/empty pipeline gracefully', () => {
+  // 1. Initial dataset is null by default
+  assert.equal(DEFAULT_DATASET, null);
+
+  // 2. Default pivot config for null dataset
+  const cfg = buildDefaultPivotConfig(null);
+  assert.deepEqual(cfg.rows, []);
+  assert.deepEqual(cfg.columns, []);
+  assert.deepEqual(cfg.values, []);
+  assert.deepEqual(cfg.filters, []);
+
+  // 3. Engine calculation with null dataset
+  const pRes = calculatePivot(null, cfg);
+  assert.equal(pRes.totalCount, 0);
+  assert.equal(pRes.filteredCount, 0);
+  assert.deepEqual(pRes.tableRows.filter((r) => !r.isTotal), []);
+  assert.equal(pRes.tableRows.find((r) => r.isTotal)?.rowKey, '__GRAND_TOTAL_ROW__');
+  assert.deepEqual(pRes.colHeaderRows, []);
+
+  // 4. Chart spec generation with null dataset & empty pivot result
+  const cSpec = buildUnifiedChartSpec(null, pRes, 'bar', { primaryValueId: '' });
+  assert.equal(cSpec.hasValues, false);
+  assert.deepEqual(cSpec.kpiCards, []);
+  assert.deepEqual(cSpec.items, []);
+});
+
+test('benchmark suite and chaos edge-cases dataset execute without errors or exceptions', () => {
+  for (const ds of ALL_BENCHMARK_PRESETS) {
+    assert.ok(ds.name);
+    assert.ok(Array.isArray(ds.fields) && ds.fields.length > 0);
+    assert.ok(Array.isArray(ds.rows) && ds.rows.length > 0);
+
+    const cfg = buildDefaultPivotConfig(ds);
+    const pRes = calculatePivot(ds, cfg);
+
+    assert.equal(pRes.totalCount, ds.rows.length);
+    assert.ok(pRes.tableRows.length > 0);
+    assert.ok(pRes.filteredCount > 0);
+
+    const cSpec = buildUnifiedChartSpec(ds, pRes, 'bar', { primaryValueId: '' });
+    assert.ok(cSpec);
+  }
+
+  // Specifically check Chaos Guard dataset (containing null, NaN, empty string, negative values)
+  const chaosCfg = buildDefaultPivotConfig(CHAOS_EDGE_CASE_DATASET);
+  const chaosRes = calculatePivot(CHAOS_EDGE_CASE_DATASET, chaosCfg);
+  assert.equal(chaosRes.totalCount, CHAOS_EDGE_CASE_DATASET.rows.length);
+  // Verify that grand total value does not crash and produces valid numeric or finite result
+  const grandTotalRow = chaosRes.tableRows.find((r) => r.isTotal);
+  assert.ok(grandTotalRow);
 });

@@ -10,7 +10,7 @@ export function exportToCSV(dataset, pivotResult, showToast) {
   try {
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = dataset.name + '_透视表.csv';
+    anchor.download = (dataset?.name || '数据') + '_透视表.csv';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -39,7 +39,7 @@ export function exportToExcelMerged(dataset, pivotResult, showToast) {
       const sheet = XLSX.utils.aoa_to_sheet(rows);
       XLSX.utils.book_append_sheet(workbook, sheet, '透视表');
     }
-    XLSX.writeFile(workbook, dataset.name + '_透视表.xlsx', { compression: true });
+    XLSX.writeFile(workbook, (dataset?.name || '数据') + '_透视表.xlsx', { compression: true });
     showToast?.(fullTableRendered ? '已导出 Excel 工作簿（保留表头合并）' : '已导出完整 Excel 工作簿（扁平表头）');
   } catch {
     showToast?.('XLSX 导出失败，请检查透视表内容', 'error');
@@ -48,7 +48,7 @@ export function exportToExcelMerged(dataset, pivotResult, showToast) {
 
 export function exportChartAsPNG(dataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast) {
   if (viewMode === 'table') {
-    showToast?.('请先切换到「表图并列」或「仅图表」视图再导出图表', 'error');
+    showToast?.('请先切换到「表图上下」或「仅图表」视图再导出图表', 'error');
     return;
   }
   if (!unifiedChartSpec || unifiedChartSpec.items.length === 0) {
@@ -64,7 +64,7 @@ export function exportChartAsPNG(dataset, unifiedChartSpec, chartType, darkMode,
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = darkMode ? '#F8F8F2' : '#272822';
     ctx.font = 'bold 16px "JetBrains Mono", "Noto Sans SC", monospace, sans-serif';
-    ctx.fillText(`${dataset.name} — 锥形转化漏斗图 (${unifiedChartSpec.primarySeriesKey})`, 32, 42);
+    ctx.fillText(`${dataset?.name || '数据'} — 锥形转化漏斗图 (${unifiedChartSpec.primarySeriesKey})`, 32, 42);
     unifiedChartSpec.funnelItems.forEach((fItem, idx) => {
       const y = 76 + idx * 54;
       ctx.fillStyle = darkMode ? '#F8F8F2' : '#272822';
@@ -88,7 +88,7 @@ export function exportChartAsPNG(dataset, unifiedChartSpec, chartType, darkMode,
     const url = canvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${dataset.name}_漏斗图.png`;
+    a.download = `${dataset?.name || '数据'}_漏斗图.png`;
     a.click();
     showToast?.('已导出高清 PNG 漏斗图文件');
     return;
@@ -104,7 +104,7 @@ export function exportChartAsPNG(dataset, unifiedChartSpec, chartType, darkMode,
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${dataset.name}_透视图表.svg`;
+  a.download = `${dataset?.name || '数据'}_透视图表.svg`;
   a.click();
   URL.revokeObjectURL(url);
   showToast?.('已导出高清矢量图表文件');

@@ -17,10 +17,10 @@ export function FilterModal({
 
   const { zone, dim } = activeHeaderFilterModal;
   const liveDim = (pivotConfig[zone] || []).find((x) => x.id === dim.id) || dim;
-  const fMeta = currentDataset.fields.find((f) => f.name === liveDim.field);
+  const fMeta = currentDataset?.fields?.find((f) => f.name === liveDim.field);
   const allDistinctVals = Array.from(
     new Set(
-      currentDataset.rows.map((r) =>
+      (currentDataset?.rows || []).map((r) =>
         zone === 'filters' ? String(r[liveDim.field] ?? '') : formatDimensionValue(r[liveDim.field], liveDim, fMeta)
       )
     )

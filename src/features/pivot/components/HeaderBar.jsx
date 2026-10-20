@@ -1,11 +1,16 @@
 import React from 'react';
 import {
   Terminal, Layers3, Lock, Search, Zap, Film, CheckCircle2, Palette,
-  FolderOpen, Volume2, VolumeX, Sun, Moon, SkipBack, SkipForward, AlertCircle, ChevronRight, X
+  FolderOpen, Volume2, VolumeX, Sun, Moon, SkipBack, SkipForward, AlertCircle, ChevronRight, X,
+  Undo2, Redo2
 } from 'lucide-react';
 import { KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
 
 export function HeaderBar({
+  canUndo,
+  canRedo,
+  undo,
+  redo,
   darkMode,
   setDarkMode,
   soundEnabled,
@@ -101,6 +106,27 @@ export function HeaderBar({
             event.currentTarget.scrollBy({left:event.key === 'ArrowRight'?180:-180,behavior:'smooth'});
           }
         }} className="flex flex-1 flex-nowrap items-center gap-2 overflow-x-auto xl:overflow-visible max-w-full min-w-0 pb-1 xl:pb-0 [&>*]:shrink-0">
+          {/* Undo / Redo */}
+          <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 shadow-xs">
+            <button
+              disabled={!canUndo}
+              onClick={() => { soundEngine?.playClick?.(500); undo?.(); }}
+              className={`p-1.5 rounded-md transition ${canUndo ? 'text-[#272822] dark:text-[#F8F8F2] hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32]' : 'text-[#75715E]/40 cursor-not-allowed'}`}
+              title="撤销透视配置 (⌘Z / Ctrl+Z)"
+              aria-label="撤销"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              disabled={!canRedo}
+              onClick={() => { soundEngine?.playClick?.(580); redo?.(); }}
+              className={`p-1.5 rounded-md transition ${canRedo ? 'text-[#272822] dark:text-[#F8F8F2] hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32]' : 'text-[#75715E]/40 cursor-not-allowed'}`}
+              title="重做透视配置 (⌘Y / Ctrl+Y / ⌘⇧Z)"
+              aria-label="重做"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <button
             onClick={() => { soundEngine?.playClick(640); setShowCommandPalette(true); setCommandQuery(''); }}
             className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#66D9EF] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2] apple-transition"

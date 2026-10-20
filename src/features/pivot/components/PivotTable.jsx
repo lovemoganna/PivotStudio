@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import {
   ArrowUp, ArrowDown, ArrowUpDown, Sparkles, StretchHorizontal,
   RotateCcw, Columns, Rows, AlignCenter, AlignLeft, AlignRight, Copy, Check,
-  Maximize2, Minimize2
+  Maximize2, Minimize2, Filter, Palette
 } from 'lucide-react';
 import { AGG_METHODS } from '../../../constants/pivotConstants';
 import { getColorScaleStyle, formatCellNumber, getDimDisplayLabel } from '../../../utils/formatters';
@@ -14,6 +14,8 @@ export function PivotTable({
   setPivotConfig,
   chartSpecConfig,
   condFormat,
+  setCondFormat,
+  currentDataset,
   darkMode,
   isPrintingReport,
   isVirtualized,
@@ -57,6 +59,10 @@ export function PivotTable({
   const [dragClientX, setDragClientX] = useState(null);
   const [copiedCellKey, setCopiedCellKey] = useState(null);
 
+  // Rectangular cell range selection state for multi-cell copy
+  const [selectionRange, setSelectionRange] = useState(null); // { startRow, startCol, endRow, endCol }
+  const [isSelectingRange, setIsSelectingRange] = useState(false);
+
   // Horizontal scroll state for dynamic shadow masks
   const [scrollState, setScrollState] = useState({ hasLeft: false, hasRight: false });
 
@@ -81,6 +87,142 @@ export function PivotTable({
     ro.observe(el);
     return () => ro.disconnect();
   }, [updateScrollState, tableContainerRef, pivotResult]);
+
+  // Row and Column Index Maps for O(1) range selection lookup
+  // Available Slicer Fields (Rows + Columns + Filters, fallback to text fields)
+  const slicerFields = useMemo(() => {
+    const list = [];
+    (pivotConfig?.rows || []).forEach((r) => { if (r.field && !list.includes(r.field)) list.push(r.field); });
+    (pivotConfig?.columns || []).forEach((c) => { if (c.field && !list.includes(c.field)) list.push(c.field); });
+    (pivotConfig?.filters || []).forEach((f) => { if (f.field && !list.includes(f.field)) list.push(f.field); });
+    if (list.length === 0 && currentDataset?.fields) {
+      currentDataset.fields.filter((f) => f.type !== 'number').forEach((f) => list.push(f.name));
+    }
+    return list;
+  }, [pivotConfig?.rows, pivotConfig?.columns, pivotConfig?.filters, currentDataset?.fields]);
+
+  const [activeSlicerField, setActiveSlicerField] = useState(() => slicerFields[0] || '');
+
+  useEffect(() => {
+    if (!slicerFields.includes(activeSlicerField) && slicerFields[0]) {
+      setActiveSlicerField(slicerFields[0]);
+    }
+  }, [slicerFields, activeSlicerField]);
+
+  // Slicer Value Pills with record counts
+  const slicerValuePills = useMemo(() => {
+    if (!activeSlicerField || !currentDataset?.rows) return [];
+    const counts = new Map();
+    for (const row of currentDataset.rows) {
+      const val = String(row[activeSlicerField] ?? '');
+      if (val !== '') {
+        counts.set(val, (counts.get(val) || 0) + 1);
+      }
+    }
+    const arr = Array.from(counts.entries()).map(([label, count]) => ({ label, count }));
+    return arr.slice(0, 16);
+  }, [activeSlicerField, currentDataset?.rows]);
+
+  // Current selected slicer values
+  const currentSlicerSelected = useMemo(() => {
+    const fObj = (pivotConfig?.filters || []).find((f) => f.field === activeSlicerField);
+    return fObj?.selectedValues || [];
+  }, [pivotConfig?.filters, activeSlicerField]);
+
+  const handleSlicerToggle = useCallback((val) => {
+    soundEngine?.playClick?.(540);
+    setPivotConfig?.((prev) => {
+      const existingFilters = prev.filters || [];
+      const fIdx = existingFilters.findIndex((f) => f.field === activeSlicerField);
+      if (!val) {
+        if (fIdx === -1) return prev;
+        const nextFilters = [...existingFilters];
+        nextFilters.splice(fIdx, 1);
+        return { ...prev, filters: nextFilters };
+      }
+      const fObj = existingFilters[fIdx] || { field: activeSlicerField, selectedValues: [] };
+      const curSelected = fObj.selectedValues || [];
+      const nextSelected = curSelected.includes(val) ? [] : [val];
+      const nextFilters = [...existingFilters];
+      if (fIdx >= 0) {
+        if (nextSelected.length === 0) {
+          nextFilters.splice(fIdx, 1);
+        } else {
+          nextFilters[fIdx] = { ...fObj, selectedValues: nextSelected };
+        }
+      } else if (nextSelected.length > 0) {
+        nextFilters.push({ field: activeSlicerField, selectedValues: nextSelected });
+      }
+      return { ...prev, filters: nextFilters };
+    });
+  }, [activeSlicerField, soundEngine, setPivotConfig]);
+
+  const rowKeyToIndex = useMemo(() => {
+    const map = new Map();
+    (pivotResult.tableRows || []).forEach((r, idx) => {
+      map.set(r.rowKey, idx);
+    });
+    return map;
+  }, [pivotResult.tableRows]);
+
+  const valColKeyToIndex = useMemo(() => {
+    const map = new Map();
+    let idx = 0;
+    for (const cg of pivotResult.allColGroups || []) {
+      for (const vc of pivotResult.valConfigs || []) {
+        map.set(`${cg.key}_${vc.id}`, idx++);
+      }
+    }
+    return map;
+  }, [pivotResult.allColGroups, pivotResult.valConfigs]);
+
+  // Global mouseup and copy keydown for range selection
+  useEffect(() => {
+    const handleMouseUp = () => {
+      setIsSelectingRange(false);
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setSelectionRange(null);
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'c' || e.key === 'C')) {
+        if (!selectionRange) return;
+        const minR = Math.min(selectionRange.startRow, selectionRange.endRow);
+        const maxR = Math.max(selectionRange.startRow, selectionRange.endRow);
+        const minC = Math.min(selectionRange.startCol, selectionRange.endCol);
+        const maxC = Math.max(selectionRange.startCol, selectionRange.endCol);
+
+        const rows = [];
+        for (let r = minR; r <= maxR; r++) {
+          const rowObj = pivotResult.tableRows[r];
+          if (!rowObj) continue;
+          const lineCells = [];
+          let colIdx = 0;
+          for (const cg of pivotResult.allColGroups) {
+            for (const vc of pivotResult.valConfigs) {
+              if (colIdx >= minC && colIdx <= maxC) {
+                const cellData = pivotResult.displayMatrix[`${rowObj.rowKey}@@${cg.key}@@${vc.id}`];
+                lineCells.push(formatCellNumber(cellData, vc));
+              }
+              colIdx++;
+            }
+          }
+          rows.push(lineCells.join('\t'));
+        }
+        if (rows.length > 0) {
+          const tsv = rows.join('\n');
+          e.preventDefault();
+          copyTextToClipboard?.(tsv, `已复制选区数据 (${maxR - minR + 1}行 × ${maxC - minC + 1}列) 到剪贴板`);
+        }
+      }
+    };
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectionRange, pivotResult, copyTextToClipboard]);
 
   // Global mouse event listeners during column resizing
   useEffect(() => {
@@ -333,6 +475,58 @@ export function PivotTable({
         </div>
       )}
 
+      {/* Universal Slicer Pills Bar (通用快捷切片器胶囊条) */}
+      {slicerFields.length > 0 && slicerValuePills.length > 0 && (
+        <div className="bg-[#FAF8F1] dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1.5 flex items-center gap-2 overflow-x-auto text-[10px] apple-font-mono shrink-0 select-none">
+          <div className="flex items-center gap-1.5 shrink-0 text-[#75715E] dark:text-[#908E80] font-bold">
+            <Filter className="w-3 h-3 text-[#A6E22E]" />
+            <span className="hidden sm:inline">切片器:</span>
+            <select
+              value={activeSlicerField}
+              onChange={(e) => {
+                soundEngine?.playClick?.(500);
+                setActiveSlicerField(e.target.value);
+              }}
+              className="px-2 py-0.5 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] text-[#272822] dark:text-[#F8F8F2] font-semibold"
+            >
+              {slicerFields.map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1 overflow-x-auto min-w-0 pr-1">
+            <button
+              onClick={() => handleSlicerToggle(null)}
+              className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-semibold transition shrink-0 ${
+                currentSlicerSelected.length === 0
+                  ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
+                  : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+              }`}
+            >
+              全部 (All)
+            </button>
+            {slicerValuePills.map((p) => {
+              const isSelected = currentSlicerSelected.includes(p.label);
+              return (
+                <button
+                  key={p.label}
+                  onClick={() => handleSlicerToggle(p.label)}
+                  className={`px-2 py-0.5 rounded-full text-[9.5px] font-medium transition shrink-0 flex items-center gap-1 ${
+                    isSelected
+                      ? 'bg-[#66D9EF] text-[#1E1F1C] font-bold shadow-xs'
+                      : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:border-[#66D9EF] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+                  }`}
+                >
+                  <span className="truncate max-w-[120px]">{p.label}</span>
+                  <span className="opacity-60 text-[8.5px]">({p.count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 透视表增强控制工具条 (自适应列宽、行高密度、数据居中对齐、斑马纹、专注全屏) */}
       <div className="bg-[#EFECE1]/90 dark:bg-[#1E1F1C]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] apple-font-mono shrink-0 select-none">
         {/* Left: Column Width & Row Height & Alignment */}
@@ -454,8 +648,40 @@ export function PivotTable({
           </div>
         </div>
 
-        {/* Right: Quick Options (Zebra, Extremes, Focus table toggle) */}
+        {/* Right: Quick Options (Zebra, Extremes, Subtotals, Range badge, Focus table toggle) */}
         <div className="flex items-center gap-2">
+          {selectionRange && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-[#0088A3] dark:text-[#66D9EF] text-[10px] font-semibold">
+              <span>
+                选区: {Math.abs(selectionRange.endRow - selectionRange.startRow) + 1}行 × {Math.abs(selectionRange.endCol - selectionRange.startCol) + 1}列
+              </span>
+              <kbd className="px-1 py-0.2 rounded bg-black/10 dark:bg-white/10 text-[9px]">⌘C 复制</kbd>
+              <button
+                onClick={() => setSelectionRange(null)}
+                className="hover:text-[#F92672] px-1 text-xs font-bold leading-none"
+                title="清除选区 (Esc)"
+                aria-label="清除选区"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="开启或隐藏行分组多级小计 (Subtotals)">
+            <input
+              type="checkbox"
+              checked={Boolean(pivotConfig?.showSubtotals)}
+              onChange={(e) => {
+                soundEngine?.playClick?.(520);
+                const next = e.target.checked;
+                setPivotConfig?.((prev) => ({ ...prev, showSubtotals: next }));
+                showToast?.(next ? '已开启行分组小计' : '已隐藏行分组小计');
+              }}
+              className="rounded accent-[#AE81FF]"
+            />
+            <span>分组小计</span>
+          </label>
+
           <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="标注每列最高值(●)与负数语义色">
             <input
               type="checkbox"
@@ -475,6 +701,29 @@ export function PivotTable({
             />
             <span>斑马纹</span>
           </label>
+
+          {/* Quick Heatmap Color Scale Toggle */}
+          {setCondFormat && (
+            <button
+              onClick={() => {
+                soundEngine?.playClick?.(560);
+                setCondFormat((p) => {
+                  const nextScale = p.colorScale === 'none' ? 'green_yellow_red' : p.colorScale === 'green_yellow_red' ? 'blue_scale' : 'none';
+                  showToast?.(nextScale === 'none' ? '已关闭矩阵色阶' : nextScale === 'green_yellow_red' ? '已开启红-黄-绿热力图' : '已开启冰川青渐变色阶');
+                  return { ...p, colorScale: nextScale };
+                });
+              }}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border transition ${
+                condFormat?.colorScale && condFormat.colorScale !== 'none'
+                  ? 'bg-[#FD971F]/20 text-[#C86400] dark:text-[#FD971F] border-[#FD971F]/50 shadow-xs'
+                  : 'bg-[#FFFDF7] dark:bg-[#272822] border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+              }`}
+              title="一键循环切换矩阵热力色阶 (红黄绿三色热力 / 冰川青 / 关闭)"
+            >
+              <Palette className="w-3 h-3 text-[#FD971F]" />
+              <span className="hidden sm:inline">热力色阶</span>
+            </button>
+          )}
 
           {/* Table Focus / Maximize Button */}
           {setViewMode && (
@@ -902,6 +1151,19 @@ export function PivotTable({
                       const isColMax = extremes && val === extremes.maxVal && val > 0 && !isSubtotalCell;
                       const isNegative = typeof val === 'number' && val < 0;
 
+                      // Range selection lookup
+                      const rIdx = rowKeyToIndex.get(row.rowKey);
+                      const cIdx = valColKeyToIndex.get(`${cGroup.key}_${vCfg.id}`);
+                      const isCellSelected = Boolean(
+                        selectionRange &&
+                        rIdx !== undefined &&
+                        cIdx !== undefined &&
+                        rIdx >= Math.min(selectionRange.startRow, selectionRange.endRow) &&
+                        rIdx <= Math.max(selectionRange.startRow, selectionRange.endRow) &&
+                        cIdx >= Math.min(selectionRange.startCol, selectionRange.endCol) &&
+                        cIdx <= Math.max(selectionRange.startCol, selectionRange.endCol)
+                      );
+
                       const openCellDetail = () => {
                         soundEngine?.playTransitionChord();
                         const effectiveRowKey = row.isSubtotal ? row.rowKey.replace('__SUBTOTAL__', '') : row.rowKey;
@@ -934,7 +1196,21 @@ export function PivotTable({
                             minWidth: `${colW}px`,
                             ...colorScaleStyle,
                           }}
+                          onMouseDown={(e) => {
+                            if (e.button === 0 && !e.altKey && rIdx !== undefined && cIdx !== undefined) {
+                              setIsSelectingRange(true);
+                              setSelectionRange({
+                                startRow: rIdx,
+                                startCol: cIdx,
+                                endRow: rIdx,
+                                endCol: cIdx,
+                              });
+                            }
+                          }}
                           onMouseEnter={() => {
+                            if (isSelectingRange && rIdx !== undefined && cIdx !== undefined) {
+                              setSelectionRange((prev) => (prev ? { ...prev, endRow: rIdx, endCol: cIdx } : null));
+                            }
                             setHoveredCellTelemetry?.({
                               rowKey: row.rowKey,
                               colKey: cGroup.key,
@@ -966,13 +1242,15 @@ export function PivotTable({
                           }}
                           onDoubleClick={openCellDetail}
                           className={`relative border border-[#D6D4C8] dark:border-[#3E3D32] ${densityCellPadding} align-middle ${dataTextAlignCls} apple-font-mono ${cellWrapCls} cursor-pointer transition-colors ${
+                            isCellSelected ? 'bg-[#66D9EF]/25 dark:bg-[#66D9EF]/35 ring-1.5 ring-inset ring-[#66D9EF] font-bold z-1' : ''
+                          } ${
                             isSubtotalCell ? 'font-semibold bg-[#66D9EF]/10 text-[#0088A3] dark:text-[#66D9EF]' : ''
                           } ${
                             isNegative ? 'text-[#F92672] dark:text-[#FF5C8A] font-medium' : ''
                           } ${
-                            isColCrosshair && !isSubtotalCell ? 'bg-[#66D9EF]/[0.05] dark:bg-[#66D9EF]/[0.07]' : ''
+                            isColCrosshair && !isSubtotalCell && !isCellSelected ? 'bg-[#66D9EF]/[0.05] dark:bg-[#66D9EF]/[0.07]' : ''
                           } ${
-                            isExactHovered ? 'ring-2 ring-inset ring-[#F92672]' : ''
+                            isExactHovered && !isCellSelected ? 'ring-2 ring-inset ring-[#F92672]' : ''
                           } ${
                             isCustomHit ? 'text-[#F92672] font-bold underline decoration-[#F92672]' : ''
                           }`}

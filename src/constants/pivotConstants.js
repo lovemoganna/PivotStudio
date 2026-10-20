@@ -27,6 +27,8 @@ export const AGG_METHODS = [
   { value: 'sum', label: '求和 (SUM)', short: '求和' },
   { value: 'count', label: '计数 (COUNT)', short: '计数' },
   { value: 'avg', label: '平均值 (AVG)', short: '均值' },
+  { value: 'median', label: '中位数 (MEDIAN)', short: '中位' },
+  { value: 'stddev', label: '标准差 (STDDEV)', short: '标差' },
   { value: 'max', label: '最大值 (MAX)', short: '最大' },
   { value: 'min', label: '最小值 (MIN)', short: '最小' },
   { value: 'count_distinct', label: '去重计数 (DISTINCT)', short: '去重' },
@@ -37,7 +39,9 @@ export const SHOW_AS_MODES = [
   { value: 'pct_grand', label: '占总计百分比 (% of Grand)' },
   { value: 'pct_row', label: '占行总计百分比 (% of Row)' },
   { value: 'pct_col', label: '占列总计百分比 (% of Col)' },
-  { value: 'prev_diff', label: '环比差异 (较上一行)' },
+  { value: 'prev_diff', label: '环比绝对差 (较上一行)' },
+  { value: 'pct_prev_diff', label: '环比变动率 (% Growth / MoM)' },
+  { value: 'running_total', label: '时序累计求和 (Running Total)' },
 ];
 
 export const DATE_GRANULARITIES = [
@@ -47,6 +51,9 @@ export const DATE_GRANULARITIES = [
   { value: 'month', label: '按月 (Month)' },
   { value: 'week', label: '按周 (Week)' },
   { value: 'day', label: '按日 (Day)' },
+  { value: 'hour', label: '按小时 (Hour)' },
+  { value: 'minute', label: '按分钟 (Minute)' },
+  { value: 'day_of_week', label: '按星期几 (Day of Week)' },
 ];
 
 export const CHART_COLORS = ['#F92672', '#A6E22E', '#66D9EF', '#FD971F', '#AE81FF', '#E6DB74', '#FF6188', '#78DCE8'];
@@ -223,11 +230,12 @@ export const RETAIL_TEST_DATASET = {
   rows: RETAIL_SALES_ROWS,
 };
 
-export const DEFAULT_DATASET = RETAIL_TEST_DATASET;
+export const DEFAULT_DATASET = null;
 
 /**
  * 根据任意数据集的元数据规范动态构建默认的透视表配置
  * 自动识别文本字段（行维度）、日期字段（列维度/时序）与数值度量（值聚合）
+ * 包含：主键/高基数智能避让、无数值列自适应注入 COUNT(*) 频数、比率类字段默认均值 (AVG)
  */
 export function buildDefaultPivotConfig(dataset) {
   if (!dataset || !dataset.fields || dataset.fields.length === 0) {
@@ -243,24 +251,39 @@ export function buildDefaultPivotConfig(dataset) {
     };
   }
 
-  const textFields = dataset.fields.filter((f) => f.type === 'text' || (!f.type && f.name !== 'id'));
-  const dateFields = dataset.fields.filter((f) => f.type === 'date');
-  const numberFields = dataset.fields.filter((f) => f.type === 'number');
+  // 1. 分类识别维度与度量（优先尊重用户的 role 标注）
+  const dimensionFields = dataset.fields.filter(
+    (f) => f.role === 'dimension' || (!f.role && f.type !== 'number')
+  );
+  const measureFields = dataset.fields.filter(
+    (f) => f.role === 'measure' || (!f.role && f.type === 'number')
+  );
+
+  const dateFields = dimensionFields.filter((f) => f.type === 'date');
+  const textFields = dimensionFields.filter((f) => f.type !== 'date');
+
+  // 2. 避免将纯 ID/唯一键作为默认首选行维度
+  const isKeyName = (name) => /(^id$|_id$|uuid|guid|no$|编号|代码|工号|序号)/i.test(name);
+  const sortedTextFields = [...textFields].sort((a, b) => {
+    const aIsKey = isKeyName(a.name) ? 1 : 0;
+    const bIsKey = isKeyName(b.name) ? 1 : 0;
+    return aIsKey - bIsKey;
+  });
 
   const rows = [];
-  if (textFields[0]) {
+  if (sortedTextFields[0]) {
     rows.push({
       id: `r_init_1`,
-      field: textFields[0].name,
+      field: sortedTextFields[0].name,
       sort: 'none',
       dateGranularity: 'raw',
       excludedValues: [],
     });
   }
-  if (textFields[1]) {
+  if (sortedTextFields[1]) {
     rows.push({
       id: `r_init_2`,
-      field: textFields[1].name,
+      field: sortedTextFields[1].name,
       sort: 'none',
       dateGranularity: 'raw',
       excludedValues: [],
@@ -279,32 +302,34 @@ export function buildDefaultPivotConfig(dataset) {
   }
 
   const values = [];
-  if (numberFields[0]) {
-    const isCurrency = /额|利|成本|价|price|amount|revenue|cost/i.test(numberFields[0].name);
-    values.push({
-      id: 'v_init_1',
-      field: numberFields[0].name,
-      agg: 'sum',
-      showAs: 'normal',
-      format: {
-        thousands: true,
-        decimals: 0,
-        currency: isCurrency ? '¥' : '',
-        isPercent: false,
-      },
+  if (measureFields.length > 0) {
+    measureFields.slice(0, 2).forEach((mf, idx) => {
+      const isRateOrAvg = /rate|ratio|pct|percent|score|age|temp|lat|cpu|率|比|分|度|龄|均/i.test(mf.name);
+      const isCurrency = /额|利|成本|价|营收|收入|price|amount|revenue|cost|profit|salary/i.test(mf.name);
+      values.push({
+        id: `v_init_${idx + 1}`,
+        field: mf.name,
+        agg: isRateOrAvg ? 'avg' : 'sum',
+        showAs: 'normal',
+        format: {
+          thousands: true,
+          decimals: isRateOrAvg ? 1 : 0,
+          currency: isCurrency ? '¥' : '',
+          isPercent: /rate|ratio|pct|percent|率|比/i.test(mf.name),
+        },
+      });
     });
-  }
-  if (numberFields[1]) {
-    const isCurrency = /额|利|成本|价|price|amount|revenue|cost/i.test(numberFields[1].name);
+  } else {
+    // 纯文本/问卷/分类数据集自适应降级：自动注入通用的记录频数度量
     values.push({
-      id: 'v_init_2',
-      field: numberFields[1].name,
-      agg: 'sum',
+      id: 'v_init_count',
+      field: '__COUNT__',
+      agg: 'count',
       showAs: 'normal',
       format: {
         thousands: true,
         decimals: 0,
-        currency: isCurrency ? '¥' : '',
+        currency: '',
         isPercent: false,
       },
     });
@@ -320,4 +345,114 @@ export function buildDefaultPivotConfig(dataset) {
     collapsedColKeys: {},
     showSubtotals: false,
   };
+}
+
+/**
+ * 根据任意数据集动态生成 5 个自适应分析故事镜头
+ * 将原本固定的零售字段重构为通用模式模板：
+ * Shot 1: 全景主次分类对比 (Top Categories Overview)
+ * Shot 2: 双维度交叉透视矩阵 (Cross-Tab Proportion Matrix)
+ * Shot 3: 时序双轴共振 (Temporal Dual-Axis Trend)
+ * Shot 4: 细分贡献瀑布流 (Incremental Contribution Waterfall)
+ * Shot 5: 相关拟合与离群检测 (Correlation & Scatter Regression)
+ */
+export function generateDynamicKeynoteShots(dataset) {
+  if (!dataset || !dataset.fields || dataset.fields.length === 0) {
+    return KEYNOTE_STORYBOARD_SHOTS;
+  }
+
+  const dimensions = dataset.fields.filter((f) => f.role === 'dimension' || (!f.role && f.type !== 'number'));
+  const measures = dataset.fields.filter((f) => f.role === 'measure' || (!f.role && f.type === 'number'));
+  const dates = dimensions.filter((f) => f.type === 'date');
+  const texts = dimensions.filter((f) => f.type !== 'date');
+
+  const dim1 = texts[0]?.name || dimensions[0]?.name || '未指定维度';
+  const dim2 = texts[1]?.name || texts[0]?.name || dimensions[1]?.name || dim1;
+  const dateDim = dates[0]?.name || dim1;
+  const num1 = measures[0]?.name || '__COUNT__';
+  const num2 = measures[1]?.name || measures[0]?.name || num1;
+
+  const makeVal = (field, id = 'v_1', agg = 'sum') => ({
+    id,
+    field,
+    agg: field === '__COUNT__' ? 'count' : agg,
+    showAs: 'normal',
+    format: { thousands: true, decimals: 0, currency: '', isPercent: false },
+  });
+
+  return [
+    {
+      id: 'shot_1',
+      number: '01',
+      title: `全景「${dim1}」对比概览`,
+      subtitle: `聚焦核心维度【${dim1}】在【${num1}】${num2 !== num1 ? `与【${num2}】` : ''}上的整体分布对比`,
+      cameraNote: 'Wide Establishing Shot · Effortless Analytical Flow',
+      viewMode: 'split',
+      chartType: 'bar',
+      pivotOverride: {
+        rows: [{ id: 'r_k1', field: dim1, sort: 'desc', dateGranularity: 'raw', excludedValues: [] }],
+        columns: [],
+        values: [makeVal(num1, 'v_1'), ...(num2 !== num1 ? [makeVal(num2, 'v_2')] : [])],
+      },
+    },
+    {
+      id: 'shot_2',
+      number: '02',
+      title: `多维交叉透视矩阵`,
+      subtitle: `【${dim1}】×【${dim2}】交叉透视，呈现百分比堆叠结构占比`,
+      cameraNote: 'Matrix Cross-Tab Focus · Structural Proportion',
+      viewMode: 'split',
+      chartType: 'pct_stacked_bar',
+      pivotOverride: {
+        rows: [
+          { id: 'r_k1', field: dim1, sort: 'none', dateGranularity: 'raw', excludedValues: [] },
+          ...(dim2 !== dim1 ? [{ id: 'r_k2', field: dim2, sort: 'none', dateGranularity: 'raw', excludedValues: [] }] : []),
+        ],
+        columns: dates.length > 0 ? [{ id: 'c_k1', field: dateDim, sort: 'asc', dateGranularity: 'year', excludedValues: [] }] : [],
+        values: [makeVal(num1, 'v_1')],
+      },
+    },
+    {
+      id: 'shot_3',
+      number: '03',
+      title: `时序趋势演变透镜`,
+      subtitle: `追踪【${dateDim}】演进斜率与阶段性波动`,
+      cameraNote: 'Temporal Tracking · Trendline & Acceleration',
+      viewMode: 'split',
+      chartType: measures.length > 1 ? 'combo' : 'line',
+      pivotOverride: {
+        rows: [{ id: 'r_k3', field: dateDim, sort: 'asc', dateGranularity: dates.length > 0 ? 'month' : 'raw', excludedValues: [] }],
+        columns: [],
+        values: [makeVal(num1, 'v_1'), ...(num2 !== num1 ? [makeVal(num2, 'v_2')] : [])],
+      },
+    },
+    {
+      id: 'shot_4',
+      number: '04',
+      title: `核心贡献增减瀑布流`,
+      subtitle: `清晰拆解【${dim1}】各项目对【${num1}】累计总量的边际拉动`,
+      cameraNote: 'Incremental Bridge Breakdown · Waterfall',
+      viewMode: 'split',
+      chartType: 'waterfall',
+      pivotOverride: {
+        rows: [{ id: 'r_k4', field: dim1, sort: 'desc', dateGranularity: 'raw', excludedValues: [] }],
+        columns: [],
+        values: [makeVal(num1, 'v_1')],
+      },
+    },
+    {
+      id: 'shot_5',
+      number: '05',
+      title: `相关性拟合与离群检测`,
+      subtitle: measures.length > 1 ? `【${num1}】与【${num2}】的线性拟合趋势线与残差异常点自动识别` : `【${num1}】的频数直方分布`,
+      cameraNote: 'Outlier Detection & Regression · Scatter / Histogram',
+      viewMode: 'split',
+      chartType: measures.length > 1 ? 'scatter' : 'histogram',
+      pivotOverride: {
+        rows: [{ id: 'r_k5', field: dim1, sort: 'none', dateGranularity: 'raw', excludedValues: [] }],
+        columns: [],
+        values: [makeVal(num1, 'v_1'), ...(num2 !== num1 ? [makeVal(num2, 'v_2')] : [])],
+      },
+    },
+  ];
 }

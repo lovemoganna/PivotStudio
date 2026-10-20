@@ -16,10 +16,11 @@ export function DrillDownModal({
   const dialogRef = useDialogFocus(Boolean(modalData), onClose);
   if (!modalData) return null;
 
+  const fields = currentDataset?.fields || [];
   const q = drillSearch.trim().toLowerCase();
   const filteredRecs = q
     ? modalData.records.filter((r) =>
-        currentDataset.fields.some((f) => String(r[f.name] ?? '').toLowerCase().includes(q))
+        fields.some((f) => String(r[f.name] ?? '').toLowerCase().includes(q))
       )
     : modalData.records;
   const pageSize = 50;
@@ -28,7 +29,7 @@ export function DrillDownModal({
   const pagedRecs = filteredRecs.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const handleExportCSV = () => {
-    const headers = currentDataset.fields.map((f) => f.name);
+    const headers = fields.map((f) => f.name);
     const csvRows = [
       headers.map(encodeCsvCell).join(','),
       ...modalData.records.map((r) =>
@@ -97,7 +98,7 @@ export function DrillDownModal({
               <thead className="sticky top-0 bg-[#EFECE1] dark:bg-[#1E1F1C]">
                 <tr>
                   <th className="border border-[#D6D4C8] dark:border-[#3E3D32] px-2.5 py-1.5 text-left text-[#75715E]">#</th>
-                  {currentDataset.fields.map((f) => (
+                  {fields.map((f) => (
                     <th key={f.name} className="border border-[#D6D4C8] dark:border-[#3E3D32] px-2.5 py-1.5 text-left text-[#66D9EF]">
                       {f.name}
                     </th>
@@ -110,7 +111,7 @@ export function DrillDownModal({
                     <td className="border border-[#D6D4C8] dark:border-[#3E3D32] px-2.5 py-1 text-[#75715E]">
                       {(safePage - 1) * pageSize + idx + 1}
                     </td>
-                    {currentDataset.fields.map((f) => (
+                    {fields.map((f) => (
                       <td key={f.name} className="border border-[#D6D4C8] dark:border-[#3E3D32] px-2.5 py-1">
                         {f.type === 'number' ? (rec[f.name] === null || rec[f.name] === undefined || rec[f.name] === '' ? '—' : Number.isFinite(Number(rec[f.name])) ? Number(rec[f.name]).toLocaleString() : String(rec[f.name])) : String(rec[f.name] ?? '')}
                       </td>

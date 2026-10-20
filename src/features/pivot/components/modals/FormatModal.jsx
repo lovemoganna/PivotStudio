@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
-import { Palette, X, AlignCenter, AlignLeft, AlignRight, Rows, Table } from 'lucide-react';
+import { Palette, X, AlignCenter, AlignLeft, AlignRight, Rows, Table, Calculator, Plus, Trash2 } from 'lucide-react';
 import { SHOW_AS_MODES } from '../../../../constants/pivotConstants';
 
 export function FormatModal({
@@ -14,7 +14,52 @@ export function FormatModal({
   onClose,
 }) {
   const dialogRef = useDialogFocus(Boolean(isOpen), onClose);
+  const [showCalcBuilder, setShowCalcBuilder] = useState(false);
+  const [calcForm, setCalcForm] = useState({
+    name: '毛利率',
+    operandA: '',
+    op: '/',
+    operandB: '',
+    isPercent: true,
+    decimals: 1,
+  });
+
   if (!isOpen) return null;
+
+  const baseValues = (pivotConfig.values || []).filter((v) => !v.isCalculated);
+
+  const handleCreateCalculatedField = () => {
+    if (!calcForm.name.trim() || !calcForm.operandA || !calcForm.operandB) return;
+    const newId = `v_calc_${Date.now()}`;
+    const newCalcValue = {
+      id: newId,
+      field: calcForm.name.trim(),
+      isCalculated: true,
+      operandA: calcForm.operandA,
+      op: calcForm.op,
+      operandB: calcForm.operandB,
+      agg: 'calc',
+      showAs: 'normal',
+      format: {
+        thousands: false,
+        decimals: calcForm.decimals,
+        currency: '',
+        isPercent: calcForm.isPercent,
+      },
+    };
+    setPivotConfig((prev) => ({
+      ...prev,
+      values: [...(prev.values || []), newCalcValue],
+    }));
+    setShowCalcBuilder(false);
+  };
+
+  const handleRemoveValue = (id) => {
+    setPivotConfig((prev) => ({
+      ...prev,
+      values: (prev.values || []).filter((v) => v.id !== id),
+    }));
+  };
 
   return (
     <div
@@ -49,9 +94,11 @@ export function FormatModal({
                   className="w-full px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] apple-font-mono"
                 >
                   <option value="none">关闭色阶 (None)</option>
-                  <option value="green_yellow_red">红-黄-绿热力色阶</option>
+                  <option value="green_yellow_red">红-黄-绿三色热力图</option>
                   <option value="blue_scale">Monokai 冰川青色阶</option>
                   <option value="emerald_scale">Monokai 荧光绿色阶</option>
+                  <option value="purple_magenta">Monokai 品红-极光紫色阶</option>
+                  <option value="orange_heat">暖橙渐变热力色阶</option>
                 </select>
               </div>
               <div className="flex flex-col justify-end gap-2">
@@ -182,13 +229,122 @@ export function FormatModal({
 
           {/* Section 3: Values & Formatting */}
           <div className="space-y-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-4">
-            <div className="font-bold text-[#66D9EF] apple-font-mono">3. 值字段显示方式 (占比/环比) 与数值精度</div>
+            <div className="flex items-center justify-between">
+              <div className="font-bold text-[#66D9EF] apple-font-mono">3. 值指标显示方式 (占比/环比/累计) 与衍生计算度量</div>
+              <button
+                type="button"
+                onClick={() => setShowCalcBuilder((prev) => !prev)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#A6E22E]/15 border border-[#A6E22E]/40 text-[#4A7500] dark:text-[#A6E22E] text-[10.5px] font-bold apple-font-mono hover:bg-[#A6E22E]/25 transition"
+              >
+                <Calculator className="w-3.5 h-3.5" />
+                <span>{showCalcBuilder ? '收起公式构建' : '+ 新建衍生计算指标'}</span>
+              </button>
+            </div>
+
+            {/* Calculated Field Builder Inline Card */}
+            {showCalcBuilder && (
+              <div className="p-3.5 rounded-xl bg-[#FAF8F1] dark:bg-[#1E1F1C] border border-[#A6E22E]/50 space-y-3 apple-font-mono text-xs animate-apple-modal">
+                <div className="flex items-center justify-between text-[#4A7500] dark:text-[#A6E22E] font-bold">
+                  <span>新建复合计算度量 (跨指标聚合级公式运算)</span>
+                  <span className="text-[10px] text-[#75715E]">如: [毛利润] / [销售额]</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                  <div>
+                    <label className="block text-[9.5px] text-[#75715E] mb-1">指标名称:</label>
+                    <input
+                      type="text"
+                      value={calcForm.name}
+                      onChange={(e) => setCalcForm((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="如: 毛利率"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9.5px] text-[#75715E] mb-1">指标 A (分子/首项):</label>
+                    <select
+                      value={calcForm.operandA}
+                      onChange={(e) => setCalcForm((p) => ({ ...p, operandA: e.target.value }))}
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs"
+                    >
+                      <option value="">-- 选择指标 A --</option>
+                      {baseValues.map((v) => (
+                        <option key={v.id} value={v.id}>{v.field} ({v.agg})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div>
+                      <label className="block text-[9.5px] text-[#75715E] mb-1">运算符:</label>
+                      <select
+                        value={calcForm.op}
+                        onChange={(e) => setCalcForm((p) => ({ ...p, op: e.target.value }))}
+                        className="w-full px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs text-center font-bold text-[#F92672]"
+                      >
+                        <option value="/">÷ (除法)</option>
+                        <option value="*">× (乘法)</option>
+                        <option value="-">- (减法)</option>
+                        <option value="+">+ (加法)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9.5px] text-[#75715E] mb-1">指标 B (分母):</label>
+                      <select
+                        value={calcForm.operandB}
+                        onChange={(e) => setCalcForm((p) => ({ ...p, operandB: e.target.value }))}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs"
+                      >
+                        <option value="">-- 选择指标 B --</option>
+                        {baseValues.map((v) => (
+                          <option key={v.id} value={v.id}>{v.field} ({v.agg})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1 cursor-pointer text-[10px]">
+                      <input
+                        type="checkbox"
+                        checked={calcForm.isPercent}
+                        onChange={(e) => setCalcForm((p) => ({ ...p, isPercent: e.target.checked }))}
+                        className="rounded accent-[#A6E22E]"
+                      />
+                      <span>百分比 %</span>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={!calcForm.name.trim() || !calcForm.operandA || !calcForm.operandB}
+                      onClick={handleCreateCalculatedField}
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-[#A6E22E] hover:bg-[#B8F03E] text-[#1E1F1C] font-bold text-xs shadow-xs transition disabled:opacity-40"
+                    >
+                      生成指标
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {pivotConfig.values.length === 0 ? (
               <div className="text-[#75715E] italic apple-font-mono">/* 当前值区域为空，请先拖入值指标 */</div>
             ) : (
               pivotConfig.values.map((vItem) => (
                 <div key={vItem.id} className="p-3 rounded-xl bg-[#EFECE1]/50 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-center apple-font-mono">
-                  <div className="font-bold text-[#FD971F] truncate">{vItem.field} ({vItem.agg})</div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-[#FD971F] truncate flex items-center gap-1.5">
+                      {vItem.isCalculated && (
+                        <span className="px-1.5 py-0.2 rounded bg-[#AE81FF]/20 text-[#6B38FB] dark:text-[#AE81FF] text-[8.5px] font-bold uppercase tracking-wider shrink-0">
+                          CALC
+                        </span>
+                      )}
+                      <span className="truncate">{vItem.field}</span>
+                    </div>
+                    {vItem.isCalculated ? (
+                      <div className="text-[9px] text-[#75715E] truncate mt-0.5">
+                        公式: [{baseValues.find(b => b.id === vItem.operandA)?.field || vItem.operandA}] {vItem.op} [{baseValues.find(b => b.id === vItem.operandB)?.field || vItem.operandB}]
+                      </div>
+                    ) : (
+                      <div className="text-[9px] text-[#75715E] truncate mt-0.5">聚合: {vItem.agg}</div>
+                    )}
+                  </div>
                   <div>
                     <label className="block text-[9px] text-[#75715E] mb-0.5">显示方式 (Show As):</label>
                     <select
@@ -208,9 +364,11 @@ export function FormatModal({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[9px] text-[#75715E] mb-0.5">货币符号 / 小数位:</label>
+                    <label className="block text-[9px] text-[#75715E] mb-0.5">单位/符号与小数位:</label>
                     <div className="flex items-center gap-1">
-                      <select
+                      <input
+                        type="text"
+                        placeholder="单位(如¥,ms,MB)"
                         value={vItem.format?.currency ?? ''}
                         onChange={(e) => {
                           const cur = e.target.value;
@@ -221,14 +379,10 @@ export function FormatModal({
                             ),
                           }));
                         }}
-                        className="px-1.5 py-1 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px]"
-                      >
-                        <option value="">无符号</option>
-                        <option value="¥">¥ (CNY)</option>
-                        <option value="$">$ (USD)</option>
-                      </select>
+                        className="w-20 px-1.5 py-1 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px]"
+                      />
                       <select
-                        value={vItem.format?.decimals ?? 0}
+                        value={vItem.format?.decimals ?? (vItem.format?.isPercent ? 1 : 0)}
                         onChange={(e) => {
                           const dec = Number(e.target.value);
                           setPivotConfig((prev) => ({
@@ -246,23 +400,35 @@ export function FormatModal({
                       </select>
                     </div>
                   </div>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-[10px]">
-                    <input
-                      type="checkbox"
-                      checked={vItem.format?.thousands !== false}
-                      onChange={(e) => {
-                        const th = e.target.checked;
-                        setPivotConfig((prev) => ({
-                          ...prev,
-                          values: prev.values.map((v) =>
-                            v.id === vItem.id ? { ...v, format: { ...v.format, thousands: th } } : v
-                          ),
-                        }));
-                      }}
-                      className="rounded accent-[#A6E22E]"
-                    />
-                    <span>千分位分隔符</span>
-                  </label>
+                  <div className="flex items-center justify-between gap-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px]">
+                      <input
+                        type="checkbox"
+                        checked={vItem.format?.thousands !== false && !vItem.format?.isPercent}
+                        onChange={(e) => {
+                          const th = e.target.checked;
+                          setPivotConfig((prev) => ({
+                            ...prev,
+                            values: prev.values.map((v) =>
+                              v.id === vItem.id ? { ...v, format: { ...v.format, thousands: th } } : v
+                            ),
+                          }));
+                        }}
+                        className="rounded accent-[#A6E22E]"
+                      />
+                      <span>千分位</span>
+                    </label>
+                    {vItem.isCalculated && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveValue(vItem.id)}
+                        className="p-1 rounded text-[#75715E] hover:text-[#F92672] transition"
+                        title="删除该计算指标"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}

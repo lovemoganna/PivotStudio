@@ -2,22 +2,47 @@ import { formatDimensionValue } from '../../../utils/formatters.js';
 
 export function computeAggregation(records, fieldName, aggMethod) {
   if (!records?.length) return 0;
+  const isVirtualCount = fieldName === '__COUNT__' || !fieldName;
+  if (isVirtualCount) {
+    if (aggMethod === 'count' || !aggMethod) return records.length;
+  }
   const meaningful = (v) => v !== null && v !== undefined && !(typeof v === 'string' && v.trim() === '');
-  if (aggMethod === 'count') return records.filter((r) => meaningful(r[fieldName])).length;
-  if (aggMethod === 'count_distinct') return new Set(records.map((r) => r[fieldName]).filter(meaningful).map(String)).size;
-  let sum=0,count=0,min=Infinity,max=-Infinity;
+  if (aggMethod === 'count') {
+    if (isVirtualCount) return records.length;
+    return records.filter((r) => meaningful(r[fieldName])).length;
+  }
+  if (aggMethod === 'count_distinct') {
+    if (isVirtualCount) return records.length > 0 ? 1 : 0;
+    return new Set(records.map((r) => r[fieldName]).filter(meaningful).map(String)).size;
+  }
+  let sum = 0, count = 0, min = Infinity, max = -Infinity;
+  const numList = (aggMethod === 'median' || aggMethod === 'stddev') ? [] : null;
   for (const row of records) {
     const raw = row[fieldName];
     if (!meaningful(raw)) continue;
-    const value = typeof raw === 'number' ? raw : Number(String(raw).replace(/,/g,''));
+    const value = typeof raw === 'number' ? raw : Number(String(raw).replace(/,/g, ''));
     if (!Number.isFinite(value)) continue;
-    sum += value; count++;
-    min=Math.min(min,value); max=Math.max(max,value);
+    sum += value;
+    count++;
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+    if (numList) numList.push(value);
   }
   if (!count) return 0;
-  if (aggMethod === 'avg') return sum/count;
+  if (aggMethod === 'avg') return sum / count;
   if (aggMethod === 'min') return min;
   if (aggMethod === 'max') return max;
+  if (aggMethod === 'median') {
+    numList.sort((a, b) => a - b);
+    const mid = Math.floor(count / 2);
+    return count % 2 !== 0 ? numList[mid] : (numList[mid - 1] + numList[mid]) / 2;
+  }
+  if (aggMethod === 'stddev') {
+    if (count <= 1) return 0;
+    const mean = sum / count;
+    const sqDiffSum = numList.reduce((acc, val) => acc + (val - mean) ** 2, 0);
+    return Math.sqrt(sqDiffSum / (count - 1));
+  }
   return sum;
 }
 
@@ -25,34 +50,75 @@ export function calculatePivot(dataset, pivotConfig) {
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const allRows = dataset?.rows || [];
   const fieldMap = new Map((dataset?.fields || []).map((f) => [f.name, f]));
+  const validFieldNames = new Set(fieldMap.keys());
+  validFieldNames.add('__COUNT__');
 
-  const rowConfigs = (pivotConfig?.rows || []).map((r, i) => ({
-    id: r.id || `r_${i}`,
-    field: r.field,
-    sort: r.sort || 'none',
-    dateGranularity: r.dateGranularity || 'raw',
-    numberBin: r.numberBin || null,
-    excludedValues: r.excludedValues || [],
-  }));
+  // Field Sanity Guard: 字段有效性自愈守卫
+  // 过滤掉当前数据集中不存在的失效字段，避免因筛选器残留导致整表记录被清空
+  const ignoredFilters = [];
+  const filters = [];
+  (pivotConfig?.filters || []).forEach((f) => {
+    if (validFieldNames.has(f.field)) {
+      filters.push(f);
+    } else {
+      ignoredFilters.push(f.field);
+    }
+  });
 
-  const colConfigs = (pivotConfig?.columns || []).map((c, i) => ({
-    id: c.id || `c_${i}`,
-    field: c.field,
-    sort: c.sort || 'none',
-    dateGranularity: c.dateGranularity || 'raw',
-    numberBin: c.numberBin || null,
-    excludedValues: c.excludedValues || [],
-  }));
+  const ignoredRows = [];
+  const rowConfigs = [];
+  (pivotConfig?.rows || []).forEach((r, i) => {
+    if (validFieldNames.has(r.field)) {
+      rowConfigs.push({
+        id: r.id || `r_${i}`,
+        field: r.field,
+        sort: r.sort || 'none',
+        dateGranularity: r.dateGranularity || 'raw',
+        numberBin: r.numberBin || null,
+        excludedValues: r.excludedValues || [],
+      });
+    } else {
+      ignoredRows.push(r.field);
+    }
+  });
 
-  const valConfigs = (pivotConfig?.values || []).map((v, i) => ({
-    id: v.id || `v_${i}`,
-    field: v.field,
-    agg: v.agg || 'sum',
-    showAs: v.showAs || 'normal',
-    format: v.format || { thousands: true, decimals: 0, currency: /销售额|金额/.test(v.field || '') ? '¥' : '', isPercent: false },
-  }));
+  const ignoredCols = [];
+  const colConfigs = [];
+  (pivotConfig?.columns || []).forEach((c, i) => {
+    if (validFieldNames.has(c.field)) {
+      colConfigs.push({
+        id: c.id || `c_${i}`,
+        field: c.field,
+        sort: c.sort || 'none',
+        dateGranularity: c.dateGranularity || 'raw',
+        numberBin: c.numberBin || null,
+        excludedValues: c.excludedValues || [],
+      });
+    } else {
+      ignoredCols.push(c.field);
+    }
+  });
 
-  const filters = pivotConfig?.filters || [];
+  const ignoredVals = [];
+  const valConfigs = [];
+  (pivotConfig?.values || []).forEach((v, i) => {
+    if (v.isCalculated || validFieldNames.has(v.field)) {
+      valConfigs.push({
+        id: v.id || `v_${i}`,
+        field: v.field,
+        agg: v.isCalculated ? 'calc' : (v.agg || 'sum'),
+        showAs: v.showAs || 'normal',
+        format: v.format || { thousands: true, decimals: v.isCalculated && v.op === '/' ? 1 : 0, currency: '', isPercent: Boolean(v.isCalculated && v.op === '/') },
+        isCalculated: Boolean(v.isCalculated),
+        operandA: v.operandA,
+        op: v.op,
+        operandB: v.operandB,
+      });
+    } else {
+      ignoredVals.push(v.field);
+    }
+  });
+
   const collapsedRowKeys = pivotConfig?.collapsedRowKeys || {};
   const collapsedColKeys = pivotConfig?.collapsedColKeys || {};
   const showSubtotals = Boolean(pivotConfig?.showSubtotals);
@@ -373,11 +439,33 @@ export function calculatePivot(dataset, pivotConfig) {
       const recs = cellRecordsMap.get(`${lookupRowKey}@@${cg.key}`) || [];
       for (let vIdx = 0; vIdx < valConfigs.length; vIdx++) {
         const vc = valConfigs[vIdx];
-        const rawVal = computeAggregation(recs, vc.field, vc.agg);
-        rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = rawVal;
+        if (!vc.isCalculated) {
+          const rawVal = computeAggregation(recs, vc.field, vc.agg);
+          rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = rawVal;
+        }
       }
     }
   }
+
+  // 对计算字段 (Calculated Measures) 执行跨指标聚合运算
+  valConfigs.filter((vc) => vc.isCalculated).forEach((vc) => {
+    const valAConfig = valConfigs.find((v) => v.id === vc.operandA || v.field === vc.operandA);
+    const valBConfig = valConfigs.find((v) => v.id === vc.operandB || v.field === vc.operandB);
+    for (let rIdx = 0; rIdx < tableRows.length; rIdx++) {
+      const r = tableRows[rIdx];
+      for (let cIdx = 0; cIdx < allColGroups.length; cIdx++) {
+        const cg = allColGroups[cIdx];
+        const valA = valAConfig ? (rawValueMatrix[`${r.rowKey}@@${cg.key}@@${valAConfig.id}`] ?? 0) : 0;
+        const valB = valBConfig ? (rawValueMatrix[`${r.rowKey}@@${cg.key}@@${valBConfig.id}`] ?? 0) : 0;
+        let calcVal = 0;
+        if (vc.op === '+') calcVal = valA + valB;
+        else if (vc.op === '-') calcVal = valA - valB;
+        else if (vc.op === '*') calcVal = valA * valB;
+        else if (vc.op === '/') calcVal = valB !== 0 ? (valA / valB) : 0;
+        rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = calcVal;
+      }
+    }
+  });
 
   const nonTotalRows = tableRows.filter((r) => !r.isTotal && !r.isSubtotal);
   for (let rIdx = 0; rIdx < tableRows.length; rIdx++) {
@@ -415,6 +503,33 @@ export function calculatePivot(dataset, pivotConfig) {
               const prevVal = rawValueMatrix[`${prevRow.rowKey}@@${cg.key}@@${vc.id}`] ?? 0;
               displayVal = rawVal - prevVal;
             }
+          }
+        } else if (vc.showAs === 'pct_prev_diff') {
+          if (r.isTotal || r.isSubtotal) {
+            isBaseline = true;
+            displayVal = 0;
+          } else {
+            const idxInNonTotal = nonTotalRows.findIndex((nr) => nr.rowKey === r.rowKey);
+            if (idxInNonTotal <= 0) {
+              isBaseline = true;
+              displayVal = 0;
+            } else {
+              const prevRow = nonTotalRows[idxInNonTotal - 1];
+              const prevVal = rawValueMatrix[`${prevRow.rowKey}@@${cg.key}@@${vc.id}`] ?? 0;
+              displayVal = prevVal !== 0 ? ((rawVal - prevVal) / Math.abs(prevVal)) * 100 : 0;
+            }
+          }
+        } else if (vc.showAs === 'running_total') {
+          if (r.isTotal || r.isSubtotal) {
+            displayVal = rawVal;
+          } else {
+            const idxInNonTotal = nonTotalRows.findIndex((nr) => nr.rowKey === r.rowKey);
+            let runSum = 0;
+            for (let i = 0; i <= idxInNonTotal; i++) {
+              const prevRow = nonTotalRows[i];
+              runSum += (rawValueMatrix[`${prevRow.rowKey}@@${cg.key}@@${vc.id}`] ?? 0);
+            }
+            displayVal = runSum;
           }
         }
 
@@ -458,5 +573,12 @@ export function calculatePivot(dataset, pivotConfig) {
     filteredCount: filteredRows.length,
     totalCount: allRows.length,
     elapsedMs: Math.max(1, Math.round(t1 - t0)),
+    sanitizedInfo: {
+      ignoredFilters,
+      ignoredRows,
+      ignoredCols,
+      ignoredVals,
+      hasInvalidFields: ignoredFilters.length > 0 || ignoredRows.length > 0 || ignoredCols.length > 0 || ignoredVals.length > 0,
+    },
   };
 }
