@@ -54,7 +54,7 @@ try{
   console.log('BROWSER_NAVIGATION',JSON.stringify(navigation));
   await sleep(2500);
   console.log('BROWSER_BOOT',JSON.stringify(await evaluate('({url:location.href,ready:document.readyState,title:document.title,body:document.body?.innerText.slice(0,500),html:document.documentElement?.outerHTML.slice(0,800)})')));
-  await waitFor(async()=>(await evaluate("document.querySelector('h1')?.textContent || ''")).includes('PivotStudio'),'React app',12000);
+  await waitFor(async()=>await evaluate("Array.from(document.querySelectorAll('h1')).some(h => h.textContent.includes('PivotStudio'))"),'React app',12000);
   const errors=[];
   for(const [name,width,height] of [['mobile',390,844],['tablet',768,900],['desktop',1440,900]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
