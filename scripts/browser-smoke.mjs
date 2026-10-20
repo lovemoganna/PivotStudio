@@ -134,6 +134,31 @@ try{
   if(themeBefore===themeAfter)errors.push('theme toggle not responding');
   const light=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   await writeFile('artifacts/browser/desktop-light.png',Buffer.from(light.data,'base64'));
+  // End-to-end: import a real UTF-8 CSV through the browser file input.
+  const imported=await evaluate(`(() => {
+    const csv='区域,金额,备注\\n华东,100,"包含,分隔符"\\n华南,200,"跨行\\n说明"\\n华北,,留空\\n';
+    const input=document.querySelector('aside input[type="file"]');
+    if(!input)return false;
+    const transfer=new DataTransfer();
+    transfer.items.add(new File([csv],'real-upload-regression.csv',{type:'text/csv'}));
+    input.files=transfer.files;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    return true;
+  })()`);
+  if(!imported)errors.push('real CSV input missing');
+  else {
+    const previewReady=await waitFor(async()=>await evaluate('!!document.querySelector("[aria-label=\\\"文件数据预览与类型校准\\\"]")'),'file upload preview',12000);
+    if(!previewReady)errors.push('real CSV preview unavailable');
+    const previewRows=await evaluate('document.querySelector("[aria-label=\\\"文件数据预览与类型校准\\\"]")?.textContent || ""');
+    if(!previewRows.includes('共解析 3 行数据') || !previewRows.includes('跨行'))errors.push('UTF-8 quoted CSV row count/preview mismatch');
+    assert.equal(await clickText('确认导入并自动初始化透视'),true);
+    await sleep(300);
+    const importedState=await evaluate('({text:document.body.textContent.includes("real-upload-regression.csv (3行)"),total:document.querySelector("#pivot-main-html-table")?.textContent || ""})');
+    if(!importedState.text || !importedState.total.includes('300'))errors.push('real imported pivot failed or amount aggregation incorrect: '+JSON.stringify(importedState).slice(0,600));
+    const importShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+    await writeFile('artifacts/browser/real-csv-import.png',Buffer.from(importShot.data,'base64'));
+    console.log('REAL_CSV_IMPORT',JSON.stringify({datasetVisible:importedState.text,pivotHasExpectedTotal:importedState.total.includes('300')}));
+  }
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){
