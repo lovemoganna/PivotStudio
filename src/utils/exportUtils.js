@@ -1,46 +1,48 @@
-import { getDimDisplayLabel, formatCellNumber } from './formatters';
+import { formatCellNumber } from './formatters';
+import { buildPivotExportRows, encodeCsvCell } from './exportMatrix.js';
 import * as XLSX from 'xlsx';
 
 export function exportToCSV(dataset, pivotResult, showToast) {
-  const headers = [
-    ...pivotResult.rowConfigs.map((r) => getDimDisplayLabel(r)),
-    ...pivotResult.allColGroups.flatMap((cg) =>
-      pivotResult.valConfigs.map((vc) => `${cg.pathLabels.join('/')}_${vc.field}(${vc.agg})`)
-    ),
-  ];
-  const lines = [headers.join(',')];
-  pivotResult.tableRows.forEach((r) => {
-    const rowLabels = r.isTotal
-      ? ['总计', ...new Array(Math.max(0, pivotResult.rowConfigs.length - 1)).fill('')]
-      : r.rowKey.replace('__SUBTOTAL__', '').split('||');
-    while (rowLabels.length < Math.max(1, pivotResult.rowConfigs.length)) rowLabels.push('');
-    const vals = pivotResult.allColGroups.flatMap((cg) =>
-      pivotResult.valConfigs.map((vc) => {
-        const cellObj = pivotResult.displayMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`];
-        return `"${String(formatCellNumber(cellObj, vc)).replace(/"/g, '""')}"`;
-      })
-    );
-    lines.push([...rowLabels.map((l) => `"${String(l).replace(/"/g, '""')}"`), ...vals].join(','));
-  });
-  const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+  const rows = buildPivotExportRows(pivotResult);
+  const csv = '\uFEFF' + rows.map((row) => row.map(encodeCsvCell).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${dataset.name}_透视表.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast?.('已导出 CSV 文件');
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = dataset.name + '_透视表.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    showToast?.('已导出完整 CSV 透视结果');
+  } catch {
+    showToast?.('CSV 导出失败', 'error');
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
 }
 
 export function exportToExcelMerged(dataset, pivotResult, showToast) {
-  const table = document.getElementById('pivot-main-html-table');
-  if (!table) { showToast?.('当前没有可导出的透视表', 'error'); return; }
   try {
-    const book = XLSX.utils.table_to_book(table, { sheet: '透视表' });
-    XLSX.writeFile(book, `${dataset.name}_透视表.xlsx`, { compression: true });
-    showToast?.('已导出 XLSX 工作簿');
+    const rows = buildPivotExportRows(pivotResult);
+    if (rows.length < 2) {
+      showToast?.('透视结果为空，无法导出 Excel', 'error');
+      return;
+    }
+    const table = document.getElementById('pivot-main-html-table');
+    // Preserve visual merged headers when every row is actually rendered.
+    const fullTableRendered = Boolean(table) && pivotResult.tableRows.length <= 80;
+    const workbook = fullTableRendered
+      ? XLSX.utils.table_to_book(table, { sheet: '透视表' })
+      : XLSX.utils.book_new();
+    if (!fullTableRendered) {
+      const sheet = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(workbook, sheet, '透视表');
+    }
+    XLSX.writeFile(workbook, dataset.name + '_透视表.xlsx', { compression: true });
+    showToast?.(fullTableRendered ? '已导出 Excel 工作簿（保留表头合并）' : '已导出完整 Excel 工作簿（扁平表头）');
   } catch {
-    showToast?.('XLSX 导出失败，请检查当前透视表', 'error');
+    showToast?.('XLSX 导出失败，请检查透视表内容', 'error');
   }
 }
 
