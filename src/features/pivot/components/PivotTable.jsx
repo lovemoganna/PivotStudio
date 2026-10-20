@@ -643,11 +643,10 @@ export function PivotTable({
           </div>
         </div>
 
-        {/* Right: Quick Options (Zebra, Extremes, Subtotals, Range badge, Focus table toggle) */}
-        <div className="flex items-center gap-2">
-          {selectionRange && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-[#0088A3] dark:text-[#66D9EF] text-[10px] font-semibold">
-              <span>{' ' + t("选区:") + ' '}{Math.abs(selectionRange.endRow - selectionRange.startRow) + 1}{t("行 ×") + ' '}{Math.abs(selectionRange.endCol - selectionRange.startCol) + 1}{t("列") + ' '}</span>
+        {/* Reserve selection badge space to keep pointer targets stable. */}
+        <div className="flex flex-wrap max-w-full items-center gap-2">
+            <div aria-hidden={!selectionRange} className={`w-[170px] shrink-0 ${selectionRange ? '' : 'invisible pointer-events-none'} flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-[#0088A3] dark:text-[#66D9EF] text-[10px] font-semibold`}>
+              <span className="truncate">{' ' + t("选区:") + ' '}{Math.abs((selectionRange?.endRow || 0) - (selectionRange?.startRow || 0)) + 1}{t("行 ×") + ' '}{Math.abs((selectionRange?.endCol || 0) - (selectionRange?.startCol || 0)) + 1}{t("列") + ' '}</span>
               <kbd className="px-1 py-0.2 rounded bg-black/10 dark:bg-white/10 text-[9px]">{t("⌘C 复制")}</kbd>
               <button
                 onClick={() => setSelectionRange(null)}
@@ -658,7 +657,7 @@ export function PivotTable({
                 ×
               </button>
             </div>
-          )}
+
 
           <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("开启或隐藏行分组多级小计 (Subtotals)")}>
             <input
@@ -1184,6 +1183,8 @@ export function PivotTable({
                           }}
                           onMouseDown={(e) => {
                             if (e.button === 0 && !e.altKey && rIdx !== undefined && cIdx !== undefined) {
+                              // Highlight before range selection can alter toolbar/scroll geometry.
+                              if (!row.isSubtotal) handleChartPointClick({ rowKey: row.rowKey, name: row.label });
                               setIsSelectingRange(true);
                               setSelectionRange({
                                 startRow: rIdx,

@@ -15,7 +15,7 @@ test('R1 500k CSV responds, shows progress, and cancels',async({page})=>{
   const csv='区域,金额\n'+Array.from({length:500000},(_,i)=>`区域${i%10},${i%100}`).join('\n');
   await upload(page,csv,'500k.csv');
   await expect(page.locator('progress[aria-label="导入进度"]')).toBeVisible();
-  await page.getByRole('button',{name:'切换主题',exact:true}).click();
+  // Fast parsers may already have opened the modal; do not click behind its overlay.
   await expect(preview(page)).toContainText('500000 行',{timeout:45000});
   await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
   await expect(page.locator('[role=status]').filter({hasText:/500,000 \/ 500,000 行/}).first()).toBeVisible({timeout:45000});
@@ -50,6 +50,7 @@ test('R2 GBK Chinese preview, delimiter, header and field overrides',async({page
 });
 
 test('R3 four-zone drag/drop, aggregations, history and 100k refresh budget',async({page})=>{
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto('/');
   await upload(page,'区域,渠道,金额\n'+Array.from({length:100000},(_,i)=>`区域${i%5},渠道${i%2},${i%100}`).join('\n'));
   await expect(preview(page)).toBeVisible();

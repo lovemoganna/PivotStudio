@@ -312,7 +312,7 @@ export function FieldShelf({
               {/* Middle Section: Schema Field Palette */}
               <div
                 id="pivot-schema-fields"
-                className={`${showMobileSchema ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-h-[140px] border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2`}
+                className={`${showMobileSchema ? 'flex' : 'hidden'} md:flex flex-none flex-col min-h-[200px] border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[11px] font-bold tracking-tight apple-font-mono">{' ' + t("可用字段 (")}{filteredFields.length}/{currentDataset?.fields?.length || 0})
