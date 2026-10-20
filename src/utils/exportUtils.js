@@ -63,12 +63,12 @@ export function exportChartAsPNG(dataset, unifiedChartSpec, chartType, darkMode,
     ctx.fillStyle = darkMode ? '#272822' : '#F7F6F0';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = darkMode ? '#F8F8F2' : '#272822';
-    ctx.font = 'bold 16px "JetBrains Mono", monospace, sans-serif';
+    ctx.font = 'bold 16px "JetBrains Mono", "Noto Sans SC", monospace, sans-serif';
     ctx.fillText(`${dataset.name} — 锥形转化漏斗图 (${unifiedChartSpec.primarySeriesKey})`, 32, 42);
     unifiedChartSpec.funnelItems.forEach((fItem, idx) => {
       const y = 76 + idx * 54;
       ctx.fillStyle = darkMode ? '#F8F8F2' : '#272822';
-      ctx.font = '13px "JetBrains Mono", monospace, sans-serif';
+      ctx.font = '13px "JetBrains Mono", "Noto Sans SC", monospace, sans-serif';
       ctx.fillText(fItem.name, 32, y + 23);
       const maxBarW = 680;
       const barW = Math.max(160, (fItem.widthPct / 100) * maxBarW);
