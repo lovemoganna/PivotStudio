@@ -24,23 +24,21 @@ export function exportToCSV(dataset, pivotResult, showToast) {
 
 export function exportToExcelMerged(dataset, pivotResult, showToast) {
   try {
+    // Always export the raw, typed, full pivot result. DOM table cells contain
+    // formatted text ("¥300"), which cannot be summed or filtered numerically.
     const rows = buildPivotExportRows(pivotResult);
     if (rows.length < 2) {
       showToast?.('透视结果为空，无法导出 Excel', 'error');
       return;
     }
-    const table = document.getElementById('pivot-main-html-table');
-    // Preserve visual merged headers when every row is actually rendered.
-    const fullTableRendered = Boolean(table) && pivotResult.tableRows.length <= 80;
-    const workbook = fullTableRendered
-      ? XLSX.utils.table_to_book(table, { sheet: '透视表' })
-      : XLSX.utils.book_new();
-    if (!fullTableRendered) {
-      const sheet = XLSX.utils.aoa_to_sheet(rows);
-      XLSX.utils.book_append_sheet(workbook, sheet, '透视表');
-    }
+    const sheet = XLSX.utils.aoa_to_sheet(rows);
+    sheet['!cols'] = rows[0].map((heading, idx) => ({
+      wch: Math.min(36, Math.max(idx < pivotResult.rowConfigs.length ? 16 : 18, String(heading).length + 2))
+    }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, '透视表');
     XLSX.writeFile(workbook, dataset.name + '_透视表.xlsx', { compression: true });
-    showToast?.(fullTableRendered ? '已导出 Excel 工作簿（保留表头合并）' : '已导出完整 Excel 工作簿（扁平表头）');
+    showToast?.('已导出完整 XLSX（真实数值，可计算；表头已平铺）');
   } catch {
     showToast?.('XLSX 导出失败，请检查透视表内容', 'error');
   }
