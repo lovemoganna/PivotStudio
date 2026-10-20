@@ -37,7 +37,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       : '汇总维度';
 
   const dataRows = (pivotResult?.tableRows || []).filter((r) => !r.isTotal && !r.isSubtotal);
-  const grandTotalRecords = pivotResult?.cellRecordsMap?.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || [];
+  const grandTotalRecords = (pivotResult?.cellRecordsMap?.get?.('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || []).slice(0, 50);
 
   // If no value metrics are configured, return graceful empty spec immediately
   if (!hasValues) {
@@ -155,12 +155,12 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
         name: r.label,
         rowKey: r.rowKey,
         _rawSeriesValues: {},
-        matchedRows: pivotResult.cellRecordsMap.get(`${r.rowKey}@@__GRAND_TOTAL_COL__`) || [],
+        matchedRows: (pivotResult?.cellRecordsMap?.get?.(`${r.rowKey}@@__GRAND_TOTAL_COL__`) || []).slice(0, 50),
       };
       let stackSum = 0;
       let absSum = 0;
       seriesMetaList.forEach((sm) => {
-        const bucketRecs = pivotResult.cellRecordsMap.get(`${r.rowKey}@@${sm.colKey}`) || [];
+        const bucketRecs = pivotResult?.cellRecordsMap?.get?.(`${r.rowKey}@@${sm.colKey}`) || [];
         const cKey = `${r.rowKey}@@${sm.colKey}@@${sm.valCfg.id}`;
         let val = pivotResult.displayMatrix[cKey]?.display ?? 0;
 
@@ -197,7 +197,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
         name: cg.label || cg.pathLabels.join(' / '),
         rowKey: cg.key,
         _rawSeriesValues: {},
-        matchedRows: pivotResult.cellRecordsMap.get(`__GRAND_TOTAL_ROW__@@${cg.key}`) || [],
+        matchedRows: (pivotResult?.cellRecordsMap?.get?.(`__GRAND_TOTAL_ROW__@@${cg.key}`) || []).slice(0, 50),
       };
       let stackSum = 0;
       let absSum = 0;
@@ -219,7 +219,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       name: '总体汇总',
       rowKey: '__GRAND_TOTAL_ROW__',
       _rawSeriesValues: {},
-      matchedRows: grandTotalRecords,
+      matchedRows: grandTotalRecords.slice(0, 50),
     };
     seriesMetaList.forEach((sm) => {
       const cKey = `__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${sm.valCfg.id}`;
@@ -458,7 +458,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
         rangeFull: `[${low.toLocaleString()}, ${high.toLocaleString()})`,
         count: matched.length,
         pct: ((matched.length / rawNums.length) * 100).toFixed(1),
-        matchedRows: matched,
+        matchedRows: matched.slice(0, 50),
       });
     }
   }

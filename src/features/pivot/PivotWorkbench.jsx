@@ -515,6 +515,18 @@ export default function PivotWorkbench() {
     return { pivotResult: initP, unifiedChartSpec: initC };
   });
 
+  const currentDatasetRef = useRef(currentDataset);
+  const pivotConfigRef = useRef(pivotConfig);
+  const chartTypeRef = useRef(chartType);
+  const chartSpecConfigRef = useRef(chartSpecConfig);
+
+  useEffect(() => {
+    currentDatasetRef.current = currentDataset;
+    pivotConfigRef.current = pivotConfig;
+    chartTypeRef.current = chartType;
+    chartSpecConfigRef.current = chartSpecConfig;
+  }, [currentDataset, pivotConfig, chartType, chartSpecConfig]);
+
   useEffect(() => {
     let worker = null;
     try {
@@ -524,24 +536,21 @@ export default function PivotWorkbench() {
         if (id === reqIdRef.current) {
           setIsWorkerComputing(false);
           if (success && pRes && cSpec) {
-            // Worker omits cellRecordsMap to avoid cloning all raw record buckets
-            // across the message boundary (dominant serialization cost for 100k+ rows).
-            // Rebuild it here so drill-down continues to work. calculatePivot is pure;
-            // only cellRecordsMap from the rebuilt result is retained.
-            if (!pRes.cellRecordsMap) {
-              try {
-                const { cellRecordsMap } = calculatePivot(
-                  datasets.find((d) => d.id === activeDatasetId) || datasets[0],
-                  pivotConfig,
-                );
-                pRes.cellRecordsMap = cellRecordsMap;
-              } catch {
-                pRes.cellRecordsMap = new Map();
-              }
-            }
+            pRes.cellRecordsMap = new Map();
             setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+          } else {
+            const fallbackP = calculatePivot(currentDatasetRef.current, pivotConfigRef.current);
+            const fallbackC = buildUnifiedChartSpec(currentDatasetRef.current, fallbackP, chartTypeRef.current, chartSpecConfigRef.current);
+            setActiveResults({ pivotResult: fallbackP, unifiedChartSpec: fallbackC });
           }
         }
+      };
+      worker.onerror = (err) => {
+        console.warn('Pivot WebWorker execution error, falling back to main-thread:', err);
+        setIsWorkerComputing(false);
+        const fallbackP = calculatePivot(currentDatasetRef.current, pivotConfigRef.current);
+        const fallbackC = buildUnifiedChartSpec(currentDatasetRef.current, fallbackP, chartTypeRef.current, chartSpecConfigRef.current);
+        setActiveResults({ pivotResult: fallbackP, unifiedChartSpec: fallbackC });
       };
       workerRef.current = worker;
     } catch {
@@ -566,11 +575,20 @@ export default function PivotWorkbench() {
     const nextId = ++reqIdRef.current;
     if (workerRef.current) {
       setIsWorkerComputing(true);
-      workerRef.current.postMessage({
-        id: nextId,
-        payload: { dataset: currentDataset, pivotConfig, chartType, chartSpecConfig },
-      });
+      try {
+        workerRef.current.postMessage({
+          id: nextId,
+          payload: { dataset: currentDataset, pivotConfig, chartType, chartSpecConfig },
+        });
+      } catch (postErr) {
+        console.warn('postMessage to WebWorker failed, running on main-thread:', postErr);
+        setIsWorkerComputing(false);
+        const pRes = calculatePivot(currentDataset, pivotConfig);
+        const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
+        setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+      }
     } else {
+      setIsWorkerComputing(false);
       const pRes = calculatePivot(currentDataset, pivotConfig);
       const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
       setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });

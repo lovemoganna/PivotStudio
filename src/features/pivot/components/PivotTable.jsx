@@ -1171,7 +1171,7 @@ export function PivotTable({
                       const openCellDetail = () => {
                         soundEngine?.playTransitionChord();
                         const effectiveRowKey = row.isSubtotal ? row.rowKey.replace('__SUBTOTAL__', '') : row.rowKey;
-                        const rawRecs = pivotResult.cellRecordsMap.get(`${effectiveRowKey}@@${cGroup.key}`) || [];
+                        const rawRecs = (pivotResult?.cellRecordsMap?.get ? pivotResult.cellRecordsMap.get(`${effectiveRowKey}@@${cGroup.key}`) : null) || [];
                         setDrillSearch?.('');
                         setDrillPage?.(1);
                         setDrillDownModal?.({
