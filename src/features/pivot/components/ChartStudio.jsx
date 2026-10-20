@@ -82,17 +82,17 @@ export function ChartStudio({
               setIsChartFullscreen((prev) => !prev);
             }}
             className="p-1.5 rounded-md bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:text-[#F92672] text-[#75715E] dark:text-[#908E80]"
-            title="全屏切换"
+            title="全屏切换" aria-label={isChartFullscreen ? "退出图表全屏" : "图表全屏"}
           >
             {isChartFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
 
           {/* Chart Studio Popover */}
           {showChartStudioPopover && (
-            <div className="absolute right-0 top-9 z-40 w-80 p-4 rounded-xl bg-[#FFFDF7]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-2xl border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl space-y-3 text-xs animate-apple-modal">
+            <div className="absolute right-0 top-9 z-40 w-[min(20rem,calc(100vw-2rem))] p-4 rounded-xl bg-[#FFFDF7]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-2xl border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl space-y-3 text-xs animate-apple-modal">
               <div className="flex items-center justify-between border-b border-[#3E3D32]/50 pb-2">
                 <span className="font-bold text-[11px] text-[#F92672]">CHART_SPEC // 规格与衍生分析</span>
-                <button onClick={() => setShowChartStudioPopover(false)} className="p-1 rounded hover:bg-white/10 text-[#75715E]">
+                <button onClick={() => setShowChartStudioPopover(false)} aria-label="关闭图表规格面板" className="p-1 rounded hover:bg-white/10 text-[#75715E]">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>

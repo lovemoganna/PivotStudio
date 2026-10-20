@@ -93,7 +93,7 @@ export function HeaderBar({
           <button
             onClick={() => { soundEngine?.playClick(640); setShowCommandPalette(true); setCommandQuery(''); }}
             className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#66D9EF] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2] apple-transition"
-            title="打开全局指令面板 (⌘K / Ctrl+K)"
+            title="打开全局指令面板 (⌘K / Ctrl+K)" aria-label="打开指令面板"
           >
             <Search className="w-3 h-3 text-[#66D9EF]" />
             <span className="hidden md:inline apple-font-mono">cmd_palette()</span>

@@ -51,10 +51,10 @@ export function FieldShelf({
 }) {
   return (
     <>
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative">
         {/* Left Sidebar: Schema Field Palette & Data Ingestion (Step 5) */}
         {!cinemaTheaterMode && (
-          <aside className="w-full md:w-64 bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
+          <aside className="w-full md:w-64 max-h-[310px] md:max-h-none bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono">
@@ -86,7 +86,7 @@ export function FieldShelf({
               </select>
 
               <div className="flex gap-1.5">
-                <label className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border border-dashed border-[#ACA99A] dark:border-[#75715E] bg-[#FFFDF7]/60 dark:bg-[#1E1F1C]/70 hover:border-[#F92672] dark:hover:border-[#F92672] cursor-pointer text-[11px] font-medium transition ${isReadOnly ? 'opacity-40 pointer-events-none' : ''}`}>
+                <label className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg focus-within:ring-2 focus-within:ring-[#66D9EF] border border-dashed border-[#ACA99A] dark:border-[#75715E] bg-[#FFFDF7]/60 dark:bg-[#1E1F1C]/70 hover:border-[#F92672] dark:hover:border-[#F92672] cursor-pointer text-[11px] font-medium transition ${isReadOnly ? 'opacity-40 pointer-events-none' : ''}`}>
                   <Upload className="w-3.5 h-3.5 text-[#F92672] shrink-0" />
                   <span className="truncate">上传 CSV / Excel</span>
                   <input type="file" accept=".csv,.txt,.xls,.xlsx" onChange={handleFileUpload} className="hidden" disabled={isReadOnly} />
@@ -186,7 +186,7 @@ export function FieldShelf({
         )}
 
         {/* Main Work Area */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto lg:overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-visible md:overflow-y-auto lg:overflow-hidden">
           {!cinemaTheaterMode && (
             <section className="bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden">
               {[
@@ -355,6 +355,7 @@ export function FieldShelf({
                   <button
                     key={m.id}
                     onClick={() => { soundEngine?.playClick(520); setViewMode(m.id); }}
+                    aria-pressed={viewMode === m.id}
                     className={`px-3 py-1 rounded-md text-[10px] font-semibold transition ${viewMode === m.id ? 'bg-[#F92672] text-[#F8F8F2] shadow-sm' : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
                   >
                     {m.label}
@@ -363,6 +364,7 @@ export function FieldShelf({
               </div>
 
               <select
+                aria-label="选择图表类型"
                 value={chartType}
                 onChange={(e) => { soundEngine?.playClick(560); setChartType(e.target.value); }}
                 className="px-3 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#66D9EF] text-[10px] font-semibold apple-font-mono focus:outline-none focus:border-[#F92672]"

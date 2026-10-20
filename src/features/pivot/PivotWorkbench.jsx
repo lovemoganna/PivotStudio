@@ -188,17 +188,29 @@ export default function PivotWorkbench() {
     toastTimerRef.current = setTimeout(() => { setToastMessage(null); }, 3200);
   }, []);
 
-  const copyTextToClipboard = useCallback((text, successMsg = '已复制到剪贴板') => {
+  const copyTextToClipboard = useCallback(async (text, successMsg = '已复制到剪贴板') => {
     try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(String(text));
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = String(text);
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        try {
+          ta.focus();
+          ta.select();
+          if (!document.execCommand('copy')) throw new Error('Clipboard API unavailable');
+        } finally {
+          ta.remove();
+        }
+      }
       showToast(successMsg);
+      return true;
     } catch {
-      showToast(successMsg);
+      showToast('复制失败，请检查浏览器剪贴板权限', 'error');
+      return false;
     }
   }, [showToast]);
 
@@ -1044,7 +1056,7 @@ export default function PivotWorkbench() {
       return { startIndex: 0, endIndex: pivotResult.tableRows.length, topPadding: 0, bottomPadding: 0, rows: pivotResult.tableRows };
     }
     const viewportHeight = tableContainerRef.current?.clientHeight || 560;
-    const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 8);
+    const startIdx = Math.min(Math.max(0, pivotResult.tableRows.length - 1), Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 8));
     const endIdx = Math.min(pivotResult.tableRows.length, startIdx + Math.ceil(viewportHeight / ROW_HEIGHT) + 16);
     return {
       startIndex: startIdx,
@@ -1057,7 +1069,7 @@ export default function PivotWorkbench() {
 
   return (
     <div className={darkMode && !isPrintingReport ? 'dark' : ''}>
-      <div className={`h-screen bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans select-none print:bg-white print:text-black apple-transition ${isPrintingReport ? 'h-auto overflow-visible' : 'overflow-hidden'}`}>
+      <div className={`min-h-[100dvh] h-auto lg:h-[100dvh] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans print:bg-white print:text-black apple-transition ${isPrintingReport ? 'overflow-visible' : 'overflow-x-hidden lg:overflow-hidden'}`}>
         <div className="hidden print:block px-6 py-4 border-b border-black/15">
           <h1 className="text-base font-semibold tracking-tight text-black">PivotEngine Studio [Monokai Pro] 数据透视分析报告 — {currentDataset.name}</h1>
           <p className="text-[11px] text-[#75715E] mt-1">导出时间: {new Date().toLocaleString('zh-CN')} · 有效记录: {pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()} 行 · 导出人: {currentUser.name}</p>
@@ -1177,15 +1189,15 @@ export default function PivotWorkbench() {
           {/* Main Work Content Area: Split Container with Table and Chart Studio */}
         <div
           ref={splitContainerRef}
-          key={`${viewMode}_${chartType}_${keynoteShotIdx}`}
-          className={`flex-1 flex flex-col lg:flex-row min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col min-h-0 h-auto' : 'overflow-hidden'}`}
+          
+          className={`flex-1 flex flex-col lg:flex-row min-h-[680px] md:min-h-[720px] lg:min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col h-auto' : 'overflow-hidden'}`}
         >
           {(viewMode !== 'chart' || isPrintingReport) && (
             <div
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%` } : {}),
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'min-w-0 lg:min-w-[280px] flex-1 min-h-[300px] lg:min-h-0 lg:h-full' : 'w-full flex-1 min-h-[400px] lg:min-h-0 lg:h-full'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
                 pivotResult={pivotResult}
@@ -1218,6 +1230,25 @@ export default function PivotWorkbench() {
           {/* Interactive Draggable Split Handle */}
           {viewMode === 'split' && !isPrintingReport && (
             <div
+              role="separator"
+              aria-label="调整透视表与图表宽度"
+              aria-orientation="vertical"
+              aria-valuemin={35}
+              aria-valuemax={75}
+              aria-valuenow={splitRatioPct}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                  e.preventDefault();
+                  setSplitRatioPct((pct) => Math.max(35, Math.min(75, pct + (e.key === 'ArrowRight' ? 5 : -5))));
+                } else if (e.key === 'Home') {
+                  e.preventDefault();
+                  setSplitRatioPct(35);
+                } else if (e.key === 'End') {
+                  e.preventDefault();
+                  setSplitRatioPct(75);
+                }
+              }}
               onMouseDown={() => setIsResizingSplit(true)}
               onDoubleClick={() => {
                 soundEngine.playClick(600);
@@ -1225,7 +1256,7 @@ export default function PivotWorkbench() {
                 showToast('已复位分栏比例为 58 : 42');
               }}
               title="左右拖拽无级调节表图比例 · 双击复位 (58:42)"
-              className={`hidden lg:flex w-2.5 h-full rounded-full items-center justify-center cursor-col-resize select-none transition-colors shrink-0 group ${isResizingSplit ? 'bg-[#F92672]/30' : 'hover:bg-[#66D9EF]/20'}`}
+              className={`hidden lg:flex w-2.5 h-full rounded-full items-center justify-center cursor-col-resize focus-visible:ring-2 focus-visible:ring-[#66D9EF] select-none transition-colors shrink-0 group ${isResizingSplit ? 'bg-[#F92672]/30' : 'hover:bg-[#66D9EF]/20'}`}
             >
               <div className={`w-1 h-12 rounded-full transition-colors ${isResizingSplit ? 'bg-[#F92672]' : 'bg-[#D6D4C8] dark:bg-[#3E3D32] group-hover:bg-[#66D9EF]'}`} />
             </div>
@@ -1237,7 +1268,7 @@ export default function PivotWorkbench() {
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%` } : {}),
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] monokai-grid-canvas rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'min-w-[280px] flex-1 h-full' : 'w-full flex-1 h-full'} ${isPrintingReport ? 'h-auto' : ''}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] monokai-grid-canvas rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'min-w-0 lg:min-w-[280px] flex-1 min-h-[300px] lg:min-h-0 lg:h-full' : 'w-full flex-1 min-h-[400px] lg:min-h-0 lg:h-full'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
               <ChartStudio
                 chartType={chartType}
