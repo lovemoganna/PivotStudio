@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { CheckCircle2, X } from 'lucide-react';
 import { RETAIL_TEST_DATASET } from '../../../../constants/pivotConstants';
 
@@ -12,6 +13,7 @@ export function TestSuiteModal({
   soundEngine,
   showToast,
 }) {
+  const dialogRef = useDialogFocus(Boolean(isOpen), onClose);
   if (!isOpen) return null;
 
   return (
@@ -20,6 +22,8 @@ export function TestSuiteModal({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
+        ref={dialogRef}
+        role="dialog" aria-modal="true" aria-label="内置校验结果" tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-3xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-apple-modal"
       >
@@ -30,7 +34,7 @@ export function TestSuiteModal({
               内置演示数据计算校验（不替代自动化回归） ({liveEngineTestResults.filter((t) => t.passed).length}/5 通过)
             </h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label="关闭内置校验结果" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>

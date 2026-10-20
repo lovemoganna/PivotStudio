@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { Palette, X } from 'lucide-react';
 import { SHOW_AS_MODES } from '../../../../constants/pivotConstants';
 
@@ -10,6 +11,7 @@ export function FormatModal({
   setPivotConfig,
   onClose,
 }) {
+  const dialogRef = useDialogFocus(Boolean(isOpen), onClose);
   if (!isOpen) return null;
 
   return (
@@ -18,6 +20,8 @@ export function FormatModal({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
+        ref={dialogRef}
+        role="dialog" aria-modal="true" aria-label="数值与条件格式设置" tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-apple-modal"
       >
@@ -26,7 +30,7 @@ export function FormatModal({
             <Palette className="w-4 h-4 text-[#FD971F]" />
             <span>FORMAT_STUDIO // 条件格式、色阶数据条与数值显示方式 (步骤8)</span>
           </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label="关闭数值与条件格式设置" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>

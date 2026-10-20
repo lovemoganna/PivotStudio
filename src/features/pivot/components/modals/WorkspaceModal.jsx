@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { FolderOpen, X } from 'lucide-react';
 
 export function WorkspaceModal({
@@ -32,6 +33,7 @@ export function WorkspaceModal({
   copyTextToClipboard,
   showToast,
 }) {
+  const dialogRef = useDialogFocus(Boolean(isOpen), onClose);
   if (!isOpen) return null;
 
   return (
@@ -40,6 +42,8 @@ export function WorkspaceModal({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
+        ref={dialogRef}
+        role="dialog" aria-modal="true" aria-label="本机工作区与配置分享" tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden flex flex-col max-h-[86vh] animate-apple-modal"
       >
@@ -48,7 +52,7 @@ export function WorkspaceModal({
             <FolderOpen className="w-4 h-4 text-[#F92672]" />
             <span>WORKSPACE_HUB // 本机快照与配置分享</span>
           </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label="关闭本机工作区与配置分享" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>

@@ -33,6 +33,8 @@ export function ChartStudio({
   keynoteShotIdx,
   soundEngine,
 }) {
+  const [showChartTypes, setShowChartTypes] = React.useState(false);
+  const [showLensPresets, setShowLensPresets] = React.useState(false);
   const [compactAxis, setCompactAxis] = React.useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   React.useEffect(() => {
     const measure = () => setCompactAxis(window.innerWidth < 640);
@@ -56,7 +58,7 @@ export function ChartStudio({
             )}
           </h3>
           <p className="text-[10px] text-[#75715E] dark:text-[#908E80] mt-0.5 apple-font-mono flex items-center gap-2">
-            <span>dim: {unifiedChartSpec.xDimensionLabel} · series: {unifiedChartSpec.primarySeriesKey}</span>
+            <span>维度：{unifiedChartSpec.xDimensionLabel} · 指标：{unifiedChartSpec.primarySeriesKey}</span>
             {!unifiedChartSpec.canStack && (chartType === 'stacked_bar' || chartType === 'stacked_area') && (
               <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-[#FD971F] border border-[#FD971F]/30 text-[9px]">
                 量纲不同已自动按分组呈现
@@ -64,7 +66,14 @@ export function ChartStudio({
             )}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 relative apple-font-mono">
+        <div className="flex flex-wrap items-center gap-1.5 relative apple-font-mono">
+          <button
+            type="button"
+            aria-controls="pivot-chart-types"
+            aria-expanded={showChartTypes}
+            onClick={() => setShowChartTypes((open) => !open)}
+            className="px-2.5 py-1 rounded-md border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] text-[11px] font-semibold hover:border-[#66D9EF]"
+          >图表类型 {showChartTypes ? '收起' : '展开'}</button>
           <button
             onClick={() => {
               soundEngine?.playClick(560);
@@ -228,7 +237,7 @@ export function ChartStudio({
       </div>
 
       {/* Quick Tactile Chart Switcher Pill Strip */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 apple-font-mono shrink-0">
+      {showChartTypes && <div id="pivot-chart-types" className="flex items-center gap-1 overflow-x-auto pb-2 mb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 apple-font-mono shrink-0">
         {VISUAL_CHART_TYPES.map((ct) => (
           <button
             key={ct.value}
@@ -241,7 +250,7 @@ export function ChartStudio({
             {ct.short}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* Main Chart Canvas */}
       <div className="flex-1 w-full h-full min-h-[260px] flex items-center justify-center overflow-hidden">
@@ -679,23 +688,30 @@ export function ChartStudio({
         )}
       </div>
 
-      {/* Quick Analytical Lens Strip inside Chart Footer */}
-      <div className="mt-2 pt-2 border-t border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 flex flex-wrap items-center justify-between gap-2 text-[10px] apple-font-mono shrink-0">
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          <span className="text-[#75715E] dark:text-[#908E80] shrink-0">LENS_PRESETS:</span>
+      {/* Optional analysis presets: keep the plot clear by default. */}
+      <div className="mt-2 pt-2 border-t border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 flex flex-col gap-2 text-[10px] apple-font-mono shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            aria-expanded={showLensPresets}
+            aria-controls="pivot-lens-presets"
+            onClick={() => setShowLensPresets((open) => !open)}
+            className="text-[#0088A3] dark:text-[#66D9EF] font-semibold px-2 py-1 rounded border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]"
+          >分析视角 {showLensPresets ? '收起' : '展开'}</button>
+          <span className="text-[#75715E] dark:text-[#B8B5A8] hidden sm:inline">
+            双击单元格或图表数据点查看原始明细
+          </span>
+        </div>
+        {showLensPresets && <div id="pivot-lens-presets" className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {KEYNOTE_STORYBOARD_SHOTS.map((shot, idx) => (
             <button
               key={shot.id}
               onClick={() => applyKeynoteShot(idx)}
-              className={`px-2 py-0.5 rounded border transition shrink-0 ${keynoteShotIdx === idx ? 'bg-[#A6E22E]/20 border-[#A6E22E]/50 text-[#4A7500] dark:text-[#A6E22E] font-bold' : 'bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
-            >
-              {shot.number}·{shot.title.slice(0, 4)}
-            </button>
+              className={`px-2 py-1 rounded border transition shrink-0 ${keynoteShotIdx === idx ? 'bg-[#A6E22E]/20 border-[#A6E22E]/50 text-[#4A7500] dark:text-[#A6E22E] font-bold' : 'bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+              title={shot.title}
+            >{shot.number}·{shot.title.slice(0, 4)}</button>
           ))}
-        </div>
-        <span className="text-[#75715E] dark:text-[#908E80] hidden sm:inline">
-          双击任意单元格或柱体可下钻原始明细
-        </span>
+        </div>}
       </div>
     </div>
   );

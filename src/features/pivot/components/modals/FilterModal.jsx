@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { Filter, X } from 'lucide-react';
 import { formatDimensionValue } from '../../../../utils/formatters';
 
@@ -11,6 +12,7 @@ export function FilterModal({
   setHeaderFilterSearch,
   onClose,
 }) {
+  const dialogRef = useDialogFocus(Boolean(activeHeaderFilterModal), onClose);
   if (!activeHeaderFilterModal) return null;
 
   const { zone, dim } = activeHeaderFilterModal;
@@ -84,6 +86,8 @@ export function FilterModal({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
+        ref={dialogRef}
+        role="dialog" aria-modal="true" aria-label="字段筛选" tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-apple-modal"
       >
@@ -92,7 +96,7 @@ export function FilterModal({
             <Filter className="w-3.5 h-3.5 text-[#A6E22E]" />
             <span>FILTER // 筛选「{liveDim.field}」({allDistinctVals.length}项)</span>
           </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label="关闭字段筛选" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>

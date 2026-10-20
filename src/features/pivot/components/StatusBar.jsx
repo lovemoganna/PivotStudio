@@ -14,7 +14,7 @@ export function StatusBar({
       <div className="flex items-center gap-3 min-w-0 truncate">
         <span className="inline-flex items-center gap-1 text-[#F92672] font-bold shrink-0">
           <Crosshair className="w-3 h-3" />
-          <span>TELEMETRY</span>
+          <span>分析指标</span>
         </span>
         {hoveredCellTelemetry ? (
           <div className="flex items-center gap-2.5 truncate">
@@ -31,16 +31,16 @@ export function StatusBar({
         ) : (
           <div className="flex items-center gap-3 text-[#75715E] dark:text-[#908E80] truncate">
             <span>
-              SUM: <strong className="text-[#272822] dark:text-[#F8F8F2]">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.total, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
+              总和: <strong className="text-[#272822] dark:text-[#F8F8F2]">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.total, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
             </span>
             <span>
-              AVG: <strong className="text-[#C86400] dark:text-[#FD971F]">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
+              均值: <strong className="text-[#C86400] dark:text-[#FD971F]">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
             </span>
             <span className="hidden sm:inline">
-              MAX: <strong className="text-[#4A7500] dark:text-[#A6E22E]">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.max, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
+              最大: <strong className="text-[#4A7500] dark:text-[#A6E22E]">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.max, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
             </span>
             <span className="hidden md:inline">
-              SPLIT: <strong className="text-[#0088A3] dark:text-[#66D9EF]">{splitRatioPct}:{100 - splitRatioPct}</strong>
+              分栏: <strong className="text-[#0088A3] dark:text-[#66D9EF]">{splitRatioPct}:{100 - splitRatioPct}</strong>
             </span>
           </div>
         )}

@@ -54,14 +54,14 @@ export function FieldShelf({
 
   return (
     <>
-      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden relative">
         {/* Left Sidebar: Schema Field Palette & Data Ingestion (Step 5) */}
         {!cinemaTheaterMode && (
-          <aside className="w-full md:w-64 max-h-[310px] md:max-h-none bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
+          <aside className="w-full lg:w-64 max-h-[310px] lg:max-h-none bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono">
-                  ACTIVE_DATASET
+                  当前数据集
                 </span>
                 <span className="text-[11px] text-[#4A7500] dark:text-[#A6E22E] apple-font-mono">
                   {currentDataset.rows.length.toLocaleString()} records
@@ -151,7 +151,7 @@ export function FieldShelf({
             </div>
 
             {/* Schema Field List */}
-            <div className="md:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2">
+            <div className="lg:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2">
               <button
                 type="button"
                 aria-expanded={showMobileSchema}
@@ -163,10 +163,10 @@ export function FieldShelf({
                 <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileSchema ? '收起' : '展开'}</span>
               </button>
             </div>
-            <div id="pivot-schema-fields" className={`${showMobileSchema ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3`}>
+            <div id="pivot-schema-fields" className={`${showMobileSchema ? 'flex' : 'hidden'} lg:flex flex-1 flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3`}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold tracking-tight apple-font-mono">SCHEMA_FIELDS ({currentDataset.fields.length})</span>
-                <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">// drag or +add</span>
+                <span className="text-[11px] font-bold tracking-tight apple-font-mono">数据字段 ({currentDataset.fields.length})</span>
+                <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">拖拽或点击添加</span>
               </div>
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
                 {currentDataset.fields.map((field) => {
@@ -201,10 +201,10 @@ export function FieldShelf({
         )}
 
         {/* Main Work Area */}
-        <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-visible md:overflow-y-auto lg:overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-visible lg:overflow-hidden">
           {!cinemaTheaterMode && (
             <>
-            <div className="md:hidden px-3 py-2 bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32]">
+            <div className="lg:hidden px-3 py-2 bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32]">
               <button
                 aria-expanded={showMobileConfig}
                 aria-controls="pivot-analysis-config"
@@ -215,12 +215,12 @@ export function FieldShelf({
                 <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileConfig ? '收起' : '展开'}</span>
               </button>
             </div>
-            <section id="pivot-analysis-config" className={`${showMobileConfig ? 'grid' : 'hidden'} md:grid bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden`}>
+            <section id="pivot-analysis-config" className={`${showMobileConfig ? 'grid' : 'hidden'} lg:grid bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden`}>
               {[
-                { key: 'filters', label: 'FILTERS // 筛选器', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
-                { key: 'rows', label: 'ROWS // 行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
-                { key: 'columns', label: 'COLUMNS // 列维度', badgeColor: 'text-[#0088A3] dark:text-[#66D9EF]', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
-                { key: 'values', label: 'VALUES // 值指标', badgeColor: 'text-[#C86400] dark:text-[#FD971F]', borderAccent: 'border-l-2 border-l-[#FD971F]' },
+                { key: 'filters', label: '筛选条件', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
+                { key: 'rows', label: '行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
+                { key: 'columns', label: '列维度', badgeColor: 'text-[#0088A3] dark:text-[#66D9EF]', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
+                { key: 'values', label: '数值指标', badgeColor: 'text-[#C86400] dark:text-[#FD971F]', borderAccent: 'border-l-2 border-l-[#FD971F]' },
               ].map((z) => {
                 const items = pivotConfig[z.key] || [];
                 const isOver = dragOverZone === z.key;
@@ -405,6 +405,7 @@ export function FieldShelf({
               <label className="inline-flex items-center gap-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
                 <input
                   type="checkbox"
+                  aria-label="显示多级小计"
                   checked={pivotConfig.showSubtotals}
                   onChange={(e) => setPivotConfig((p) => ({ ...p, showSubtotals: e.target.checked }))}
                   className="rounded accent-[#F92672]"
@@ -415,6 +416,7 @@ export function FieldShelf({
               <label className="inline-flex items-center gap-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
                 <input
                   type="checkbox"
+                  aria-label="冻结行表头"
                   checked={chartSpecConfig.stickyRowHeaders}
                   onChange={(e) => setChartSpecConfig((p) => ({ ...p, stickyRowHeaders: e.target.checked }))}
                   className="rounded accent-[#F92672]"
