@@ -58,6 +58,8 @@ export default function PivotWorkbench() {
   const [showAwardBadgeModal, setShowAwardBadgeModal] = useState(false);
 
   const [datasets, setDatasets] = useState([RETAIL_TEST_DATASET]);
+  const [syntheticProgress, setSyntheticProgress] = useState(null);
+  const syntheticGenerationRef = useRef(false);
   const [activeDatasetId, setActiveDatasetId] = useState(RETAIL_TEST_DATASET.id);
 
   const currentDataset = useMemo(
@@ -964,50 +966,64 @@ export default function PivotWorkbench() {
     showToast(`成功导入数据集「${newDs.name}」`);
   }, [uploadPreviewModal, showToast]);
 
-  const generate100kDataset = useCallback((count = 100000) => {
+  const generate100kDataset = useCallback(async (count = 100000) => {
+    if (syntheticGenerationRef.current) return;
+    syntheticGenerationRef.current = true;
     const regions = ['华东', '华南', '华北', '西南', '华中', '西北'];
     const cities = ['上海', '深圳', '北京', '成都', '杭州', '广州', '武汉', '西安'];
     const channels = ['线上旗舰店', '企业集采', '线下自营店', '抖音电商'];
     const categories = ['智能数码', '办公外设', '智能家居', '潮流服饰', '休闲食品'];
     const products = ['降噪耳机 Pro', '4K高清显示器', '智能扫地机 X9', '机械键盘 RGB', '纯棉连帽卫衣', '意式咖啡机', '冻干咖啡礼盒', '极光便携投影'];
     const memberTypes = ['普通会员', 'VIP黄金会员', '企业客户'];
-
     const bigRows = new Array(count);
-    for (let i = 0; i < count; i++) {
-      const m = (i % 12) + 1;
-      const d = (i % 28) + 1;
-      const yr = 2023 + (i % 3);
-      const sales = ((i * 173) % 95000) + 5000;
-      const qty = ((i * 7) % 45) + 1;
-      const cost = Math.round(sales * 0.6);
-      const profit = sales - cost;
-
-      bigRows[i] = {
-        订单日期: `${yr}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-        销售大区: regions[i % regions.length],
-        城市: cities[i % cities.length],
-        销售渠道: channels[i % channels.length],
-        商品类别: categories[i % categories.length],
-        商品名称: products[i % products.length],
-        客户类型: memberTypes[i % memberTypes.length],
-        销售额: sales,
-        销量: qty,
-        成本: cost,
-        毛利润: profit,
-        是否促销: i % 2 === 0,
+    const batchSize = 10000;
+    try {
+      setSyntheticProgress({ done: 0, total: count });
+      for (let start = 0; start < count; start += batchSize) {
+        const end = Math.min(count, start + batchSize);
+        for (let i = start; i < end; i++) {
+          const m = (i % 12) + 1;
+          const d = (i % 28) + 1;
+          const yr = 2023 + (i % 3);
+          const sales = ((i * 173) % 95000) + 5000;
+          const qty = ((i * 7) % 45) + 1;
+          const cost = Math.round(sales * 0.6);
+          bigRows[i] = {
+            订单日期: `${yr}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+            销售大区: regions[i % regions.length],
+            城市: cities[i % cities.length],
+            销售渠道: channels[i % channels.length],
+            商品类别: categories[i % categories.length],
+            商品名称: products[i % products.length],
+            客户类型: memberTypes[i % memberTypes.length],
+            销售额: sales,
+            销量: qty,
+            成本: cost,
+            毛利润: sales - cost,
+            是否促销: i % 2 === 0,
+          };
+        }
+        setSyntheticProgress({ done: end, total: count });
+        // Yield after each bounded batch so input and paint are not held hostage.
+        if (end < count) await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      const bigDs = {
+        id: `ds_100k_${Date.now()}`,
+        name: `10万行级全渠道零售压测数据集 (${count.toLocaleString()}行)`,
+        fields: RETAIL_TEST_DATASET.fields,
+        rows: bigRows,
       };
+      setDatasets((prev) => [...prev, bigDs]);
+      switchDataset(bigDs.id, bigDs);
+      setActiveDataSourceModal(null);
+      soundEngine.playTransitionChord();
+      showToast(`已生成 ${count.toLocaleString()} 行合成数据，透视计算由本地 Worker 执行；实际完成状态以数据栏为准。`);
+    } catch {
+      showToast('合成数据生成失败，未切换数据集', 'error');
+    } finally {
+      syntheticGenerationRef.current = false;
+      setSyntheticProgress(null);
     }
-    const bigDs = {
-      id: `ds_100k_${Date.now()}`,
-      name: `10万行级全渠道零售压测数据集 (${count.toLocaleString()}行)`,
-      fields: RETAIL_TEST_DATASET.fields,
-      rows: bigRows,
-    };
-    setDatasets((prev) => [...prev, bigDs]);
-    switchDataset(bigDs.id, bigDs);
-    setActiveDataSourceModal(null);
-    soundEngine.playTransitionChord();
-    showToast(`已生成并载入 ${count.toLocaleString()} 行全渠道零售数据集，虚拟滚动已就绪，聚合仍由本地 JavaScript 执行。`);
   }, [showToast, switchDataset]);
 
   const exportToCSV = useCallback(() => {
@@ -1180,6 +1196,7 @@ export default function PivotWorkbench() {
 
         <div role="status" aria-live="polite" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
           <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#66D9EF]" />
+          {syntheticProgress && <span className="shrink-0 font-semibold text-[#0088A3] dark:text-[#66D9EF]">正在生成合成数据 {syntheticProgress.done.toLocaleString()} / {syntheticProgress.total.toLocaleString()} 行</span>}
           <span className="truncate">数据来源：{currentDataset.id === RETAIL_TEST_DATASET.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {isPivotCalculating ? `正在计算 ${currentDataset.rows.length.toLocaleString()} 行` : `${pivotResult.filteredCount.toLocaleString()} / ${pivotResult.totalCount.toLocaleString()} 行`} · {usesWorker ? (workerFallback?.dataset === currentDataset && workerFallback?.config === pivotConfig ? 'Worker 失败，已回退主线程计算' : 'Web Worker 本地计算') : '本地 JavaScript 计算'}</span>
         </div>
 
