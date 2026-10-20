@@ -50,6 +50,7 @@ export function FieldShelf({
   showToast,
 }) {
   const [showMobileSchema, setShowMobileSchema] = useState(false);
+  const [showMobileConfig, setShowMobileConfig] = useState(false);
 
   return (
     <>
@@ -202,7 +203,19 @@ export function FieldShelf({
         {/* Main Work Area */}
         <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-visible md:overflow-y-auto lg:overflow-hidden">
           {!cinemaTheaterMode && (
-            <section className="bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden">
+            <>
+            <div className="md:hidden px-3 py-2 bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32]">
+              <button
+                aria-expanded={showMobileConfig}
+                aria-controls="pivot-analysis-config"
+                onClick={() => setShowMobileConfig((open) => !open)}
+                className="w-full px-3 py-2 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] flex items-center justify-between text-[11px] font-semibold"
+              >
+                <span>分析配置 · 行 / 列 / 值 / 筛选</span>
+                <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileConfig ? '收起' : '展开'}</span>
+              </button>
+            </div>
+            <section id="pivot-analysis-config" className={`${showMobileConfig ? 'grid' : 'hidden'} md:grid bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden`}>
               {[
                 { key: 'filters', label: 'FILTERS // 筛选器', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
                 { key: 'rows', label: 'ROWS // 行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
@@ -355,6 +368,7 @@ export function FieldShelf({
                 );
               })}
             </section>
+            </>
           )}
 
           {/* View Mode, Cube Formula Bar & Executive Insight Strip */}

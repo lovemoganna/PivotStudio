@@ -68,6 +68,11 @@ try{
     console.log(JSON.stringify({viewport:name,...result}));
   }
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  const isConfigCollapsed=await evaluate('document.querySelector("button[aria-controls=pivot-analysis-config]")?.getAttribute("aria-expanded")');
+  if(isConfigCollapsed!=='false')errors.push('mobile analysis settings not collapsed by default');
+  assert.equal(await clickText('分析配置'),true,'mobile analysis expansion');
+  await sleep(100);
+  if(await evaluate('document.querySelector("button[aria-controls=pivot-analysis-config]")?.getAttribute("aria-expanded")')!=='true')errors.push('mobile settings did not expand');
   assert.equal(await clickText('字段列表'),true,'mobile field expansion');
   await sleep(150);
   const expanded=await evaluate('document.querySelector("button[aria-controls=pivot-schema-fields]")?.getAttribute("aria-expanded")');

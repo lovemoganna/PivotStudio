@@ -98,13 +98,6 @@ export function HeaderBar({
             <kbd className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#272822] text-[9px] font-semibold text-[#F92672] border border-[#D6D4C8] dark:border-[#49483E] apple-font-mono">⌘K</kbd>
           </button>
 
-          <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-[#75715E] dark:text-[#908E80] apple-font-mono">
-            <Zap className="w-3.5 h-3.5 text-[#FD971F] shrink-0" />
-            <span>rows: <strong className="text-[#6B38FB] dark:text-[#AE81FF] font-semibold">{pivotResult.filteredCount.toLocaleString()}</strong>/{pivotResult.totalCount.toLocaleString()}</span>
-            <span className="text-[#49483E]">|</span>
-            <span>time: <strong className="text-[#528000] dark:text-[#A6E22E] font-semibold">{pivotResult.elapsedMs}ms</strong></span>
-          </div>
-
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5">
             <button
               onClick={() => {
