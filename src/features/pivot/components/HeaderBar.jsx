@@ -32,6 +32,7 @@ export function HeaderBar({
   liveEngineTestResults,
   exportToExcelMerged,
   exportToCSV,
+  isPivotCalculating = false,
   exportChartAsPNG,
   exportPDFReport,
   showToast,
@@ -122,8 +123,8 @@ export function HeaderBar({
           </button>
 
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 apple-font-mono">
-            <button onClick={exportToExcelMerged} title="导出真正的 Excel 工作簿 (.xlsx)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLSX</span></button>
-            <button onClick={exportToCSV} title="导出 CSV 数据表 (.csv)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
+            <button onClick={exportToExcelMerged} disabled={isPivotCalculating} title={isPivotCalculating ? '请先完成透视计算' : '导出真正的 Excel 工作簿 (.xlsx)'} className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLSX</span></button>
+            <button onClick={exportToCSV} disabled={isPivotCalculating} title={isPivotCalculating ? '请先完成透视计算' : '导出 CSV 数据表 (.csv)'} className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
             <button
               disabled={viewMode === 'table'}
               onClick={exportChartAsPNG}
