@@ -240,6 +240,19 @@ try{
   if(!perf.rows || !perf.chartVisible)errors.push('100k browser workbench not ready');
   if(!await evaluate('document.body.textContent.includes("Web Worker 本地计算")'))errors.push('100k pivot worker did not finish on dedicated thread');
   console.log('BROWSER_100K_MEASUREMENT',JSON.stringify({wallTimeMs:largeWallMs,...perf,note:'Synthetic records, CI Chromium only; no performance SLA'}));
+
+  // Switching away from a large dataset must never expose stale worker results.
+  const options=await evaluate('Array.from(document.querySelector("aside select").options).map(o=>o.value)');
+  if(options.length<2)errors.push('Cannot test worker dataset switch: missing datasets');
+  else{
+    await evaluate('(() => {const s=document.querySelector("aside select");s.value='+JSON.stringify("__DATASET_ORIGINAL__")+';return true})()'.replace('__DATASET_ORIGINAL__',options[0]));
+    await evaluate('(() => {document.querySelector("aside select").dispatchEvent(new Event("change",{bubbles:true}));return true;})()');
+    await waitFor(async()=>await evaluate('document.body.textContent.includes("33 / 33 行")'),'switch back to 33-row retail demo',12000);
+    const returnId=options.at(-1);
+    await evaluate('(() => { const s=document.querySelector("aside select");s.value='+JSON.stringify(returnId)+';s.dispatchEvent(new Event("change",{bubbles:true}));return true;})()');
+    await waitFor(async()=>await evaluate('document.body.textContent.includes("100,000 / 100,000 行") && document.body.textContent.includes("Web Worker 本地计算")'),'worker re-evaluates after dataset switch',45000);
+    console.log('WORKER_DATASET_SWITCH','PASS',JSON.stringify({original:options[0],target:returnId}));
+  }
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){
