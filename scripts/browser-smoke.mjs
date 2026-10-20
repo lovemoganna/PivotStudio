@@ -59,13 +59,19 @@ try{
   for(const [name,width,height] of [['mobile',390,844],['tablet',768,900],['desktop',1440,900]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
     await sleep(400);
-    const result=await evaluate('(() => { const ch=document.getElementById("pivot-chart-container"); const tb=document.getElementById("pivot-main-html-table"); return {pageWidth:document.documentElement.scrollWidth, viewportWidth:innerWidth, chartVisible:!!ch&&ch.getBoundingClientRect().height>0, tableVisible:!!tb&&tb.getBoundingClientRect().height>0, datasetLabel:document.body.textContent.includes("数据来源："), appTitle:document.querySelector("h1")?.textContent||""}; })()');
+    const result=await evaluate('(() => { const ch=document.getElementById("pivot-chart-container"); const tb=document.getElementById("pivot-main-html-table"); const sidebar=document.querySelector("aside"); return {pageWidth:document.documentElement.scrollWidth, viewportWidth:innerWidth, chartVisible:!!ch&&ch.getBoundingClientRect().height>0, tableVisible:!!tb&&tb.getBoundingClientRect().height>0, sidebarHeight:sidebar?.getBoundingClientRect().height || 0, datasetLabel:document.body.textContent.includes("数据来源："), appTitle:Array.from(document.querySelectorAll("h1")).find(h=>h.offsetParent!==null)?.textContent||""}; })()');
     if(result.pageWidth>result.viewportWidth+2)errors.push(name+': horizontal overflow '+JSON.stringify(result));
+    if(name==='mobile' && result.sidebarHeight>235)errors.push('mobile sidebar exceeds compact height: '+result.sidebarHeight);
     if(!result.tableVisible||!result.chartVisible||!result.datasetLabel)errors.push(name+': missing work surface '+JSON.stringify(result));
     const img=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     await writeFile('artifacts/browser/'+name+'.png',Buffer.from(img.data,'base64'));
     console.log(JSON.stringify({viewport:name,...result}));
   }
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  assert.equal(await clickText('字段列表'),true,'mobile field expansion');
+  await sleep(150);
+  const expanded=await evaluate('document.querySelector("button[aria-controls=pivot-schema-fields]")?.getAttribute("aria-expanded")');
+  if(expanded!=='true')errors.push('mobile schema did not expand');
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
   assert.equal(await clickText('仅图表'),true,'chart button');
   await sleep(200);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Upload, Globe, Server, Zap, GripVertical, ArrowUp, ArrowDown,
   ArrowUpDown, Filter, RotateCcw, Sparkles, Code2, X
@@ -49,6 +49,8 @@ export function FieldShelf({
   pivotResult,
   showToast,
 }) {
+  const [showMobileSchema, setShowMobileSchema] = useState(false);
+
   return (
     <>
       <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative">
@@ -148,7 +150,19 @@ export function FieldShelf({
             </div>
 
             {/* Schema Field List */}
-            <div className="flex-1 flex flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
+            <div className="md:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2">
+              <button
+                type="button"
+                aria-expanded={showMobileSchema}
+                aria-controls="pivot-schema-fields"
+                onClick={() => setShowMobileSchema((expanded) => !expanded)}
+                className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-3 py-2 text-left text-[11px] font-semibold flex items-center justify-between"
+              >
+                <span>字段列表（{currentDataset.fields.length}）</span>
+                <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileSchema ? '收起' : '展开'}</span>
+              </button>
+            </div>
+            <div id="pivot-schema-fields" className={`${showMobileSchema ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3`}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-bold tracking-tight apple-font-mono">SCHEMA_FIELDS ({currentDataset.fields.length})</span>
                 <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">// drag or +add</span>
