@@ -1290,6 +1290,7 @@ export default function PivotWorkbench() {
                 setDrillPage={setDrillPage}
                 applyKeynoteShot={applyKeynoteShot}
                 keynoteShotIdx={keynoteShotIdx}
+                showPresentationPresets={keynotePlaying || cinemaTheaterMode}
                 soundEngine={soundEngine}
               />
             </div>

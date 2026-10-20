@@ -31,6 +31,7 @@ export function ChartStudio({
   setDrillPage,
   applyKeynoteShot,
   keynoteShotIdx,
+  showPresentationPresets = false,
   soundEngine,
 }) {
   const [compactAxis, setCompactAxis] = React.useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
@@ -46,7 +47,7 @@ export function ChartStudio({
     <div className="flex-1 flex flex-col h-full min-h-0">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
         <div>
-          <h3 className="text-xs font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2 apple-font-mono">
+          <h3 className="text-sm font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2 apple-font-mono">
             <BarChart3 className="w-4 h-4 text-[#F92672]" />
             <span>{VISUAL_CHART_TYPES.find((t) => t.value === chartType)?.label || chartType}</span>
             {unifiedChartSpec.derivedSeriesKey && (
@@ -55,7 +56,7 @@ export function ChartStudio({
               </span>
             )}
           </h3>
-          <p className="text-[10px] text-[#75715E] dark:text-[#908E80] mt-0.5 apple-font-mono flex items-center gap-2">
+          <p className="text-[11px] text-[#75715E] dark:text-[#B8B5A8] mt-0.5 apple-font-mono flex items-center gap-2">
             <span>dim: {unifiedChartSpec.xDimensionLabel} · series: {unifiedChartSpec.primarySeriesKey}</span>
             {!unifiedChartSpec.canStack && (chartType === 'stacked_bar' || chartType === 'stacked_area') && (
               <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-[#FD971F] border border-[#FD971F]/30 text-[9px]">
@@ -225,22 +226,6 @@ export function ChartStudio({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Quick Tactile Chart Switcher Pill Strip */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 apple-font-mono shrink-0">
-        {VISUAL_CHART_TYPES.map((ct) => (
-          <button
-            key={ct.value}
-            onClick={() => {
-              soundEngine?.playClick(540);
-              setChartType(ct.value);
-            }}
-            className={`px-2 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap transition ${chartType === ct.value ? 'bg-[#F92672] text-[#F8F8F2]' : 'bg-[#EFECE1]/70 dark:bg-[#1E1F1C] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
-          >
-            {ct.short}
-          </button>
-        ))}
       </div>
 
       {/* Main Chart Canvas */}
@@ -679,7 +664,8 @@ export function ChartStudio({
         )}
       </div>
 
-      {/* Quick Analytical Lens Strip inside Chart Footer */}
+      {/* Presentation presets are optional, never part of the primary analysis canvas. */}
+      {showPresentationPresets && (
       <div className="mt-2 pt-2 border-t border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 flex flex-wrap items-center justify-between gap-2 text-[10px] apple-font-mono shrink-0">
         <div className="flex items-center gap-1.5 overflow-x-auto">
           <span className="text-[#75715E] dark:text-[#908E80] shrink-0">LENS_PRESETS:</span>
@@ -697,6 +683,7 @@ export function ChartStudio({
           双击任意单元格或柱体可下钻原始明细
         </span>
       </div>
+      )}
     </div>
   );
 }

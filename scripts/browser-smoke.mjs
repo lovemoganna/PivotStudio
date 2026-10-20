@@ -57,6 +57,7 @@ try{
   await waitFor(async()=>await evaluate("Array.from(document.querySelectorAll('h1')).some(h => h.textContent.includes('PivotStudio'))"),'React app',12000);
   const errors=[];
   const demoClosed=await evaluate('!document.body.textContent.includes("Keynote 演示")');
+  if(await evaluate('document.body.textContent.includes("LENS_PRESETS:")')) errors.push('presentation presets clutter ordinary analysis chart');
   if(!demoClosed)errors.push('demo actions displace primary navigation on initial load');
   assert.equal(await clickText('演示与检查'),true);
   await sleep(80);
