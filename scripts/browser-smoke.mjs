@@ -52,7 +52,7 @@ try{
   const clickText=(label)=>evaluate('(() => { const b=[...document.querySelectorAll("button")].find(x=>x.textContent.trim().includes('+JSON.stringify(label)+')); if(!b)return false; b.click(); return true; })()');
   await send('Page.enable');
   await send('Runtime.enable');
-  const navigation=await send('Page.navigate',{url:'http://127.0.0.1:5173/'});
+  const navigation=await send('Page.navigate',{url:'http://127.0.0.1:5173/?smoke=true'});
   console.log('BROWSER_NAVIGATION',JSON.stringify(navigation));
   await sleep(2500);
   console.log('BROWSER_BOOT',JSON.stringify(await evaluate('({url:location.href,ready:document.readyState,title:document.title,body:document.body?.innerText.slice(0,500),html:document.documentElement?.outerHTML.slice(0,800)})')));
