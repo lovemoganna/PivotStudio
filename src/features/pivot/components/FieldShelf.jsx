@@ -61,7 +61,7 @@ export function FieldShelf({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono">
-                  ACTIVE_DATASET
+                  当前数据集
                 </span>
                 <span className="text-[11px] text-[#4A7500] dark:text-[#A6E22E] apple-font-mono">
                   {currentDataset.rows.length.toLocaleString()} records
@@ -165,8 +165,8 @@ export function FieldShelf({
             </div>
             <div id="pivot-schema-fields" className={`${showMobileSchema ? 'flex' : 'hidden'} lg:flex flex-1 flex-col min-h-0 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3`}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold tracking-tight apple-font-mono">SCHEMA_FIELDS ({currentDataset.fields.length})</span>
-                <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">// drag or +add</span>
+                <span className="text-[11px] font-bold tracking-tight apple-font-mono">数据字段 ({currentDataset.fields.length})</span>
+                <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">拖拽或点击添加</span>
               </div>
               <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
                 {currentDataset.fields.map((field) => {
@@ -217,10 +217,10 @@ export function FieldShelf({
             </div>
             <section id="pivot-analysis-config" className={`${showMobileConfig ? 'grid' : 'hidden'} lg:grid bg-[#EFECE1]/65 dark:bg-[#272822]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 py-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2.5 shrink-0 print:hidden`}>
               {[
-                { key: 'filters', label: 'FILTERS // 筛选器', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
-                { key: 'rows', label: 'ROWS // 行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
-                { key: 'columns', label: 'COLUMNS // 列维度', badgeColor: 'text-[#0088A3] dark:text-[#66D9EF]', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
-                { key: 'values', label: 'VALUES // 值指标', badgeColor: 'text-[#C86400] dark:text-[#FD971F]', borderAccent: 'border-l-2 border-l-[#FD971F]' },
+                { key: 'filters', label: '筛选条件', badgeColor: 'text-[#4A7500] dark:text-[#A6E22E]', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
+                { key: 'rows', label: '行维度', badgeColor: 'text-[#F92672]', borderAccent: 'border-l-2 border-l-[#F92672]' },
+                { key: 'columns', label: '列维度', badgeColor: 'text-[#0088A3] dark:text-[#66D9EF]', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
+                { key: 'values', label: '数值指标', badgeColor: 'text-[#C86400] dark:text-[#FD971F]', borderAccent: 'border-l-2 border-l-[#FD971F]' },
               ].map((z) => {
                 const items = pivotConfig[z.key] || [];
                 const isOver = dragOverZone === z.key;

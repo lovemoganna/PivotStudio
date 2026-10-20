@@ -62,7 +62,7 @@ export function PivotTable({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span>COL_DIM: {pivotResult.colConfigs.map((c) => getDimDisplayLabel(c)).join(' / ')}</span>
+                        <span>列维度：{pivotResult.colConfigs.map((c) => getDimDisplayLabel(c)).join(' / ')}</span>
                       </div>
                     </th>
                   )}

@@ -58,7 +58,7 @@ export function ChartStudio({
             )}
           </h3>
           <p className="text-[10px] text-[#75715E] dark:text-[#908E80] mt-0.5 apple-font-mono flex items-center gap-2">
-            <span>dim: {unifiedChartSpec.xDimensionLabel} · series: {unifiedChartSpec.primarySeriesKey}</span>
+            <span>维度：{unifiedChartSpec.xDimensionLabel} · 指标：{unifiedChartSpec.primarySeriesKey}</span>
             {!unifiedChartSpec.canStack && (chartType === 'stacked_bar' || chartType === 'stacked_area') && (
               <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-[#FD971F] border border-[#FD971F]/30 text-[9px]">
                 量纲不同已自动按分组呈现
