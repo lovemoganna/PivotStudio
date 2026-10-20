@@ -136,7 +136,7 @@ try{
   // The raw-record affordance must show actual underlying rows, not just a count or a toast.
   assert.equal(await clickText('查看原始记录'),true,'open all filtered source rows');
   await sleep(150);
-  const sourceRecords=await evaluate('(() => { const dialog=document.querySelector("[role=dialog][aria-label=\"原始交易明细下钻\"]"); return {exists:!!dialog, text:dialog?.textContent.slice(0,360) || ""}; })()');
+  const sourceRecords=await evaluate(`(() => { const dialog=document.querySelector('[role="dialog"][aria-label="原始交易明细下钻"]'); return {exists:!!dialog, text:dialog?.textContent.slice(0,360) || ""}; })()`);
   if(!sourceRecords.exists || !sourceRecords.text.includes('33 条记录'))errors.push('source record dialog did not show 33 real rows');
   await evaluate('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
   await sleep(150);
