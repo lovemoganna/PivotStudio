@@ -195,7 +195,9 @@ try{
   const drawn=await evaluate('({bars:document.querySelectorAll("#pivot-chart-container .recharts-bar-rectangle").length,axisText:[...document.querySelectorAll("#pivot-chart-container .recharts-yAxis .recharts-cartesian-axis-tick text")].map(n=>n.textContent)})');
   if(drawn.bars<1)errors.push('synthetic 100K chart has no rendered bars');
   if(!drawn.axisText.some(value=>/^(¥|\\$)?0(?:\\.0+)?$/.test(value)))errors.push('absolute positive bar chart vertical axis is not zero anchored: '+JSON.stringify(drawn.axisText));
-  console.log('BROWSER_100K_BAR_AXIS',JSON.stringify(drawn));
+  const labelGroups=await evaluate('document.querySelectorAll("#pivot-chart-container .recharts-label-list").length');
+  if(labelGroups>0)errors.push('100K equal-value bars still have colliding numeric labels: '+labelGroups);
+  console.log('BROWSER_100K_BAR_AXIS',JSON.stringify({...drawn,labelGroups}));
   const stressShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   await writeFile('artifacts/browser/100k-synthetic.png',Buffer.from(stressShot.data,'base64'));
 

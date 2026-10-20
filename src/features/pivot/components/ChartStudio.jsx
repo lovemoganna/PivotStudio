@@ -41,6 +41,23 @@ export function ChartStudio({
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, []);
+  const chartCanvasRef = React.useRef(null);
+  const [chartCanvasWidth, setChartCanvasWidth] = React.useState(0);
+  React.useEffect(() => {
+    const el = chartCanvasRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const update = () => setChartCanvasWidth(Math.max(0, el.clientWidth));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // Show numeric bar labels only where each group has enough horizontal space.
+  // Values remain accessible through tooltips regardless of available label space.
+  const barColumns = Math.max(1, unifiedChartSpec.items?.length || 0);
+  const barSeries = Math.max(1, unifiedChartSpec.seriesMetaList?.length || 0);
+  const labelsFit = chartType === 'horizontal_bar' || chartCanvasWidth / (barColumns * barSeries) >= 80;
+  const showBarDataLabels = chartSpecConfig.showDataLabels && labelsFit;
   // Display a representative subset of categorical axis ticks without dropping data points.
   const axisMaxLabels = compactAxis ? 4 : 8;
   const categoryTickInterval = Math.max(0, Math.ceil((unifiedChartSpec.items?.length || 0) / axisMaxLabels) - 1);
@@ -230,7 +247,7 @@ export function ChartStudio({
       </div>
 
       {/* Main Chart Canvas */}
-      <div className="flex-1 w-full h-full min-h-[260px] flex items-center justify-center overflow-hidden">
+      <div ref={chartCanvasRef} title={!labelsFit && chartSpecConfig.showDataLabels ? '当前空间不足，已隐藏数据标签；悬停柱体可查看完整数值' : undefined} className="flex-1 w-full h-full min-h-[260px] flex items-center justify-center overflow-hidden">
         {!unifiedChartSpec.hasValues ? (
           <div className="flex flex-col items-center justify-center p-8 text-center apple-font-mono animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-[#FD971F]/10 border border-[#FD971F]/30 flex items-center justify-center mb-3 text-[#FD971F] shadow-sm">
@@ -650,7 +667,7 @@ export function ChartStudio({
                       cursor="pointer"
                       onClick={(d) => handleChartPointClick(d)}
                     >
-                      {chartSpecConfig.showDataLabels && (idx === 0 || !isStacked) && unifiedChartSpec.seriesMetaList.length <= 3 && (
+                      {showBarDataLabels && (idx === 0 || !isStacked) && unifiedChartSpec.seriesMetaList.length <= 3 && (
                         <LabelList
                           dataKey={idx === 0 && !isStacked ? '_compactPrimaryLabel' : sm.key}
                           content={(p) => renderSmartBarLabel(p, darkMode, chartType === 'horizontal_bar')}
