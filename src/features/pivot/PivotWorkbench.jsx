@@ -1202,7 +1202,7 @@ export default function PivotWorkbench() {
 
         {/* Bento KPI Cards Strip with Mini Sparklines */}
         {!isPivotCalculating && unifiedChartSpec.kpiCards.length > 0 && (
-          <div className="bg-[#F7F6F0] dark:bg-[#1E1F1C] px-4 pt-3 pb-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 shrink-0">
+          <div style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 18rem), 1fr))' }} className="bg-[#F7F6F0] dark:bg-[#1E1F1C] px-4 pt-3 pb-1 grid gap-3 shrink-0">
             {unifiedChartSpec.kpiCards.map((kpi) => (
               <div key={kpi.id} className="px-4 py-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822] apple-specular-card flex items-center justify-between gap-3 apple-transition hover:border-[#66D9EF]/60">
                 <div className="min-w-0">
