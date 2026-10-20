@@ -39,3 +39,53 @@ test('SQL template groups by transformed year expression',()=>{
   assert.match(sql,/FROM "sales-data"/);
   assert.match(sql,/TEMPLATE ONLY/);
 });
+
+test('multi-dimensional pivot preserves audited totals, filters and underlying record evidence',()=>{
+  const regions=['华东','华南','华北'], years=['2025','2026'], channels=['线上','线下'];
+  const rows=Array.from({length:144},(_,i)=>({
+    region:regions[i%3],year:years[Math.floor(i/3)%2],channel:channels[Math.floor(i/6)%2],
+    amount:i%17===0?null:(i%13)-4,
+    user:'U'+i%19
+  }));
+  const fields=[{name:'region',type:'text'},{name:'year',type:'text'},{name:'channel',type:'text'},{name:'amount',type:'number'},{name:'user',type:'text'}];
+  const base={
+    rows:[{field:'region',sort:'none'}],
+    columns:[{field:'year',sort:'none'}],
+    values:[
+      {id:'sum',field:'amount',agg:'sum'},
+      {id:'count',field:'amount',agg:'count'},
+      {id:'avg',field:'amount',agg:'avg'},
+      {id:'distinct',field:'user',agg:'count_distinct'}
+    ],filters:[],showSubtotals:false
+  };
+  const configurations=[
+    base,
+    {...base,filters:[{field:'channel',selectedValues:['线上']}]},
+    {...base,filters:[{field:'channel',selectedValues:['线下']}]},
+    {...base,filters:[{field:'year',selectedValues:['2026']}]}
+  ];
+  for(const cfg of configurations){
+    const result=calculatePivot({fields,rows},cfg);
+    const expectedRows=rows.filter(r=>cfg.filters.every(f=>f.selectedValues.includes(String(r[f.field]))));
+    assert.equal(result.filteredCount,expectedRows.length);
+    for(const region of regions){
+      for(const year of years){
+        const matching=expectedRows.filter(r=>r.region===region && r.year===year);
+        const finite=matching.filter(r=>r.amount !== null);
+        const sum=finite.reduce((a,r)=>a+r.amount,0);
+        const avg=finite.length?sum/finite.length:0;
+        const prefix=region+'@@'+year+'@@';
+        assert.equal(result.rawValueMatrix[prefix+'sum'],sum);
+        assert.equal(result.rawValueMatrix[prefix+'count'],finite.length);
+        assert.equal(result.rawValueMatrix[prefix+'avg'],avg);
+        assert.equal(result.rawValueMatrix[prefix+'distinct'],new Set(matching.map(r=>r.user)).size);
+        assert.equal((result.cellRecordsMap.get(region+'@@'+year)||[]).length,matching.length);
+      }
+    }
+    const finite=expectedRows.filter(r=>r.amount !== null);
+    assert.equal(result.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@sum'],finite.reduce((a,r)=>a+r.amount,0));
+    const transferred=structuredClone(result);
+    assert.ok(transferred.cellRecordsMap instanceof Map);
+    assert.equal(transferred.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@sum'],result.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@sum']);
+  }
+});
