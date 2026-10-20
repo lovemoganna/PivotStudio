@@ -47,7 +47,7 @@ export function PivotTable({
         </div>
       )}
       <div ref={tableContainerRef} onScroll={(e) => setScrollTop?.(e.currentTarget.scrollTop)} className="flex-1 h-full min-h-0 overflow-auto relative">
-        <table id="pivot-main-html-table" className="w-full border-separate border-spacing-0 text-[11px] text-left select-text tabular-nums">
+        <table id="pivot-main-html-table" className="w-full border-separate border-spacing-0 text-[12px] text-left select-text tabular-nums">
           <thead className="sticky top-0 z-20 bg-[#EFECE1]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-md text-[#272822] dark:text-[#F8F8F2] shadow-sm">
             {pivotResult.colConfigs.length > 0 && pivotResult.colHeaderRows.length > 0 && (
               pivotResult.colHeaderRows.map((headerRow, levelIdx) => (

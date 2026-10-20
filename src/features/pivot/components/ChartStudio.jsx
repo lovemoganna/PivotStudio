@@ -325,7 +325,7 @@ export function ChartStudio({
                   angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                   textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                   height={unifiedChartSpec.items.length > 5 ? 56 : 28}
-                  tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }}
+                  tick={{ fontSize: 10.5, fill: darkMode ? '#908E80' : '#75715E' }}
                   tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                 />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
@@ -394,7 +394,7 @@ export function ChartStudio({
                   angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                   textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                   height={unifiedChartSpec.items.length > 5 ? 56 : 28}
-                  tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }}
+                  tick={{ fontSize: 10.5, fill: darkMode ? '#908E80' : '#75715E' }}
                   tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                 />
                 <YAxis
@@ -426,7 +426,7 @@ export function ChartStudio({
                   angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                   textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                   height={unifiedChartSpec.items.length > 5 ? 56 : 28}
-                  tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }}
+                  tick={{ fontSize: 10.5, fill: darkMode ? '#908E80' : '#75715E' }}
                   tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                 />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#F92672' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
@@ -574,7 +574,7 @@ export function ChartStudio({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
-                <XAxis dataKey="name" tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }} />
+                <XAxis dataKey="name" tick={{ fontSize: 10.5, fill: darkMode ? '#908E80' : '#75715E' }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} />
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
@@ -628,7 +628,7 @@ export function ChartStudio({
                       dataKey="name"
                       reversed={true}
                       width={110}
-                      tick={{ fontSize: 9.5, fill: darkMode ? '#F8F8F2' : '#272822' }}
+                      tick={{ fontSize: 10.5, fill: darkMode ? '#F8F8F2' : '#272822' }}
                       tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                     />
                   </>
@@ -640,7 +640,7 @@ export function ChartStudio({
                       angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                       textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                       height={unifiedChartSpec.items.length > 5 ? 56 : 28}
-                      tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }}
+                      tick={{ fontSize: 10.5, fill: darkMode ? '#908E80' : '#75715E' }}
                       tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                     />
                     <YAxis
