@@ -401,6 +401,7 @@ export function FieldShelf({
                       return (
                         <div
                           key={field.name}
+                          data-testid={`field-${field.name}`}
                           draggable={!isReadOnly}
                           onDragStart={() => setDraggingPayload({ source: 'fieldList', field: field.name })}
                           onDragEnd={() => { setDraggingPayload(null); setDragOverZone(null); }}
@@ -495,6 +496,8 @@ export function FieldShelf({
                     return (
                       <div
                         key={z.key}
+                        data-testid={`zone-${z.key}`}
+                        role="group" aria-label={z.title || z.key}
                         onDragOver={(e) => { e.preventDefault(); setDragOverZone(z.key); }}
                         onDragLeave={() => setDragOverZone(null)}
                         onDrop={(e) => {
@@ -509,10 +512,9 @@ export function FieldShelf({
                                 setDraggingPayload(null);
                                 return;
                               }
-                              removeZoneItem(draggingPayload.source, draggingPayload.itemId);
                             }
                             if (draggingPayload.source !== z.key) {
-                              addFieldToZone(z.key, draggingPayload.field);
+                              addFieldToZone(z.key, draggingPayload.field, draggingPayload);
                             }
                           }
                           setDraggingPayload(null);

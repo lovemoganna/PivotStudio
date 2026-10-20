@@ -39,3 +39,32 @@ test('R2 GBK Chinese preview, delimiter, header and field overrides',async({page
   await expect(preview(page).locator('tbody tr')).toHaveCount(20);
   await expect(preview(page).locator('select').last()).toHaveValue('number');
 });
+
+test('R3 four-zone drag/drop, aggregations, history and 100k refresh budget',async({page})=>{
+  await page.goto('/');
+  await upload(page,'区域,渠道,金额\n'+Array.from({length:100000},(_,i)=>`区域${i%5},渠道${i%2},${i%100}`).join('\n'));
+  await expect(preview(page)).toBeVisible();
+  await page.getByRole('button',{name:'仅导入数据（清空当前透视）',exact:true}).click();
+  await ready(page);
+  for(const [field,zone] of [['区域','rows'],['渠道','columns'],['金额','values'],['区域','filters']]) {
+    await page.getByTestId(`field-${field}`).dragTo(page.getByTestId(`zone-${zone}`));
+    await expect(page.getByTestId(`zone-${zone}`)).toContainText(field);
+    await ready(page);
+  }
+  const agg=page.getByLabel('切换聚合口径',{exact:true}).first();
+  for(const value of ['count','avg','count_distinct','sum']) {
+    const start=Date.now();
+    await agg.selectOption(value);
+    await expect(agg).toHaveValue(value);
+    await ready(page);
+    const elapsed=Date.now()-start;
+    console.log('R3 refresh',value,elapsed,'ms');
+    expect(elapsed).toBeLessThan(1000);
+  }
+  await page.getByLabel('快捷表计算',{exact:true}).first().selectOption('pct_grand');
+  await ready(page);
+  await page.getByRole('button',{name:'撤销',exact:true}).click();
+  await expect(page.getByLabel('快捷表计算',{exact:true}).first()).toHaveValue('normal');
+  await page.getByRole('button',{name:'重做',exact:true}).click();
+  await expect(page.getByLabel('快捷表计算',{exact:true}).first()).toHaveValue('pct_grand');
+});

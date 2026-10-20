@@ -29,3 +29,7 @@ Results are added per requirement; untested browsers are not claimed as verified
 ### R2
 
 27 Node tests passed. Chromium end-to-end verified GBK Chinese, semicolon detection, header override with row-count changes, field override, TSV and exactly 20 preview rows. Numeric/date/boolean inference and leading-zero identifier preservation tested. Ambiguous all-text headers default to present; users can correct explicitly. Excel header handling remains explicit. Added `@playwright/test` as development-only dependency for reproducible browser acceptance (zero new production dependencies).
+
+### R3
+
+Retained existing four zones, all requested aggregations, percentage modes and history. Fixed cross-zone movement to be one history transaction. Chromium 100k-row CSV: real drag/drop into all four zones; count/avg/distinct/sum refresh 411/444/323/334ms from browser action through completed Worker rendering; percentage Undo/Redo passed. These measurements use a low-cardinality fixture and are not a guarantee for every matrix cardinality or phone.

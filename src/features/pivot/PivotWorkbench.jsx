@@ -687,14 +687,18 @@ export default function PivotWorkbench() {
     });
   }, []);
 
-  const addFieldToZone = useCallback((zone, fieldName) => {
+  const addFieldToZone = useCallback((zone, fieldName, source) => {
     if (isReadOnly) {
       showToast('当前为只读预览模式 (Viewer)，无法修改透视配置', 'error');
       return;
     }
     if (!currentDataset) return;
     soundEngine.playClick(580);
-    setPivotConfig((prev) => {
+    setPivotConfig((previous) => {
+      // Cross-zone moves form one history transaction, so Undo restores both sides.
+      const prev = source?.itemId && source.source !== zone && source.source !== 'fieldList'
+        ? { ...previous, [source.source]: previous[source.source].filter((item) => item.id !== source.itemId) }
+        : previous;
       const list = prev[zone] || [];
       const fMeta = currentDataset.fields?.find((f) => f.name === fieldName);
 
