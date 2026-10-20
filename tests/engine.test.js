@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parseCSVRecords,parseCSVTextToSheet} from '../src/utils/csvParser.js';
 import {computeAggregation,calculatePivot} from '../src/features/pivot/engine/calculatePivot.js';
+import {buildUnifiedChartSpec} from '../src/features/pivot/engine/buildChartSpec.js';
 import {generateDuckDBPivotSQL} from '../src/services/duckdbQuery.js';
 
 test('quoted CSV supports multi-line data',()=>{
@@ -88,4 +89,20 @@ test('multi-dimensional pivot preserves audited totals, filters and underlying r
     assert.ok(transferred.cellRecordsMap instanceof Map);
     assert.equal(transferred.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@sum'],result.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@sum']);
   }
+});
+
+test('histogram excludes missing and invalid values without changing other chart results',()=>{
+  const ds={
+    fields:[{name:'region',type:'text'},{name:'amount',type:'number'}],
+    rows:[{region:'A',amount:null},{region:'A',amount:''},{region:'A',amount:10},
+          {region:'B',amount:20},{region:'B',amount:'invalid'}]
+  };
+  const cfg={rows:[{field:'region'}],columns:[],values:[{id:'v1',field:'amount',agg:'sum'}],filters:[]};
+  const pivot=calculatePivot(ds,cfg);
+  const histogram=buildUnifiedChartSpec(ds,pivot,'histogram',{histogramBins:4});
+  const normal=buildUnifiedChartSpec(ds,pivot,'bar',{});
+  assert.equal(histogram.histogramItems.reduce((sum,bin)=>sum+bin.count,0),2);
+  assert.equal(histogram.histogramItems.reduce((sum,bin)=>sum+bin.matchedRows.length,0),2);
+  assert.equal(normal.histogramItems.length,0);
+  assert.equal(normal.primaryStats.total,30);
 });
