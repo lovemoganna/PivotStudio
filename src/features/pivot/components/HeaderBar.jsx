@@ -59,7 +59,7 @@ export function HeaderBar({
     <>
       {/* Monokai Pro Toast Notification */}
       {toastMessage && (
-        <div role="status" aria-live="polite" className="fixed bottom-10 right-6 z-50 flex items-center gap-3 px-4 py-2.5 rounded-xl shadow-2xl border bg-[#272822]/95 text-[#F8F8F2] border-[#F92672]/50 backdrop-blur-2xl animate-apple-modal max-w-md">
+        <div role="status" aria-live="polite" className="fixed bottom-10 right-6 z-50 flex items-center gap-3 px-4 py-2.5 rounded-xl shadow-2xl border bg-[#272822]/95 text-[#F8F8F2] border-[#F92672]/50 backdrop-blur-2xl animate-apple-modal max-w-[calc(100vw-2rem)] sm:max-w-md">
           {toastMessage.type === 'error' ? <AlertCircle className="w-4 h-4 text-[#F92672] shrink-0" /> : <CheckCircle2 className="w-4 h-4 text-[#A6E22E] shrink-0" />}
           <span className="text-[11px] font-medium tracking-tight leading-snug apple-font-mono">{toastMessage.text}</span>
           <button onClick={() => setToastMessage(null)} className="ml-1 p-0.5 rounded text-[#75715E] hover:text-[#F8F8F2] hover:bg-white/10 transition" aria-label={t("关闭通知")}><X className="w-3.5 h-3.5" /></button>

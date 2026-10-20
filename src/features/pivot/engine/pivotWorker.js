@@ -1,3 +1,4 @@
+import { profileField } from './profileField.js';
 import { calculatePivot } from './calculatePivot.js';
 import { buildUnifiedChartSpec } from './buildChartSpec.js';
 
@@ -11,6 +12,11 @@ self.onmessage = (e) => {
     if (generation !== resultId) return;
     const records = cachedPivot?.cellRecordsMap.get(`${rowKey}@@${colKey}`) || [];
     self.postMessage({ kind: 'drill', generation, metadata, records });
+    return;
+  }
+  if (e.data?.kind === 'profile') {
+    try { self.postMessage({ kind:'profile', profileId:e.data.profileId, result:profileField(cachedDataset,e.data.field,e.data.dimension,e.data.matchLabel) }); }
+    catch(error) {self.postMessage({kind:'profile',profileId:e.data.profileId,error:error.message});}
     return;
   }
   if (!payload) return;

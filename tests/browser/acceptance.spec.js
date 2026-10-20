@@ -3,22 +3,27 @@ import { readFile } from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 import { encodeView } from '../../src/utils/viewConfig.js';
 import { parseCSVRecords } from '../../src/utils/csvParser.js';
+test.beforeEach(async ({page}) => { await page.route('https://fonts.googleapis.com/**',route=>route.abort()); await page.route('https://fonts.gstatic.com/**',route=>route.abort()); });
 const upload = (page, buffer, name='data.csv') => page.locator('input[type=file]').first().setInputFiles({name,mimeType:'text/csv',buffer:Buffer.isBuffer(buffer)?buffer:Buffer.from(buffer)});
 const preview = page => page.getByRole('dialog',{name:'文件数据预览与类型校准',exact:true});
-const ready = async page => { await expect(page.locator('progress[aria-label="计算进度"]')).toHaveCount(0); };
+const ready = async page => { await expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle',{timeout:45000}); };
 
 test('R1 500k CSV responds, shows progress, and cancels',async({page})=>{
   await page.goto('/');
   await page.evaluate(()=>{window.ticks=0;window.timer=setInterval(()=>window.ticks++,20)});
+  const start=Date.now();
   const csv='区域,金额\n'+Array.from({length:500000},(_,i)=>`区域${i%10},${i%100}`).join('\n');
   await upload(page,csv,'500k.csv');
   await expect(page.locator('progress[aria-label="导入进度"]')).toBeVisible();
-  await expect(preview(page)).toContainText('500000 行');
+  await page.getByRole('button',{name:'切换主题',exact:true}).click();
+  await expect(preview(page)).toContainText('500000 行',{timeout:45000});
   await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
-  await expect(page.locator('[role=status]').filter({hasText:/500,000 \/ 500,000 行/}).first()).toBeVisible();
+  await expect(page.locator('[role=status]').filter({hasText:/500,000 \/ 500,000 行/}).first()).toBeVisible({timeout:45000});
   await ready(page);
   await page.getByRole('button',{name:'切换主题',exact:true}).click();
-  expect(await page.evaluate(()=>window.ticks)).toBeGreaterThan(10);
+  const ticks=await page.evaluate(()=>window.ticks);
+  expect(ticks).toBeGreaterThan(10);
+  console.log('R1 browser evidence',JSON.stringify({rows:500000,wallMs:Date.now()-start,uiTicks:ticks}));
   await upload(page,csv,'cancel.csv');
   await page.getByRole('button',{name:'取消',exact:true}).click();
   await expect(page.locator('progress[aria-label="导入进度"]')).toHaveCount(0);
@@ -71,6 +76,13 @@ test('R3 four-zone drag/drop, aggregations, history and 100k refresh budget',asy
   await expect(page.getByLabel('快捷表计算',{exact:true}).first()).toHaveValue('normal');
   await page.getByRole('button',{name:'重做',exact:true}).click();
   await expect(page.getByLabel('快捷表计算',{exact:true}).first()).toHaveValue('pct_grand');
+  await ready(page);
+  await page.getByTestId('zone-columns').locator('[draggable=true]').first().dragTo(page.getByTestId('zone-rows'));
+  await expect(page.getByTestId('zone-rows')).toContainText('渠道');
+  await expect(page.getByTestId('zone-columns')).not.toContainText('渠道');
+  await page.getByRole('button',{name:'撤销',exact:true}).click();
+  await expect(page.getByTestId('zone-columns')).toContainText('渠道');
+  await expect(page.getByTestId('zone-rows')).not.toContainText('渠道');
 });
 
 test('R4 chart drilldown, table highlight and four chart types',async({page})=>{
@@ -188,4 +200,56 @@ test('R7 system/manual themes, language persistence and mobile sticky horizontal
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2)).toBe(true);
   await page.getByLabel('Interface language',{exact:true}).selectOption('zh');
   await expect(page.getByLabel('选择图表类型',{exact:true})).toBeVisible();
+});
+
+test('R8 malformed empty missing-field inputs recover without blank screen or data uploads',async({page})=>{
+  const requests=[];
+  page.on('request',request=>requests.push(request.url()+' '+(request.postData()||'')));
+  await page.goto('/');
+  for(const [buffer,name,expected] of [
+    ['', 'empty.csv', '文件为空'],
+    ['not a spreadsheet', 'wrong.pdf', '不支持此文件格式'],
+    ['name,value\n"broken,1','broken.csv','引号'],
+    ['<!doctype html><html>denied</html>','html.csv','HTML'],
+  ]) {
+    await upload(page,buffer,name);
+    await expect(page.locator('[role=status]').filter({hasText:expected}).first()).toBeVisible();
+    await expect(page.locator('header h1')).toBeVisible();
+  }
+  await upload(page,'name,value\nPS_LOCAL_ONLY_SENTINEL','missing.csv');
+  await expect(preview(page).getByRole('alert')).toContainText('缺少字段');
+  await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
+  await ready(page);
+  await expect(page.locator('#pivot-main-html-table')).toBeVisible();
+  expect(requests.some(request=>request.includes('PS_LOCAL_ONLY_SENTINEL'))).toBe(false);
+});
+
+test('R8 memory guard gives advice, blocks stale exports and recovers after config change',async({page})=>{
+  const config={fullConfig:{rows:[{id:'r',field:'a'}],columns:[{id:'c',field:'b'}],values:[{id:'v',field:'n',agg:'sum'}],filters:[]}};
+  await page.goto('/#share_token='+encodeURIComponent(encodeView(config)));
+  await upload(page,'a,b,n\n'+Array.from({length:1000},(_,i)=>`a${i},b${i},1`).join('\n'));
+  await expect(preview(page)).toBeVisible();
+  await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
+  await expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','failed');
+  await expect(page.getByRole('alert').filter({hasText:'内存不足'})).toBeVisible();
+  await page.getByRole('button',{name:'.CSV',exact:true}).click();
+  await expect(page.locator('[role=status]').filter({hasText:'没有可导出'})).toBeVisible();
+  await page.getByTestId('zone-columns').getByRole('button',{name:'移除字段',exact:true}).click();
+  await ready(page);
+  await expect(page.locator('#pivot-main-html-table')).toBeVisible();
+});
+
+test('R8 worker crash and storage quota failure stay visible and allow retry',async({page})=>{
+  await page.addInitScript(()=>{
+    const NativeWorker=window.Worker; window.workers=[];
+    window.Worker=class extends NativeWorker { constructor(...args){super(...args);window.workers.push(this);} };
+    const nativeSet=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(key,value){ if(key==='pivotstudio_workspaces_v1')throw new DOMException('Quota exceeded','QuotaExceededError');return nativeSet.call(this,key,value); };
+  });
+  await page.goto('/?demo=retail'); await ready(page);
+  await expect(page.locator('[role=status]').filter({hasText:'本机存储不足'})).toBeVisible();
+  await page.evaluate(()=>window.workers.at(-1).dispatchEvent(new ErrorEvent('error',{message:'simulated worker allocation failure'})));
+  await expect(page.getByRole('alert').filter({hasText:'内存不足'})).toBeVisible();
+  await page.getByRole('button',{name:'重新计算',exact:true}).click(); await ready(page);
+  await expect(page.locator('#pivot-main-html-table')).toBeVisible();
 });

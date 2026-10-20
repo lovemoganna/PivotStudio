@@ -49,3 +49,11 @@ Chromium verified named snapshot persistence, deleting the final snapshot and re
 ### R7
 
 Chromium 390×844: system dark/light changes, manual override, locale switching and reload persistence, English start-page sample button, mobile horizontal table scroll and pinned first column all passed without page-width overflow. Added a centralized UI-copy dictionary; dataset field names and record values are never translated. The outer app now permits normal mobile vertical scrolling. No production localization library added.
+
+### R8
+
+32 Node regressions and production build passed. Chromium fault tests cover empty/unsupported/malformed/HTML inputs, missing-field warning, storage quota rejection, sparse matrix memory guard, blocking stale exports, configuration repair and Worker crash/retry. Network inspection confirmed an input sentinel never appeared in outgoing requests. Errors remain visible until dismissed. A field-statistics worker query also removes slicer/profile/filter-value scans from the main thread, including public-sheet parsing.
+
+Final 500k Chromium replay: 8,204ms import/compute, 228 UI timer ticks; a theme action was performed during import. The initial browser harness had a 5s assertion limit for the entire 500k computation; it was corrected to 45s, separate from the 1s configuration-refresh SLA. The 100k configuration replay measured 412–603ms. Reference tests use synthetic records, not production user data.
+
+Remaining platform verification: Chrome/Edge/Safari/iOS/Android device and OS versions vary. Local Chromium is verified; a WebKit CI job and stable Chrome acceptance are included. WebKit automation is not a substitute for real Safari/iPhone testing. OS-level process termination is outside JavaScript error handling. High-cardinality matrix and input-size guards intentionally stop unsafe workloads with advice instead of exhausting browser memory.

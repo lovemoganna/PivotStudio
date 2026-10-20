@@ -10,6 +10,7 @@ import { getColorScaleStyle, formatCellNumber, getDimDisplayLabel } from '../../
 import { calculateAutoFitColumnWidths, calculateSingleColumnAutoFit } from '../../../utils/tableAutoFit';
 
 export function PivotTable({
+  requestProfile,
   pivotResult,
   pivotConfig,
   setPivotConfig,
@@ -112,18 +113,13 @@ export function PivotTable({
   }, [slicerFields, activeSlicerField]);
 
   // Slicer Value Pills with record counts
-  const slicerValuePills = useMemo(() => {
-    if (!activeSlicerField || !currentDataset?.rows) return [];
-    const counts = new Map();
-    for (const row of currentDataset.rows) {
-      const val = String(row[activeSlicerField] ?? '');
-      if (val !== '') {
-        counts.set(val, (counts.get(val) || 0) + 1);
-      }
-    }
-    const arr = Array.from(counts.entries()).map(([label, count]) => ({ label, count }));
-    return arr.slice(0, 16);
-  }, [activeSlicerField, currentDataset?.rows]);
+  const [slicerValuePills,setSlicerValuePills] = useState([]);
+  useEffect(() => {
+    let active=true;
+    setSlicerValuePills([]);
+    if(activeSlicerField) requestProfile?.(activeSlicerField).then((profile)=>{if(active && profile)setSlicerValuePills(profile.slicerValues);}).catch((error)=>{if(active && error.name!=='AbortError')showToast?.('切片器统计失败，请重新计算后重试','error');});
+    return ()=>{active=false;};
+  },[activeSlicerField,requestProfile,showToast]);
 
   // Current selected slicer values
   const currentSlicerSelected = useMemo(() => {

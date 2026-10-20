@@ -155,12 +155,17 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
   const rowRoot = { key: '__ROOT__', label: 'ROOT', level: -1, childrenMap: new Map(), children: [] };
   const colRoot = { key: '__ROOT__', label: 'ROOT', level: -1, childrenMap: new Map(), children: [] };
   const cellRecordsMap = new Map();
+  let groupNodes = 0;
+  const guardGroupCount = () => {
+    if (++groupNodes > 50000) throw new Error('分组数量超过 50,000，可能耗尽浏览器内存；请减少维度、使用日期/数字分组或先筛选数据');
+  };
 
   const pushBucket = (rKey, cKey, rec) => {
     const k = `${rKey}@@${cKey}`;
     let arr = cellRecordsMap.get(k);
     if (!arr) {
       arr = [];
+      if (cellRecordsMap.size >= 500000) throw new Error('分组交叉组合过多，可能内存不足；请减少行列维度或先筛选数据');
       cellRecordsMap.set(k, arr);
     }
     arr.push(rec);
@@ -178,6 +183,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
       const nextKey = rIdx === 0 ? seg : `${curRowNode.key}||${seg}`;
       let child = curRowNode.childrenMap.get(seg);
       if (!child) {
+        guardGroupCount();
         child = {
           key: nextKey,
           label: seg,
@@ -201,6 +207,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
       const nextKey = cIdx === 0 ? seg : `${curColNode.key}||${seg}`;
       let child = curColNode.childrenMap.get(seg);
       if (!child) {
+        guardGroupCount();
         child = {
           key: nextKey,
           label: seg,
@@ -427,6 +434,9 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
   }
 
   onProgress?.(70);
+  if (tableRows.length * allColGroups.length * Math.max(1,valConfigs.length) > 500000) {
+    throw new Error('透视结果超过 500,000 个单元格，可能内存不足；请减少列维度、指标或筛选数据后重试');
+  }
   const rawValueMatrix = {};
   const displayMatrix = {};
   const statsByValId = {};
@@ -473,6 +483,8 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
   });
 
   const nonTotalRows = tableRows.filter((r) => !r.isTotal && !r.isSubtotal);
+  const rowPositions = new Map(nonTotalRows.map((row,index) => [row.rowKey,index]));
+  const runningTotals = new Map();
   for (let rIdx = 0; rIdx < tableRows.length; rIdx++) {
     const r = tableRows[rIdx];
     for (let cIdx = 0; cIdx < allColGroups.length; cIdx++) {
@@ -499,7 +511,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
             isBaseline = true;
             displayVal = 0;
           } else {
-            const idxInNonTotal = nonTotalRows.findIndex((nr) => nr.rowKey === r.rowKey);
+            const idxInNonTotal = rowPositions.get(r.rowKey) ?? -1;
             if (idxInNonTotal <= 0) {
               isBaseline = true;
               displayVal = 0;
@@ -514,7 +526,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
             isBaseline = true;
             displayVal = 0;
           } else {
-            const idxInNonTotal = nonTotalRows.findIndex((nr) => nr.rowKey === r.rowKey);
+            const idxInNonTotal = rowPositions.get(r.rowKey) ?? -1;
             if (idxInNonTotal <= 0) {
               isBaseline = true;
               displayVal = 0;
@@ -528,12 +540,10 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
           if (r.isTotal || r.isSubtotal) {
             displayVal = rawVal;
           } else {
-            const idxInNonTotal = nonTotalRows.findIndex((nr) => nr.rowKey === r.rowKey);
-            let runSum = 0;
-            for (let i = 0; i <= idxInNonTotal; i++) {
-              const prevRow = nonTotalRows[i];
-              runSum += (rawValueMatrix[`${prevRow.rowKey}@@${cg.key}@@${vc.id}`] ?? 0);
-            }
+            const idxInNonTotal = rowPositions.get(r.rowKey) ?? -1;
+            const runningKey = `${cg.key}@@${vc.id}`;
+            const runSum = (runningTotals.get(runningKey) || 0) + rawVal;
+            runningTotals.set(runningKey,runSum);
             displayVal = runSum;
           }
         }

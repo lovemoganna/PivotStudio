@@ -1,21 +1,25 @@
 // Quoted commas, embedded newlines and escaped quotes are handled as one CSV record.
 export function parseCSVRecords(text, delimiter = ',', limit = Infinity) {
   const records = [];
-  let row = [], cell = '', quoted = false;
+  let row = [], cell = '', quoted = false, afterQuote = false;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (i === 0 && ch === '\uFEFF') continue;
+    if (afterQuote && ch !== delimiter && ch !== '\n' && ch !== '\r') {
+      if (ch === ' ' || ch === '\t') continue;
+      throw new Error('CSV 引号闭合后存在多余字符，请检查引号与分隔符');
+    }
     if (ch === '"') {
       if (quoted && text[i+1] === '"') { cell += '"'; i++; }
-      else if (quoted) quoted = false;
+      else if (quoted) { quoted = false; afterQuote = true; }
       else if (cell.length === 0) quoted = true;
-      else cell += ch;
-    } else if (ch === delimiter && !quoted) { row.push(cell); cell = ''; }
+      else throw new Error('CSV 未加引号的字段中出现双引号，请将整个字段加引号并转义内部引号');
+    } else if (ch === delimiter && !quoted) { row.push(cell); cell = ''; afterQuote = false; }
     else if ((ch === '\n' || ch === '\r') && !quoted) {
       if (ch === '\r' && text[i+1] === '\n') i++;
       row.push(cell);
       if (row.some((v) => v.trim() !== '')) records.push(row);
-      row = []; cell = '';
+      row = []; cell = ''; afterQuote = false;
       if (records.length >= limit) return records;
     } else cell += ch;
   }
@@ -42,7 +46,8 @@ export function decodeCSVBuffer(buffer, encoding = 'auto') {
 export function detectDelimiter(text) {
   let best = ',', bestScore = -Infinity;
   for (const delimiter of [',', '\t', ';', '|']) {
-    const sample = parseCSVRecords(text, delimiter, 24);
+    let sample;
+    try { sample = parseCSVRecords(text, delimiter, 24); } catch { continue; }
     const widths = sample.map((row) => row.length);
     const counts = new Map();
     for (const width of widths) counts.set(width, (counts.get(width) || 0) + 1);
@@ -65,6 +70,7 @@ function scalarType(value) {
 
 export function parseCSVTextToSheet(csvText, sheetName = 'Sheet1', options = {}) {
   if (!csvText?.trim()) return null;
+  if (/^\s*(?:<!doctype|<html)/i.test(csvText)) throw new Error('内容是 HTML 网页，请导出 CSV 文件或检查公开表格访问权限后重试');
   if (csvText.includes('\0')) throw new Error('文件含二进制内容，请选择文本 CSV、TSV 或有效 Excel 文件');
   const delimiter = options.delimiter && options.delimiter !== 'auto' ? options.delimiter : detectDelimiter(csvText);
   const records = parseCSVRecords(csvText, delimiter);
@@ -75,8 +81,10 @@ export function parseCSVTextToSheet(csvText, sheetName = 'Sheet1', options = {})
   if (hasHeader && records.length < 2) return null;
   const headers = hasHeader ? first.map((h,i) => h.trim() || `字段_${i+1}`) : first.map((_,i) => `字段_${i+1}`);
   if (new Set(headers).size !== headers.length) throw new Error('CSV 表头存在重复字段，请重命名后重试');
+  let shortRowCount = 0;
   const rows = records.slice(hasHeader ? 1 : 0).map((cells, rowIndex) => {
     if (cells.length > headers.length) throw new Error(`CSV 第 ${rowIndex + (hasHeader ? 2 : 1)} 行存在 ${cells.length - headers.length} 个无表头字段，请检查分隔符或补齐表头`);
+    if (cells.length < headers.length) shortRowCount++;
     const row = {};
     headers.forEach((h,i) => { Object.defineProperty(row, h, { value: cells[i] ?? '', enumerable: true, writable: true, configurable: true }); });
     return row;
@@ -91,5 +99,5 @@ export function parseCSVTextToSheet(csvText, sheetName = 'Sheet1', options = {})
     const type = ['boolean','date','number'].find((key) => nonempty && counts[key] / nonempty >= 0.7) || 'text';
     return { name, type };
   });
-  return { name: sheetName, fields, rows, importMeta: { delimiter, hasHeader, encoding: options.encoding || 'utf-8' } };
+  return { name: sheetName, fields, rows, importMeta: { delimiter, hasHeader, encoding: options.encoding || 'utf-8', warnings: shortRowCount ? `${shortRowCount} 行缺少字段，已按原有规则补为空值；请核对分隔符设置，并确认原文件是否遗漏列` : '' } };
 }

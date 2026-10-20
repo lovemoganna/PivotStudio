@@ -169,7 +169,7 @@ export function IntroScreen({
 
           <div className="inline-flex items-center gap-2 text-[10px] text-[#A6E22E] bg-[#A6E22E]/10 border border-[#A6E22E]/30 px-3 py-1 rounded-full apple-font-mono">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>{t("所有计算 100% 在本地浏览器内存中执行，商业隐私零泄露")}</span>
+            <span>{t("文件解析与计算均在浏览器本地执行，原始数据不上传服务器。")}</span>
           </div>
 
           {uploadProgress && (
@@ -193,7 +193,7 @@ export function IntroScreen({
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs apple-font-mono">
           <span className="font-bold text-[#66D9EF] flex items-center gap-1.5">
-            <Zap className="w-4 h-4 text-[#E6DB74]" />{' ' + t("多样化真实业务测试集矩阵 (Benchmark Suite)") + ' '}</span>
+            <Zap className="w-4 h-4 text-[#E6DB74]" />{' ' + t("内置演示数据集 (Benchmark Suite)") + ' '}</span>
           <span className="text-[#75715E]">{t("点击任意场景即刻载入，验证多维度交叉与边界容错")}</span>
         </div>
 
@@ -304,11 +304,11 @@ export function IntroScreen({
               <div className="w-8 h-8 rounded-lg bg-[#AE81FF]/15 border border-[#AE81FF]/30 text-[#6B38FB] dark:text-[#AE81FF] flex items-center justify-center">
                 <FlaskConical className="w-4 h-4" />
               </div>
-              <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] apple-font-mono">{' ' + t("8 组核心自检") + ' '}</span>
+              <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] apple-font-mono">{' ' + t("5 组示例校验") + ' '}</span>
             </div>
             <div>
               <div className="text-xs font-bold text-[#272822] dark:text-[#F8F8F2] group-hover:text-[#AE81FF] transition">{' ' + t("系统内核算法自检") + ' '}</div>
-              <p className="text-[10.5px] text-[#75715E] dark:text-[#908E80] mt-1 leading-snug">{' ' + t("查看多层级小计、百分比差异、字段自愈守卫、极值防护等 8 组算法运行状态。") + ' '}</p>
+              <p className="text-[10.5px] text-[#75715E] dark:text-[#908E80] mt-1 leading-snug">{' ' + t("查看 5 组内置示例的计算校验结果；完整验收请运行自动化测试。") + ' '}</p>
             </div>
           </button>
         </div>
@@ -319,7 +319,7 @@ export function IntroScreen({
         <div className="flex items-center justify-between border-b border-[#D6D4C8] dark:border-[#3E3D32] pb-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-[#A6E22E]" />
-            <span className="font-bold text-xs apple-font-mono text-[#272822] dark:text-[#F8F8F2]">{' ' + t("企业级稳定性与高可用架构保障") + ' '}</span>
+            <span className="font-bold text-xs apple-font-mono text-[#272822] dark:text-[#F8F8F2]">{' ' + t("本地处理与异常恢复") + ' '}</span>
           </div>
           <span className="text-[10px] text-[#75715E] apple-font-mono">Zero Crash Architecture</span>
         </div>
@@ -330,7 +330,7 @@ export function IntroScreen({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{t("内存与垃圾回收优化")}</span>
             </div>
-            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("扁平化单层哈希桶算法，避免递归造成的堆栈溢出；百万级计算后即时清理临时映射，零内存残留。") + ' '}</p>
+            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("按分组建立内存索引；数据量与分组基数共同决定内存占用，超出保护限额时会提示。") + ' '}</p>
           </div>
 
           <div className="space-y-1.5">
@@ -338,7 +338,7 @@ export function IntroScreen({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{t("字段失效自愈守卫")}</span>
             </div>
-            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("切换不同结构数据集或增删字段时，失效指标与筛选器自动安全脱落，绝不引发白屏崩溃。") + ' '}</p>
+            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("字段缺失时会提示并跳过失效字段；请核对数据结构，必要时重置透视配置。") + ' '}</p>
           </div>
 
           <div className="space-y-1.5">
@@ -346,15 +346,15 @@ export function IntroScreen({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{t("Web Worker 异步解耦")}</span>
             </div>
-            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("超过 2,500 行的计算自动分派至独立后台线程，主线程始终保持 60 FPS 丝滑，界面无卡顿假死。") + ' '}</p>
+            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("文件解析、透视聚合和字段统计在 Web Worker 运行；导入与计算显示进度，并可取消。") + ' '}</p>
           </div>
 
           <div className="space-y-1.5">
             <div className="font-bold text-[#AE81FF] flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{t("Excel 表头合并原生导出")}</span>
+              <span>{t("Excel / CSV 全量结果导出")}</span>
             </div>
-            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("导出为真实合并居中的原生 .xlsx 文件，多层级行/列表头完全忠实于当前屏幕透视结构。") + ' '}</p>
+            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("导出完整筛选、排序后的结果并保留数字格式；Excel 使用平铺表头。") + ' '}</p>
           </div>
         </div>
       </div>
@@ -369,7 +369,7 @@ export function IntroScreen({
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#A6E22E]" />{' ' + t("自愈守卫: 运行中") + ' '}</span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#66D9EF]" />{' ' + t("本地数据安全沙箱: 100% 隔离") + ' '}</span>
+            <span className="w-2 h-2 rounded-full bg-[#66D9EF]" />{' ' + t("原始数据在本机处理，不上传服务器") + ' '}</span>
         </div>
         <div>
           <span>PivotWorkbench v1.0 · Monokai Pro Edition</span>

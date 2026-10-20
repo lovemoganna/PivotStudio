@@ -1,4 +1,3 @@
-import { formatCellNumber } from './formatters';
 import { buildPivotExportRows, encodeCsvCell, excelNumberFormat } from './exportMatrix.js';
 import * as XLSX from 'xlsx';
 

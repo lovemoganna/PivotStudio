@@ -398,3 +398,9 @@ test('benchmark suite and chaos edge-cases dataset execute without errors or exc
   const grandTotalRow = chaosRes.tableRows.find((r) => r.isTotal);
   assert.ok(grandTotalRow);
 });
+
+test('large sparse pivot fails with actionable memory guard before allocating dense matrix',()=>{
+  const rows=Array.from({length:1000},(_,i)=>({a:'a'+i,b:'b'+i,n:1}));
+  const ds={fields:[{name:'a',type:'text'},{name:'b',type:'text'},{name:'n',type:'number'}],rows};
+  assert.throws(()=>calculatePivot(ds,{rows:[{field:'a'}],columns:[{field:'b'}],values:[{id:'v',field:'n',agg:'sum'}]}),/内存不足/);
+});

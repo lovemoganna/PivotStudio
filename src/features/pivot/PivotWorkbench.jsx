@@ -8,8 +8,7 @@ import {
   buildDefaultPivotConfig
 } from '../../constants/pivotConstants';
 import { soundEngine } from '../../services/soundEngine';
-import { formatDimensionValue } from '../../utils/formatters';
-import { decodeView } from '../../utils/viewConfig';
+import { decodeView, projectView } from '../../utils/viewConfig';
 import { startImportTask } from '../../utils/workerTask';
 import {
   exportToCSV as doExportCSV,
@@ -61,7 +60,6 @@ export default function PivotWorkbench() {
     query.addEventListener('change',update);
     return () => query.removeEventListener('change',update);
   }, []);
-  useEffect(() => { try { localStorage.setItem('pivotstudio_theme',theme); } catch { /* Controls still work with session-only preferences. */ } }, [theme]);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [keynotePlaying, setKeynotePlaying] = useState(false);
   const [keynoteShotIdx, setKeynoteShotIdx] = useState(0);
@@ -188,17 +186,21 @@ export default function PivotWorkbench() {
   const [newWorkspaceNameInput, setNewWorkspaceNameInput] = useState('');
   const pendingViewRef = useRef(null);
   const [shareTokenInput, setShareTokenInput] = useState('');
+  const workspaceLoadErrorRef = useRef(null);
   const [savedWorkspaces, setSavedWorkspaces] = useState(() => {
     try {
-      const saved = JSON.parse(window.localStorage.getItem('pivotstudio_workspaces_v1'));
-      return Array.isArray(saved) ? saved : [];
+      const raw = window.localStorage.getItem('pivotstudio_workspaces_v1');
+      if (!raw) return [];
+      const saved = JSON.parse(raw);
+      if (!Array.isArray(saved) || !saved.every((view) => view && typeof view.id === 'string' && typeof view.name === 'string' && view.pivotConfig)) throw new Error('配置损坏');
+      saved.forEach((view) => projectView({ fullConfig:view.pivotConfig }));
+      return saved;
     } catch {
+      workspaceLoadErrorRef.current = '本机视图无法读取，可能存储受限或配置损坏；请检查浏览器存储权限，或重新保存视图';
       return [];
     }
   });
-  useEffect(() => {
-    try { window.localStorage.setItem('pivotstudio_workspaces_v1', JSON.stringify(savedWorkspaces)); } catch { /* memory-only fallback */ }
-  }, [savedWorkspaces]);
+
 
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimerRef = useRef(null);
@@ -215,8 +217,23 @@ export default function PivotWorkbench() {
   const showToast = useCallback((text, type = 'success') => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage({ text, type });
-    toastTimerRef.current = setTimeout(() => { setToastMessage(null); }, 3200);
+    if (type !== 'error') toastTimerRef.current = setTimeout(() => { setToastMessage(null); }, 3200);
   }, []);
+
+  useEffect(() => {
+    if (workspaceLoadErrorRef.current) { showToast(workspaceLoadErrorRef.current,'error'); return; }
+    try { localStorage.setItem('pivotstudio_workspaces_v1',JSON.stringify(savedWorkspaces)); }
+    catch { showToast('本机存储不足或不可用，视图仅在当前标签页有效；请释放存储空间后重新保存','error'); }
+  }, [savedWorkspaces,showToast]);
+
+  useEffect(() => {
+    const handleAsyncError = (event) => showToast(`操作失败：${event.reason?.message || event.error?.message || '浏览器执行异常'}；请重试，必要时重新导入文件`, 'error');
+    window.addEventListener('unhandledrejection',handleAsyncError);
+    window.addEventListener('error',handleAsyncError);
+    return () => { window.removeEventListener('unhandledrejection',handleAsyncError); window.removeEventListener('error',handleAsyncError); };
+  }, [showToast]);
+
+  useEffect(() => { try { localStorage.setItem('pivotstudio_theme',theme); } catch { showToast('无法保存主题偏好，当前标签页内仍有效；请检查浏览器存储权限','error'); } }, [theme,showToast]);
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < configHistory.length - 1;
@@ -520,9 +537,13 @@ export default function PivotWorkbench() {
   }, [keynotePlaying, applyKeynoteShot]);
 
   const workerRef = useRef(null);
+  const profileRequestsRef = useRef(new Map());
+  const profileIdRef = useRef(0);
   const importTaskRef = useRef(null);
   const importSourceRef = useRef(null);
   const reqIdRef = useRef(0);
+  const [computeError, setComputeError] = useState(null);
+  const [computeAttempt, setComputeAttempt] = useState(0);
   const [computeProgress, setComputeProgress] = useState(0);
   const [isWorkerComputing, setIsWorkerComputing] = useState(false);
   const [activeResults, setActiveResults] = useState(() => {
@@ -534,6 +555,8 @@ export default function PivotWorkbench() {
 
   const stopCalculation = useCallback(() => {
     ++reqIdRef.current;
+    for (const request of profileRequestsRef.current.values()) request.reject(new DOMException('已取消','AbortError'));
+    profileRequestsRef.current.clear();
     workerRef.current?.terminate();
     workerRef.current = null;
     cachedDatasetRef.current = null;
@@ -547,6 +570,7 @@ export default function PivotWorkbench() {
     const id = ++reqIdRef.current;
     setIsWorkerComputing(true);
     setComputeProgress(0);
+    setComputeError(null);
     busyRef.current = true;
     try {
       if (!workerRef.current) {
@@ -554,6 +578,12 @@ export default function PivotWorkbench() {
       }
       const worker = workerRef.current;
       worker.onmessage = ({ data }) => {
+        if (data.kind === 'profile') {
+          const request = profileRequestsRef.current.get(data.profileId);
+          profileRequestsRef.current.delete(data.profileId);
+          if (request) { if(data.error) request.reject(new Error(data.error)); else request.resolve(data.result); }
+          return;
+        }
         if (data.kind === 'drill') {
           if (data.generation === reqIdRef.current) setDrillDownModal({ ...data.metadata, records: data.records });
           return;
@@ -564,20 +594,24 @@ export default function PivotWorkbench() {
         setIsWorkerComputing(false);
         if (data.success) {
           data.pivotResult.cellRecordsMap = new Map();
-          setActiveResults({ pivotResult: data.pivotResult, unifiedChartSpec: data.unifiedChartSpec });
-        } else showToast(`计算失败：${data.error}；请减少分组字段或拆分数据后重试`, 'error');
+          setActiveResults({ pivotResult: data.pivotResult, unifiedChartSpec: data.unifiedChartSpec, dataset: currentDataset, config: pivotConfig, chartType, chartSpecConfig });
+        } else { const message = `计算失败：${data.error}；请减少分组字段或拆分数据后重试`; setComputeError(message); showToast(message, 'error'); }
       };
-      worker.onerror = () => {
+      worker.onerror = (event) => {
+        event?.preventDefault?.();
         stopCalculation();
+        setComputeError('本地计算进程失败，可能内存不足；请减少分组字段或关闭其他标签页后重试');
         showToast('本地计算进程失败，可能内存不足；请减少分组字段、关闭其他标签页后重试', 'error');
       };
+      worker.onmessageerror = worker.onerror;
       worker.postMessage({ id, payload: { dataset: cachedDatasetRef.current === currentDataset ? undefined : currentDataset, pivotConfig, chartType, chartSpecConfig } });
       cachedDatasetRef.current = currentDataset;
     } catch {
       stopCalculation();
+      setComputeError('无法启动本地计算进程，请使用最新版浏览器并刷新页面重试');
       showToast('无法启动本地计算进程，请使用最新版浏览器并刷新页面重试', 'error');
     }
-  }, [currentDataset, pivotConfig, chartType, chartSpecConfig, showToast, stopCalculation]);
+  }, [currentDataset, pivotConfig, chartType, chartSpecConfig, showToast, stopCalculation, computeAttempt]);
 
   useEffect(() => () => { workerRef.current?.terminate(); importTaskRef.current?.cancel(); }, []);
 
@@ -592,6 +626,7 @@ export default function PivotWorkbench() {
     }
   }, []);
 
+  const resultIsCurrent = activeResults.dataset === currentDataset && activeResults.config === pivotConfig && activeResults.chartType === chartType && activeResults.chartSpecConfig === chartSpecConfig;
   const pivotResult = activeResults.pivotResult;
   const unifiedChartSpec = activeResults.unifiedChartSpec;
 
@@ -863,17 +898,27 @@ export default function PivotWorkbench() {
     });
   }, [isReadOnly]);
 
+  const requestProfile = useCallback((field, dimension, matchLabel) => {
+    if (busyRef.current || !workerRef.current) return Promise.resolve(null);
+    const profileId=++profileIdRef.current;
+    return new Promise((resolve,reject) => {
+      profileRequestsRef.current.set(profileId,{resolve,reject});
+      try { workerRef.current.postMessage({kind:'profile',profileId,field,dimension,matchLabel}); }
+      catch(error) { profileRequestsRef.current.delete(profileId); reject(error); }
+    });
+  }, [currentDataset,isWorkerComputing]);
+
   const requestDrillDown = useCallback((rowKey, colKey = '__GRAND_TOTAL_COL__', metadata = {}) => {
-    if (busyRef.current || !workerRef.current) { showToast('请等待本次计算完成后再查看明细', 'error'); return; }
+    if (busyRef.current || !workerRef.current || computeError || !resultIsCurrent) { showToast('请等待本次计算完成后再查看明细', 'error'); return; }
     setDrillSearch(''); setDrillPage(1);
     workerRef.current.postMessage({ kind: 'drill', generation: reqIdRef.current, rowKey: rowKey.replace('__SUBTOTAL__', ''), colKey, metadata });
-  }, [showToast]);
+  }, [showToast,computeError,resultIsCurrent]);
 
   const handleTablePointClick = useCallback((point) => {
     setHighlightedRowKey(point.rowKey);
   }, []);
 
-  const handleChartPointClick = useCallback((pointData) => {
+  const handleChartPointClick = useCallback(async (pointData) => {
     const now = Date.now();
     if (now - lastChartClickRef.current < 90) return;
     lastChartClickRef.current = now;
@@ -885,14 +930,11 @@ export default function PivotWorkbench() {
       if (!activeDim) return;
 
       const firstSeg = rk.split('||')[0];
-      const fMeta = currentDataset?.fields?.find((f) => f.name === activeDim.field);
-      const matchingRawVals = Array.from(
-        new Set(
-          (currentDataset?.rows || [])
-            .filter((r) => formatDimensionValue(r[activeDim.field], activeDim, fMeta) === firstSeg)
-            .map((r) => String(r[activeDim.field] ?? ''))
-        )
-      );
+      let matchingRawVals;
+      try { matchingRawVals = (await requestProfile(activeDim.field, activeDim, firstSeg))?.matchingRawValues; }
+      catch(error) { if(error.name!=='AbortError') showToast(`联动筛选失败：${error.message}；请重试`,'error'); return; }
+      if (!matchingRawVals) { showToast('请等待计算完成后再筛选','error'); return; }
+
 
       setPivotConfig((prev) => {
         const existing = prev.filters.find((f) => f.field === activeDim.field);
@@ -921,7 +963,7 @@ export default function PivotWorkbench() {
         valLabel: unifiedChartSpec.primarySeriesKey, valueFormatted: pointData.formattedValue || '',
       });
     }
-  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotConfig.columns, pivotResult, showToast, requestDrillDown, unifiedChartSpec.primarySeriesKey]);
+  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotConfig.columns, pivotResult, showToast, requestDrillDown, unifiedChartSpec.primarySeriesKey, requestProfile]);
 
   const handleFileUpload = useCallback(async (e) => {
     let file = null;
@@ -939,6 +981,8 @@ export default function PivotWorkbench() {
       return;
     }
     try {
+      const fileLimit = Math.max(32, Math.min(256, (navigator.deviceMemory || 4) * 32)) * 1024 * 1024;
+      if (file.size > fileLimit) throw new Error(`文件超过本机保护上限 ${Math.round(fileLimit / 1024 / 1024)} MB，可能内存不足；请拆分文件、减少字段或在内存更大的设备上重试`);
       if (!/\.(csv|tsv|txt|xlsx|xls)$/i.test(file.name)) throw new Error('不支持此文件格式，请另存为 CSV、TSV 或 Excel 后重试');
       importSourceRef.current = { file };
       const sheets = await runImport({ file }, file.name);
@@ -953,7 +997,7 @@ export default function PivotWorkbench() {
     if (!importSourceRef.current || importTaskRef.current) return;
     try {
       const sheets = await runImport({ ...importSourceRef.current, options }, uploadPreviewModal.fileName);
-      setUploadPreviewModal((prev) => ({ ...prev, sheets, options }));
+      setUploadPreviewModal((prev) => prev ? { ...prev, sheets, options } : null);
     } catch (error) { if (error.name !== 'AbortError') showToast(error.message, 'error'); }
   }, [runImport, showToast, uploadPreviewModal]);
 
@@ -1094,20 +1138,24 @@ export default function PivotWorkbench() {
   }, [showToast, runImport]);
 
   const exportToCSV = useCallback(() => {
+    if (!currentDataset || isWorkerComputing || computeError) { showToast('当前没有可导出的已完成结果，请先加载数据并完成计算', 'error'); return; }
     doExportCSV(currentDataset, pivotResult, showToast);
-  }, [currentDataset, pivotResult, showToast]);
+  }, [currentDataset, pivotResult, showToast, isWorkerComputing, computeError]);
 
   const exportToExcelMerged = useCallback(() => {
+    if (!currentDataset || isWorkerComputing || computeError) { showToast('当前没有可导出的已完成结果，请先加载数据并完成计算', 'error'); return; }
     doExportExcel(currentDataset, pivotResult, showToast);
-  }, [currentDataset, pivotResult, showToast]);
+  }, [currentDataset, pivotResult, showToast, isWorkerComputing, computeError]);
 
   const exportChartAsPNG = useCallback(() => {
+    if (!currentDataset || isWorkerComputing || computeError) { showToast('当前没有可导出的已完成结果，请先加载数据并完成计算', 'error'); return; }
     doExportPNG(currentDataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast);
-  }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode]);
+  }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode, isWorkerComputing, computeError]);
 
   const exportChartAsSVG = useCallback(() => {
+    if (!currentDataset || isWorkerComputing || computeError) { showToast('当前没有可导出的已完成结果，请先加载数据并完成计算', 'error'); return; }
     doExportSVG(currentDataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast);
-  }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode]);
+  }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode, isWorkerComputing, computeError]);
 
   const exportPDFReport = useCallback(() => {
     doExportPDF(setIsPrintingReport);
@@ -1236,7 +1284,7 @@ export default function PivotWorkbench() {
   }, [isVirtualized, pivotResult.tableRows, scrollTop]);
 
   return (
-    <div className={darkMode && !isPrintingReport ? 'dark' : ''}>
+    <div data-testid="pivot-workbench" data-calculation-status={isWorkerComputing ? 'running' : computeError ? 'failed' : resultIsCurrent ? 'idle' : 'pending'} className={darkMode && !isPrintingReport ? 'dark' : ''}>
       <div className={`min-h-[100dvh] h-auto md:h-[100dvh] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans print:bg-white print:text-black apple-transition ${isPrintingReport ? 'overflow-visible' : 'overflow-x-hidden md:overflow-hidden'}`}>
         <div className="hidden print:block px-6 py-4 border-b border-black/15">
           <h1 className="text-base font-semibold tracking-tight text-black">{t("PivotEngine Studio [Monokai Pro] 数据透视分析报告 —") + ' '}{currentDataset?.name || '空白工程'}</h1>
@@ -1290,10 +1338,13 @@ export default function PivotWorkbench() {
             <span>{uploadProgress ? `正在导入 ${uploadProgress.fileName}` : t("正在计算")}</span>
             <progress aria-label={uploadProgress ? t('导入进度') : t('计算进度')} max="100" value={uploadProgress?.pct ?? computeProgress} className="flex-1" />
             <span>{uploadProgress?.pct ?? computeProgress}%</span>
-            <button onClick={() => { if (uploadProgress) importTaskRef.current?.cancel(); else stopCalculation(); showToast('已取消，保留上次计算结果'); }}>{t("取消")}</button>
+            <button onClick={() => { if (uploadProgress) importTaskRef.current?.cancel(); else { stopCalculation(); setComputeError('已取消计算，当前显示上次成功结果；可调整配置或重新计算'); } showToast('已取消，保留上次计算结果'); }}>{t("取消")}</button>
           </div>
         )}
 
+        {computeError && <div role="alert" className="px-4 py-2 border-b border-[#F92672] text-[#F92672] flex flex-wrap gap-3 items-center">
+          <span>{computeError}</span><button onClick={() => setComputeAttempt((value) => value + 1)} className="border rounded px-2 py-1">重新计算</button>
+        </div>}
         {/* Workspace Dataset Tab Strip */}
         <DatasetTabStrip
           datasets={datasets}
@@ -1356,6 +1407,8 @@ export default function PivotWorkbench() {
           <>
             {/* Modular Field Shelf and Dropzone Shelf */}
             <FieldShelf
+          requestProfile={requestProfile}
+          onPasteText={handlePasteText}
               cinemaTheaterMode={cinemaTheaterMode}
               isReadOnly={isReadOnly}
               datasets={datasets}
@@ -1434,6 +1487,7 @@ export default function PivotWorkbench() {
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col w-full min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
+                requestProfile={requestProfile}
                 pivotResult={pivotResult}
                 pivotConfig={pivotConfig}
                 setPivotConfig={setPivotConfig}
@@ -1578,7 +1632,7 @@ export default function PivotWorkbench() {
           uploadPreviewModal={uploadPreviewModal}
           setUploadPreviewModal={setUploadPreviewModal}
           confirmUploadDataset={confirmUploadDataset}
-          onClose={() => setUploadPreviewModal(null)}
+          onClose={() => { importTaskRef.current?.cancel(); setUploadPreviewModal(null); }}
         />
 
         <BinModal
@@ -1592,6 +1646,7 @@ export default function PivotWorkbench() {
         />
 
         <FilterModal
+          requestProfile={requestProfile}
           activeHeaderFilterModal={activeHeaderFilterModal}
           pivotConfig={pivotConfig}
           setPivotConfig={setPivotConfig}
@@ -1613,6 +1668,7 @@ export default function PivotWorkbench() {
         />
 
         <DataSourceModal
+          runImport={runImport}
           activeDataSourceModal={activeDataSourceModal}
           onClose={() => setActiveDataSourceModal(null)}
           gsheetUrlInput={gsheetUrlInput}

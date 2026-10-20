@@ -343,7 +343,7 @@ export function ChartStudio({
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
-                  <Line
+                  <Line isAnimationActive={false}
                     key={sm.key}
                     yAxisId={unifiedChartSpec.hasDualAxis ? (sm.yAxisId || 'left') : 'left'}
                     connectNulls={chartSpecConfig.missingValueMode !== 'connect'}
@@ -360,7 +360,7 @@ export function ChartStudio({
                   </Line>
                 ))}
                 {unifiedChartSpec.derivedSeriesKey && (
-                  <Line
+                  <Line isAnimationActive={false}
                     yAxisId="right"
                     type="monotone"
                     dataKey={unifiedChartSpec.derivedSeriesKey}
@@ -399,7 +399,7 @@ export function ChartStudio({
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
-                  <Area
+                  <Area isAnimationActive={false}
                     key={sm.key}
                     type="monotone"
                     dataKey={sm.key}
@@ -427,7 +427,7 @@ export function ChartStudio({
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#A6E22E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true })} />
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                <Bar
+                <Bar isAnimationActive={false}
                   yAxisId="left"
                   dataKey={unifiedChartSpec.primarySeriesKey}
                   name={`${unifiedChartSpec.primarySeriesKey} [左轴]`}
@@ -440,7 +440,7 @@ export function ChartStudio({
                     <LabelList dataKey="_compactPrimaryLabel" content={(p) => renderSmartBarLabel(p, darkMode, false)} />
                   )}
                 </Bar>
-                <Line
+                <Line isAnimationActive={false}
                   yAxisId="right"
                   type="monotone"
                   dataKey={unifiedChartSpec.secondarySeriesKey}
@@ -455,7 +455,7 @@ export function ChartStudio({
               <PieChart>
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                <Pie
+                <Pie isAnimationActive={false}
                   data={unifiedChartSpec.pieItems}
                   dataKey="value"
                   nameKey="name"
@@ -496,7 +496,7 @@ export function ChartStudio({
                 <YAxis tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                 <ReferenceLine y={0} stroke="#75715E" />
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
-                <Bar dataKey="range" name="增减桥接区间" radius={[4, 4, 4, 4]} cursor="pointer" onClick={(d) => handleChartPointClick(d)}>
+                <Bar isAnimationActive={false} dataKey="range" name="增减桥接区间" radius={[4, 4, 4, 4]} cursor="pointer" onClick={(d) => handleChartPointClick(d)}>
                   {unifiedChartSpec.waterfallItems.map((entry, idx) => (
                     <Cell key={`wf_${idx}`} fill={entry.fill} />
                   ))}
@@ -540,7 +540,7 @@ export function ChartStudio({
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                <Scatter
+                <Scatter isAnimationActive={false}
                   name={`${unifiedChartSpec.primarySeriesKey} × ${unifiedChartSpec.secondarySeriesKey}`}
                   data={unifiedChartSpec.scatterPoints}
                   cursor="pointer"
@@ -572,7 +572,7 @@ export function ChartStudio({
                 <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} />
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                <Bar
+                <Bar isAnimationActive={false}
                   dataKey="count"
                   name={`频数分布 (${unifiedChartSpec.primaryValCfg.field} · 双击柱体下钻明细)`}
                   fill="url(#monokaiHistGrad)"
@@ -658,7 +658,7 @@ export function ChartStudio({
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => {
                   const isStacked = (chartType === 'stacked_bar' || chartType === 'pct_stacked_bar') && (unifiedChartSpec.canStack || chartType === 'pct_stacked_bar');
                   return (
-                    <Bar
+                    <Bar isAnimationActive={false}
                       key={sm.key}
                       dataKey={sm.key}
                       stackId={isStacked ? 'stack_bar' : undefined}

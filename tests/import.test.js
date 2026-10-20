@@ -24,3 +24,13 @@ test('UTF-8 and GBK Chinese round trip and encoding detection',()=>{
   assert.equal(decoded.encoding,'gbk');
   assert.equal(parseCSVTextToSheet(decoded.text).rows[0]['姓名'],'张三');
 });
+
+test('invalid quote tails, binary and HTML inputs give explicit actionable failures',()=>{
+  assert.throws(()=>parseCSVTextToSheet('name,value\n"a"x,1'),/引号/);
+  assert.throws(()=>parseCSVTextToSheet('name,value\na"b,1'),/引号/);
+  assert.throws(()=>parseCSVTextToSheet('<!DOCTYPE html><html>Access denied</html>'),/HTML/);
+  assert.throws(()=>parseCSVTextToSheet('name,value\na\0,1'),/二进制/);
+  const result=parseCSVTextToSheet('name,value\na');
+  assert.equal(result.rows[0].value,'');
+  assert.match(result.importMeta.warnings,/缺少字段/);
+});

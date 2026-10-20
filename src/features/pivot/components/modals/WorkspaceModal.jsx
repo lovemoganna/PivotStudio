@@ -89,6 +89,7 @@ export function WorkspaceModal({
               <input
                 type="text"
                 disabled={isReadOnly}
+                maxLength={128}
                 value={newWorkspaceNameInput}
                 onChange={(e) => setNewWorkspaceNameInput(e.target.value)}
                 placeholder={t("输入新工作区快照名称...")}
@@ -174,6 +175,7 @@ export function WorkspaceModal({
                   <div className="flex gap-2">
                     <input
                       type="text"
+                      maxLength={180000}
                       value={shareTokenInput}
                       onChange={(e) => setShareTokenInput(e.target.value)}
                       placeholder={t("在此粘贴分享链接或 Share Token 一键还原视图...")}

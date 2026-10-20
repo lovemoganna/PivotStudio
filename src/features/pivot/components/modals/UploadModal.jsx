@@ -62,6 +62,7 @@ export function UploadModal({
         )}
 
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {activeSheet.importMeta?.warnings && <p role="alert" className="text-[#F92672]">{activeSheet.importMeta.warnings}</p>}
           {activeSheet.importMeta && !/\.(xlsx|xls)$/i.test(uploadPreviewModal.fileName) && (
             <div className="flex flex-wrap gap-3 items-center">
               <span>{t("自动识别：")}{activeSheet.importMeta.encoding.toUpperCase()} · {activeSheet.importMeta.hasHeader ? t("有表头") : t("无表头")}{t("（识别有误可修改）")}</span>

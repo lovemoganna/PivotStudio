@@ -1,11 +1,11 @@
 import { t } from '../../../../i18n.js';
 import React, { useState } from 'react';
 import { Globe, Server, Zap, X } from 'lucide-react';
-import { parseCSVTextToSheet } from '../../../../utils/csvParser';
 import { generateDuckDBPivotSQL } from '../../../../services/duckdbQuery';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 
 export function DataSourceModal({
+  runImport,
   activeDataSourceModal, onClose, gsheetUrlInput, setGsheetUrlInput,
   duckdbThreshold, currentDataset, pivotConfig,
   setDatasets, setActiveDatasetId, setPivotConfig, generate100kDataset,
@@ -27,17 +27,8 @@ export function DataSourceModal({
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const csv = await res.text();
       if (/^\s*<!doctype html|^\s*<html/i.test(csv)) throw new Error('返回了登录或权限页面');
-      const sheet = parseCSVTextToSheet(csv, 'Google Sheets');
-      if (!sheet?.rows.length) throw new Error('未发现有效 CSV 数据');
-      const rows = sheet.rows.map((row) => {
-        const normalized = { ...row };
-        sheet.fields.forEach((field) => {
-          const raw = String(row[field.name] ?? '').trim();
-          if (field.type === 'number') normalized[field.name] = raw ? Number(raw.replace(/,/g, '')) : null;
-          if (field.type === 'boolean') normalized[field.name] = /^(true|1|是|yes)$/i.test(raw);
-        });
-        return normalized;
-      });
+      const sheet = (await runImport({ text:csv },'Google Sheets'))[0];
+      const rows = (await runImport({ sheets:[sheet],normalize:true },'Google Sheets'))[0].rows;
       const ds = {
         id: 'ds_google_' + Date.now(),
         name: 'Google Sheets ' + id.slice(0, 8) + ' (' + rows.length + ' 行)',
@@ -55,6 +46,7 @@ export function DataSourceModal({
       onClose();
       showToast?.('已读取真实公开数据：' + rows.length + ' 行');
     } catch (err) {
+      if(err.name==='AbortError') return;
       showToast?.('导入失败：' + err.message + '。请检查公开访问权限、CSV 导出及浏览器跨域限制', 'error');
     } finally { setLoading(false); }
   }

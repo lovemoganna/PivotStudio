@@ -1,9 +1,10 @@
 import { t } from '../../../i18n.js';
-import React, { useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDialogFocus } from '../../../utils/useDialogFocus';
 import { X, Hash, Type, Calendar, ToggleLeft, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export function FieldProfilerModal({
+  requestProfile,
   field,
   currentDataset,
   onClose,
@@ -13,61 +14,15 @@ export function FieldProfilerModal({
 }) {
   const dialogRef = useDialogFocus(Boolean(field), onClose);
 
-  const stats = useMemo(() => {
-    if (!field || !currentDataset?.rows) return null;
-    const rows = currentDataset.rows;
-    const total = rows.length;
-    let nonNullCount = 0;
-    const valueMap = new Map();
-    let numSum = 0;
-    let numMin = Infinity;
-    let numMax = -Infinity;
-    let numValidCount = 0;
-
-    for (let i = 0; i < total; i++) {
-      const raw = rows[i][field.name];
-      if (raw !== null && raw !== undefined && !(typeof raw === 'string' && raw.trim() === '')) {
-        nonNullCount++;
-        const sVal = String(raw);
-        valueMap.set(sVal, (valueMap.get(sVal) || 0) + 1);
-
-        if (field.type === 'number') {
-          const num = typeof raw === 'number' ? raw : Number(String(raw).replace(/,/g, ''));
-          if (Number.isFinite(num)) {
-            numValidCount++;
-            numSum += num;
-            if (num < numMin) numMin = num;
-            if (num > numMax) numMax = num;
-          }
-        }
-      }
-    }
-
-    const distinctCount = valueMap.size;
-    const completenessPct = total > 0 ? ((nonNullCount / total) * 100).toFixed(1) : '0';
-    const topValues = Array.from(valueMap.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([val, count]) => ({
-        val,
-        count,
-        pct: total > 0 ? ((count / total) * 100).toFixed(1) : '0',
-      }));
-
-    return {
-      total,
-      nonNullCount,
-      nullCount: total - nonNullCount,
-      completenessPct,
-      distinctCount,
-      numMin: Number.isFinite(numMin) ? numMin : 0,
-      numMax: Number.isFinite(numMax) ? numMax : 0,
-      numAvg: numValidCount > 0 ? numSum / numValidCount : 0,
-      topValues,
-    };
-  }, [field, currentDataset]);
-
-  if (!field || !stats) return null;
+  const [stats,setStats] = useState(null);
+  const [error,setError] = useState(null);
+  useEffect(()=>{
+    let active=true;setStats(null);setError(null);
+    if(field)requestProfile?.(field.name).then((profile)=>{if(active)setStats(profile);}).catch((error)=>{if(active && error.name!=='AbortError')setError('字段分析失败，请关闭后重试或减少数据量');});
+    return ()=>{active=false;};
+  },[field,currentDataset,requestProfile]);
+  if (!field) return null;
+  if (!stats) return <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"><div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('字段健康度与分布透视')} className="bg-[#FFFDF7] dark:bg-[#272822] p-5 rounded-xl"><p role="status">{error || '正在分析字段，请稍候…'}</p><button onClick={onClose}>{t('取消')}</button></div></div>;
 
   const handleAdd = (zone) => {
     if (isReadOnly) return;

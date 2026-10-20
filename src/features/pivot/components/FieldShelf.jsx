@@ -6,12 +6,13 @@ import {
   ChevronLeft, ChevronRight, Search, PanelLeft, Layers, Info
 } from 'lucide-react';
 import { FIELD_TYPES, AGG_METHODS, VISUAL_CHART_TYPES, SHOW_AS_MODES } from '../../../constants/pivotConstants';
-import { parseCSVTextToSheet } from '../../../utils/csvParser';
 import { getDimDisplayLabel } from '../../../utils/formatters';
 import { SmartTemplatesBar } from './SmartTemplatesBar';
 import { FieldProfilerModal } from './FieldProfilerModal';
 
 export function FieldShelf({
+  requestProfile,
+  onPasteText,
   children,
   cinemaTheaterMode,
   isReadOnly,
@@ -245,7 +246,7 @@ export function FieldShelf({
                   <label className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1 md:py-1.5 rounded-lg focus-within:ring-2 focus-within:ring-[#66D9EF] border border-dashed border-[#ACA99A] dark:border-[#75715E] bg-[#FFFDF7]/60 dark:bg-[#1E1F1C]/70 hover:border-[#F92672] dark:hover:border-[#F92672] cursor-pointer text-[10.5px] font-medium transition ${isReadOnly ? 'opacity-40 pointer-events-none' : ''}`}>
                     <Upload className="w-3.5 h-3.5 text-[#F92672] shrink-0" />
                     <span className="truncate">{t("上传 CSV / Excel")}</span>
-                    <input type="file" accept=".csv,.txt,.xls,.xlsx" onChange={handleFileUpload} className="hidden" disabled={isReadOnly} />
+                    <input type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" onChange={handleFileUpload} className="hidden" disabled={isReadOnly} />
                   </label>
                   <button
                     disabled={isReadOnly}
@@ -259,14 +260,7 @@ export function FieldShelf({
                         '2025-04-18,西南,成都,线下自营店,智能家居,意式咖啡机,VIP黄金会员,49000,14,29400,19600,false',
                         '2025-04-22,华中,武汉,企业集采,办公外设,4K高清显示器,企业客户,66880,22,43472,23408,false',
                       ].join('\n');
-                      const sheet = parseCSVTextToSheet(sampleCsv, 'Retail_Sales_Sample.csv');
-                      if (sheet) {
-                        setUploadPreviewModal({
-                          fileName: 'Retail_Sales_Sample.csv',
-                          activeSheetIdx: 0,
-                          sheets: [sheet],
-                        });
-                      }
+                      onPasteText?.(sampleCsv);
                     }}
                     className="px-2 py-1 md:py-1.5 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
                     title={t("无需本地文件，一键加载内置零售样例以体验字段类型推断与预览")}
@@ -812,6 +806,7 @@ export function FieldShelf({
 
       {/* Field Data Profiler Inspector Modal */}
       <FieldProfilerModal
+        requestProfile={requestProfile}
         field={profilingField}
         currentDataset={currentDataset}
         onClose={() => setProfilingField(null)}
