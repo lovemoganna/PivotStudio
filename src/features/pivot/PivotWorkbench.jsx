@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { soundEngine } from '../../services/soundEngine';
 import { formatDimensionValue } from '../../utils/formatters';
 import { parseCSVTextToSheet } from '../../utils/csvParser';
+import { validateViewConfig } from '../../utils/viewValidation';
 import {
   exportToCSV as doExportCSV,
   exportToExcelMerged as doExportExcel,
@@ -966,7 +967,12 @@ export default function PivotWorkbench() {
     try {
       const tokenPart = rawInput.includes('share_token=') ? rawInput.split('share_token=')[1].split('&')[0] : rawInput.trim();
       const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(tokenPart)))));
-      if (decoded.fullConfig) setPivotConfig(decoded.fullConfig);
+      const error = validateViewConfig(decoded, currentDataset);
+      if (error) {
+        showToast(error, 'error');
+        return false;
+      }
+      setPivotConfig(decoded.fullConfig);
       if (decoded.cf) setCondFormat(decoded.cf);
       if (decoded.csc) setChartSpecConfig((p) => ({ ...p, ...decoded.csc }));
       if (decoded.vm) setViewMode(decoded.vm);
@@ -977,7 +983,7 @@ export default function PivotWorkbench() {
       showToast('Share Token 格式无效，无法解析还原', 'error');
       return false;
     }
-  }, [showToast]);
+  }, [showToast, currentDataset]);
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get('share_token');
