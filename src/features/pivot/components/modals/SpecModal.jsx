@@ -1,7 +1,9 @@
 import React from 'react';
-import { Award, X } from 'lucide-react';
+import { Layers3, X } from 'lucide-react';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 
 export function SpecModal({ isOpen, onClose }) {
+  const dialogRef = useDialogFocus(isOpen, onClose);
   if (!isOpen) return null;
 
   return (
@@ -10,21 +12,23 @@ export function SpecModal({ isOpen, onClose }) {
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label="内部设计规范" tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden animate-apple-modal"
       >
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Award className="w-4 h-4 text-[#FD971F]" />
+            <Layers3 className="w-4 h-4 text-[#FD971F]" />
             <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2]">
-              SOTD_SPEC // Monokai Pro × Apple Keynote 视觉与工程架构规范
+              DESIGN_SPEC // PivotStudio 内部设计与工程规范
             </h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label="关闭内部设计规范" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-5 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
+          <p className="text-[11px] text-[#75715E] dark:text-[#B8B5A8] leading-relaxed">本页面记录项目内部设计约定，不代表获得 Awwwards、Webby Awards 或 FWA 奖项。最终质量仍需真实浏览器测试与独立评审。</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 apple-font-mono">
             {[
               { name: 'Keyword Pink', hex: '#F92672', role: '主交互焦点 / 行维度 / 异常点' },

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 
 export function CommandPaletteModal({
   isOpen,
@@ -10,6 +11,7 @@ export function CommandPaletteModal({
 }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const itemRefs = useRef([]);
+  const dialogRef = useDialogFocus(isOpen, onClose);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -53,6 +55,7 @@ export function CommandPaletteModal({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-start justify-center pt-24 p-4"
     >
       <div
+        ref={dialogRef} tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden animate-apple-modal flex flex-col max-h-[70vh]"
       >
@@ -67,6 +70,9 @@ export function CommandPaletteModal({
             placeholder="输入指令名称、图表类型或分镜动作... (↑↓ 选择，Enter 执行)"
             className="flex-1 bg-transparent border-none text-xs apple-font-mono focus:outline-none text-[#272822] dark:text-[#F8F8F2]"
             aria-autocomplete="list"
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-activedescendant={commandActions.length ? `command-option-${commandActions[selectedIndex]?.id}` : undefined}
             aria-controls="command-palette-list"
           />
           <kbd className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[9px] font-semibold text-[#75715E] apple-font-mono">ESC</kbd>
@@ -80,6 +86,7 @@ export function CommandPaletteModal({
               return (
                 <button
                   key={cmd.id}
+                  id={`command-option-${cmd.id}`}
                   ref={(el) => (itemRefs.current[idx] = el)}
                   role="option"
                   aria-selected={isSelected}

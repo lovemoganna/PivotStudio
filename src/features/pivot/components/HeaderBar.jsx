@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Terminal, Award, Lock, Search, Zap, Film, CheckCircle2, Palette,
+  Terminal, Layers3, Lock, Search, Zap, Film, CheckCircle2, Palette,
   FolderOpen, Volume2, VolumeX, Sun, Moon, SkipBack, SkipForward, AlertCircle, X
 } from 'lucide-react';
 import { KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
@@ -52,29 +52,27 @@ export function HeaderBar({
       )}
 
       {/* Top Monokai Pro IDE Header Bar */}
-      <header className="min-h-13 py-2 bg-[#EFECE1]/90 dark:bg-[#272822]/95 backdrop-blur-2xl border-b border-[#D6D4C8] dark:border-[#3E3D32] px-4 flex flex-wrap items-center justify-between gap-2.5 shrink-0 print:hidden z-30 relative">
+      <header className="min-h-13 py-2 bg-[#EFECE1]/90 dark:bg-[#272822]/95 backdrop-blur-2xl border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 sm:px-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 lg:gap-2.5 shrink-0 print:hidden z-30 relative">
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#F92672] via-[#FD971F] via-[#E6DB74] via-[#A6E22E] via-[#66D9EF] to-[#AE81FF]" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-8 h-8 rounded-lg bg-[#1E1F1C] border border-[#3E3D32] flex items-center justify-center text-[#F92672] shadow-sm shrink-0 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-[#F92672]/20 via-transparent to-[#66D9EF]/20" />
             <Terminal className="w-4 h-4 text-[#F92672] relative z-10" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[13px] font-bold tracking-tight apple-font-mono flex items-center gap-1">
-                <span className="text-[#F92672]">const</span>
-                <span className="text-[#272822] dark:text-[#A6E22E]">PivotStudio</span>
-                <span className="text-[#75715E]">=</span>
-                <span className="text-[#948400] dark:text-[#E6DB74]">&quot;Monokai.Pro&quot;</span>
+              <h1 className="text-[14px] font-bold tracking-tight flex items-center gap-2">
+                <span className="text-[#272822] dark:text-[#F8F8F2]">PivotStudio</span>
+                <span className="text-[9px] tracking-[0.08em] text-[#0088A3] dark:text-[#66D9EF] font-semibold apple-font-mono">DATA WORKBENCH</span>
               </h1>
               <button
                 onClick={() => { soundEngine?.playClick(620); setShowAwardBadgeModal(true); }}
                 className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition"
-                title="查看 Awwwards / Webby / FWA 视觉架构与工程规范"
+                title="查看当前项目内部设计规范（不代表获奖）"
               >
-                <Award className="w-3 h-3 text-[#FD971F]" />
-                <span>SOTD_SPEC</span>
+                <Layers3 className="w-3 h-3 text-[#FD971F]" />
+                <span>设计规范</span>
               </button>
               {isReadOnly && (
                 <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#FD971F]/15 text-[#FD971F] font-semibold border border-[#FD971F]/35 apple-font-mono">
@@ -84,28 +82,21 @@ export function HeaderBar({
               )}
             </div>
             <p className="text-[10px] text-[#75715E] dark:text-[#908E80] hidden sm:block leading-tight mt-0.5 apple-font-mono">
-              // #272822 Obsidian Canvas · Crosshair Telemetry · 96 BPM Keynote Stage
+              数据透视分析 · 多维筛选 · 表图联动
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div role="toolbar" aria-label="分析工作台工具栏，可横向滚动" className="flex flex-nowrap items-center gap-2 overflow-x-auto lg:overflow-visible max-w-full min-w-0 pb-1 lg:pb-0 [&>*]:shrink-0">
           <button
             onClick={() => { soundEngine?.playClick(640); setShowCommandPalette(true); setCommandQuery(''); }}
             className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#66D9EF] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2] apple-transition"
-            title="打开全局指令面板 (⌘K / Ctrl+K)"
+            title="打开全局指令面板 (⌘K / Ctrl+K)" aria-label="打开指令面板"
           >
             <Search className="w-3 h-3 text-[#66D9EF]" />
             <span className="hidden md:inline apple-font-mono">cmd_palette()</span>
             <kbd className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#272822] text-[9px] font-semibold text-[#F92672] border border-[#D6D4C8] dark:border-[#49483E] apple-font-mono">⌘K</kbd>
           </button>
-
-          <div className="hidden xl:flex items-center gap-2 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-[#75715E] dark:text-[#908E80] apple-font-mono">
-            <Zap className="w-3.5 h-3.5 text-[#FD971F] shrink-0" />
-            <span>rows: <strong className="text-[#6B38FB] dark:text-[#AE81FF] font-semibold">{pivotResult.filteredCount.toLocaleString()}</strong>/{pivotResult.totalCount.toLocaleString()}</span>
-            <span className="text-[#49483E]">|</span>
-            <span>time: <strong className="text-[#528000] dark:text-[#A6E22E] font-semibold">{pivotResult.elapsedMs}ms</strong></span>
-          </div>
 
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5">
             <button

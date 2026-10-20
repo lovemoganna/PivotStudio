@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Globe, Server, Zap, X } from 'lucide-react';
 import { parseCSVTextToSheet } from '../../../../utils/csvParser';
 import { generateDuckDBPivotSQL } from '../../../../services/duckdbQuery';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 
 export function DataSourceModal({
   activeDataSourceModal, onClose, gsheetUrlInput, setGsheetUrlInput,
@@ -10,6 +11,7 @@ export function DataSourceModal({
   copyTextToClipboard, showToast
 }) {
   const [loading, setLoading] = useState(false);
+  const dialogRef = useDialogFocus(Boolean(activeDataSourceModal), onClose);
   if (!activeDataSourceModal) return null;
 
   async function importPublicSheet() {
@@ -58,7 +60,7 @@ export function DataSourceModal({
 
   return (
     <div role="presentation" onClick={onClose} className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <section role="dialog" aria-modal="true" aria-label="数据源管理" onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl text-xs">
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-label="数据源管理" tabIndex={-1} onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl text-xs">
         <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-5 py-4 border-b border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822]">
           <div className="flex items-center gap-2 font-bold">
             {activeDataSourceModal === 'gsheet' ? <Globe className="w-4 h-4 text-[#66D9EF]"/> : activeDataSourceModal === 'sql' ? <Server className="w-4 h-4 text-[#FD971F]"/> : <Zap className="w-4 h-4 text-[#AE81FF]"/>}

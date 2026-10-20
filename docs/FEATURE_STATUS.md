@@ -1,29 +1,24 @@
-# PivotStudio capability audit · 2026-10-19
+# PivotStudio 功能能力与验证状态（2026-10-20）
 
-| Function | Status | Verification / limitation |
+| 能力 | 当前实现 | 已验证范围及限制 |
 | --- | --- | --- |
-| Local CSV/XLSX import | Implemented; needs browser regression | Multiline quoted CSV parser, type inference, workbook sheet selection |
-| Pivot aggregation | Implemented; tests added | SUM/AVG/MIN/MAX/COUNT/DISTINCT and grouping; further edge tests needed |
-| Charts and drill-down | Implemented; needs browser regression | Recharts, linked interaction |
-| Excel export | Implemented; needs browser regression | Native XLSX from DOM table; check complex merged headers |
-| CSV/SVG/PNG/print | Implemented; needs browser regression | PNG only for funnel, SVG for other charts, PDF via print |
-| Public Google Sheets | Real fetch path; environment-dependent | Public CSV access and browser CORS must permit request; errors shown |
-| Database SQL proxy | Not implemented | Button and false success responses removed |
-| DuckDB query execution | Not implemented | Only copyable SQL templates |
-| 100k data simulation | Implemented | Synthetic local records; no DuckDB runtime or performance guarantee |
-| Saved workspaces | Local only | Browser localStorage configuration snapshots; not cloud-backed |
-| Share link | Partial | View config only, unencrypted Base64, same dataset required |
-| Roles | Demo only | UI toggles are not authentication or authorization |
+| 本地 CSV / Excel 导入 | 已实现 | CSV 引号、换行、错误表头单元测试；真实浏览器端文件导入组合测试尚未完成 |
+| 透视聚合 | 已实现 | SUM/AVG/MIN/MAX/COUNT/DISTINCT 和分组筛选单元测试；更多复杂口径仍需测试 |
+| 图表与下钻 | 已实现 | 浏览器检查默认图、移动端图表可达与表图切换；全部图种和下钻流程尚未回归 |
+| CSV 导出 | 已实现 | 使用全量透视结果，公式型字符串转义有独立测试；完整浏览器下载验证待补 |
+| Excel 导出 | 已实现 | 不使用虚拟化 DOM 截断数据；大表全量平铺表头，小表可保留 DOM 合并表头；尚未验证复杂文件往返 |
+| SVG / PNG / 浏览器打印 | 已实现 | 一般图表 SVG，漏斗图 PNG，PDF 由打印窗口处理；真实文件回归待补 |
+| Google Sheets 公开 CSV | 真实 fetch | 受公开权限与跨域限制；部署地址端到端连接待测 |
+| SQL 代理 | 未实现 | 已移除虚假连接反馈，界面如实标记不可用 |
+| DuckDB 引擎 | 未实现 | 只有 SQL 模板；运行计算仍是浏览器 JavaScript |
+| 100K 合成数据 | 测试入口 | 并非性能认证；缺少运行时间、内存与阻塞的实际验收 |
+| 工作区 | 浏览器本地持久化 | 无服务端存储及跨设备同步 |
+| 分享与角色 | 部分 / 演示 | Base64 仅分享配置，角色非真实认证和授权 |
+| 响应式工作台 | 已改进并做烟测 | Chromium 390px、768px、1440px 视口及截图；其他设备和全部交互未覆盖 |
+| 弹窗可访问性 | 部分修复 | 指令、数据源、上传和设计规范弹窗支持焦点管理；全量无障碍审查未完成 |
 
-## Known issues / next work
+## 当前优先缺口
 
-1. Run actual browser interaction and responsive-layout regression across viewport sizes. Static source inspection and CI build do not establish production-level UX quality.
-2. Harden spreadsheet types, null semantics, CSV formula injection, malformed rows and large-file error handling.
-3. Measure 100k+ row compute time, memory and UI blocking. Consider Web Worker and/or DuckDB-Wasm based on numbers, not a UI badge.
-4. Verify live Google Sheets CSV with a public test sheet from the deployed origin; no cross-origin bypass is implemented.
-5. Add a secure backend before claiming database support, authentication, sharing or collaborative persistence.
-6. Complete a11y review, including dialog focus management and keyboard interactions.
+必须继续检查复杂真实数据流、全类型图表、100K 性能和 UI 阻塞、键盘导航、阅读器适配，以及与高水平同类作品的逐屏比较。详见 `DESIGN_QUALITY_REVIEW.md`。
 
-## Evidence rules
-
-Do not mark a function implemented because a button exists or a mock success toast appears. Claims of successful testing require build logs, test outputs or browser execution evidence.
+验收原则：CI 成功并不自动代表功能全部完成或达到获奖品质。每项完成结论均需要明确的实际运行证据。
