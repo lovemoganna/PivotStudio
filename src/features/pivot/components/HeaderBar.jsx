@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Terminal, Award, Lock, Search, Zap, Film, CheckCircle2, Palette,
+  Terminal, Layers3, Lock, Search, Zap, Film, CheckCircle2, Palette,
   FolderOpen, Volume2, VolumeX, Sun, Moon, SkipBack, SkipForward, AlertCircle, X
 } from 'lucide-react';
 import { KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
@@ -62,19 +62,17 @@ export function HeaderBar({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[13px] font-bold tracking-tight apple-font-mono flex items-center gap-1">
-                <span className="text-[#F92672]">const</span>
-                <span className="text-[#272822] dark:text-[#A6E22E]">PivotStudio</span>
-                <span className="text-[#75715E]">=</span>
-                <span className="text-[#948400] dark:text-[#E6DB74]">&quot;Monokai.Pro&quot;</span>
+              <h1 className="text-[14px] font-bold tracking-tight flex items-center gap-2">
+                <span className="text-[#272822] dark:text-[#F8F8F2]">PivotStudio</span>
+                <span className="text-[9px] tracking-[0.08em] text-[#0088A3] dark:text-[#66D9EF] font-semibold apple-font-mono">DATA WORKBENCH</span>
               </h1>
               <button
                 onClick={() => { soundEngine?.playClick(620); setShowAwardBadgeModal(true); }}
                 className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition"
-                title="查看 Awwwards / Webby / FWA 视觉架构与工程规范"
+                title="查看当前项目内部设计规范（不代表获奖）"
               >
-                <Award className="w-3 h-3 text-[#FD971F]" />
-                <span>SOTD_SPEC</span>
+                <Layers3 className="w-3 h-3 text-[#FD971F]" />
+                <span>设计规范</span>
               </button>
               {isReadOnly && (
                 <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#FD971F]/15 text-[#FD971F] font-semibold border border-[#FD971F]/35 apple-font-mono">
@@ -84,7 +82,7 @@ export function HeaderBar({
               )}
             </div>
             <p className="text-[10px] text-[#75715E] dark:text-[#908E80] hidden sm:block leading-tight mt-0.5 apple-font-mono">
-              // #272822 Obsidian Canvas · Crosshair Telemetry · 96 BPM Keynote Stage
+              数据透视分析 · 多维筛选 · 表图联动
             </p>
           </div>
         </div>

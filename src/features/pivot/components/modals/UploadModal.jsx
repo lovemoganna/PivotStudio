@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileSpreadsheet, X } from 'lucide-react';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 
 export function UploadModal({
   uploadPreviewModal,
@@ -7,6 +8,7 @@ export function UploadModal({
   confirmUploadDataset,
   onClose,
 }) {
+  const dialogRef = useDialogFocus(Boolean(uploadPreviewModal), onClose);
   if (!uploadPreviewModal) return null;
 
   const activeSheet = uploadPreviewModal.sheets[uploadPreviewModal.activeSheetIdx] || uploadPreviewModal.sheets[0];
@@ -17,6 +19,7 @@ export function UploadModal({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label="文件数据预览与类型校准" tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-4xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden flex flex-col max-h-[86vh] animate-apple-modal"
       >
@@ -30,7 +33,7 @@ export function UploadModal({
               共解析 {activeSheet.rows.length} 行数据 · {activeSheet.fields.length} 个字段（支持手动修正字段类型，展示前 20 行预览）
             </p>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label="关闭文件预览" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
