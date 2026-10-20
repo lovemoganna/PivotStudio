@@ -83,6 +83,13 @@ try{
 
     const img=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     await writeFile('artifacts/browser/'+name+'.png',Buffer.from(img.data,'base64'));
+    if(name==='small-mobile') {
+      const moved=await evaluate('(() => { const toolbar=document.querySelector("[role=toolbar]"); const button=document.querySelector("button[aria-label^=\\"更多工具\\"]"); if(!toolbar || !button)return false; toolbar.scrollLeft=0; button.click(); return true; })()');
+      await sleep(360);
+      const scrolled=await evaluate('document.querySelector("[role=toolbar]")?.scrollLeft || 0');
+      if(!moved || scrolled<50)errors.push('mobile more-tools button did not reveal hidden actions');
+      await evaluate('document.querySelector("[role=toolbar]").scrollLeft=0');
+    }
     if(name==='mobile') {
       const full=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
       await writeFile('artifacts/browser/mobile-full.png',Buffer.from(full.data,'base64'));
