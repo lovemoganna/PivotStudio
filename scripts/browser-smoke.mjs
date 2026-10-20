@@ -2,6 +2,7 @@
 import {spawn} from 'node:child_process';
 import {mkdtemp,mkdir,rm,writeFile,readdir,readFile} from 'node:fs/promises';
 import * as XLSX from 'xlsx';
+import { parseCSVRecords } from '../src/utils/csvParser.js';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
@@ -78,6 +79,7 @@ try{
       console.log('UNNAMED_CONTROLS',name,JSON.stringify(unnamed));
     }
     if(focusIssue.count===0)errors.push(name+': no accessible controls');
+    if(focusIssue.unnamed>0)errors.push(name+': unnamed visible controls: '+focusIssue.unnamed);
 
     const img=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     await writeFile('artifacts/browser/'+name+'.png',Buffer.from(img.data,'base64'));
@@ -183,7 +185,9 @@ try{
     },'CSV export download',12000);
     const csvContent=await readFile(csvFile,'utf-8');
     if(!csvContent.includes('销售额'))errors.push('CSV export missing value metric');
-    console.log('REAL_CSV_EXPORT',JSON.stringify({bytes:csvContent.length,lines:csvContent.split(/\\r?\\n/).length}));
+    const csvRows=parseCSVRecords(csvContent);
+    if(csvRows.length !== exported.length)errors.push('CSV/XLSX pivot row counts disagree: '+csvRows.length+'/'+exported.length);
+    console.log('REAL_CSV_EXPORT',JSON.stringify({bytes:csvContent.length,rows:csvRows.length}));
   }
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));

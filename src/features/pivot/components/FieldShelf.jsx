@@ -405,6 +405,7 @@ export function FieldShelf({
               <label className="inline-flex items-center gap-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
                 <input
                   type="checkbox"
+                  aria-label="显示多级小计"
                   checked={pivotConfig.showSubtotals}
                   onChange={(e) => setPivotConfig((p) => ({ ...p, showSubtotals: e.target.checked }))}
                   className="rounded accent-[#F92672]"
@@ -415,6 +416,7 @@ export function FieldShelf({
               <label className="inline-flex items-center gap-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
                 <input
                   type="checkbox"
+                  aria-label="冻结行表头"
                   checked={chartSpecConfig.stickyRowHeaders}
                   onChange={(e) => setChartSpecConfig((p) => ({ ...p, stickyRowHeaders: e.target.checked }))}
                   className="rounded accent-[#F92672]"
