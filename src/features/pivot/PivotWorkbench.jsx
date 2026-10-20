@@ -459,7 +459,18 @@ export default function PivotWorkbench() {
       worker.onmessage = (event) => {
         if (stopped || fallbackUsed) return;
         if (event.data?.ok && event.data?.result) {
-          setWorkerPivot({ dataset: currentDataset, config: pivotConfig, result: event.data.result });
+          const result = event.data.result;
+          if (event.data.encoding === 'row_indices_v1') {
+            const buckets = result.cellRecordsMap;
+            result.cellRecordsMap = {
+              get(key) {
+                const ids = buckets.get(key);
+                if (!ids) return undefined;
+                return Array.from(ids, (index) => currentDataset.rows[index]);
+              },
+            };
+          }
+          setWorkerPivot({ dataset: currentDataset, config: pivotConfig, result });
         } else {
           useFallback(event.data?.error || 'Worker 计算失败');
         }

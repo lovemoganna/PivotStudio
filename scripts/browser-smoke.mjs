@@ -238,6 +238,7 @@ try{
   const largeWallMs=Date.now()-largeStart;
   const perf=await evaluate('({rows:document.body.textContent.includes("100,000 / 100,000 行"), chartVisible:!!document.getElementById("pivot-chart-container") && document.getElementById("pivot-chart-container").getBoundingClientRect().height>0, longTasks:window.__psLongTasks?.length||0,maxLongTaskMs:Math.round(Math.max(0,...(window.__psLongTasks||[]))),totalLongTaskMs:Math.round((window.__psLongTasks||[]).reduce((a,b)=>a+b,0))})');
   if(!perf.rows || !perf.chartVisible)errors.push('100k browser workbench not ready');
+  if(!await evaluate('document.body.textContent.includes("Web Worker 本地计算")'))errors.push('100k pivot worker did not finish on dedicated thread');
   console.log('BROWSER_100K_MEASUREMENT',JSON.stringify({wallTimeMs:largeWallMs,...perf,note:'Synthetic records, CI Chromium only; no performance SLA'}));
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
