@@ -90,9 +90,13 @@ try{
   if(!gsheet.includes('公开'))errors.push('GSheet access limits missing');
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
+}catch(error){
+  console.error('BROWSER_SMOKE_ERROR',error);
+  throw error;
 }finally{
   try{ws?.close()}catch{}
   try{chrome?.kill('SIGTERM')}catch{}
   vite.kill('SIGTERM');
-  await rm(profile,{recursive:true,force:true});
+  await sleep(250);
+  await rm(profile,{recursive:true,force:true}).catch(()=>{});
 }

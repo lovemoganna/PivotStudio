@@ -19,10 +19,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - uses: browser-actions/setup-chrome@v1
+      - id: browser-chrome
+        uses: browser-actions/setup-chrome@v1
         with:
           chrome-version: stable
       - name: Real browser smoke (desktop, tablet, mobile)
+        env:
+          CHROME_BIN: ${{ steps.browser-chrome.outputs.chrome-path }}
         run: node scripts/browser-smoke.mjs
       - name: Upload responsive screenshots
         if: always()
