@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Terminal, Layers3, Lock, Search, Zap, Film, CheckCircle2, Palette,
-  FolderOpen, Volume2, VolumeX, Sun, Moon, SkipBack, SkipForward, AlertCircle, X
+  FolderOpen, Volume2, VolumeX, Sun, Moon, SkipBack, SkipForward, AlertCircle, ChevronRight, X
 } from 'lucide-react';
 import { KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
 
@@ -39,6 +39,13 @@ export function HeaderBar({
   setToastMessage,
 }) {
   const activeKeynoteShot = KEYNOTE_STORYBOARD_SHOTS[keynoteShotIdx] || KEYNOTE_STORYBOARD_SHOTS[0];
+  const toolbarRef = React.useRef(null);
+  const scrollToolbar = () => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const reachedEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 12;
+    el.scrollTo({ left: reachedEnd ? 0 : el.scrollLeft + Math.max(220, el.clientWidth * 0.8), behavior: 'smooth' });
+  };
 
   return (
     <>
@@ -87,7 +94,13 @@ export function HeaderBar({
           </div>
         </div>
 
-        <div role="toolbar" aria-label="分析工作台工具栏，可横向滚动" className="flex flex-nowrap items-center gap-2 overflow-x-auto xl:overflow-visible max-w-full min-w-0 pb-1 xl:pb-0 [&>*]:shrink-0">
+        <div className="flex items-center gap-1 min-w-0 max-w-full xl:flex-initial">
+        <div ref={toolbarRef} role="toolbar" tabIndex={0} aria-label="分析工作台工具栏，可横向滚动" onKeyDown={(event) => {
+          if (event.target === event.currentTarget && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+            event.preventDefault();
+            event.currentTarget.scrollBy({left:event.key === 'ArrowRight'?180:-180,behavior:'smooth'});
+          }
+        }} className="flex flex-1 flex-nowrap items-center gap-2 overflow-x-auto xl:overflow-visible max-w-full min-w-0 pb-1 xl:pb-0 [&>*]:shrink-0">
           <button
             onClick={() => { soundEngine?.playClick(640); setShowCommandPalette(true); setCommandQuery(''); }}
             className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#66D9EF] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2] apple-transition"
@@ -96,6 +109,39 @@ export function HeaderBar({
             <Search className="w-3 h-3 text-[#66D9EF]" />
             <span className="hidden md:inline apple-font-mono">cmd_palette()</span>
             <kbd className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#272822] text-[9px] font-semibold text-[#F92672] border border-[#D6D4C8] dark:border-[#49483E] apple-font-mono">⌘K</kbd>
+          </button>
+
+          <button onClick={() => { soundEngine?.playClick(640); setShowTestSuiteModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-font-mono apple-transition">
+            <CheckCircle2 className="w-3.5 h-3.5 text-[#A6E22E]" />
+            <span>内置校验({liveEngineTestResults.filter((r) => r.passed).length}/5)</span>
+          </button>
+
+          <button onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#FD971F] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-transition">
+            <Palette className="w-3.5 h-3.5 text-[#FD971F]" />
+            <span>格式与数值</span>
+          </button>
+
+          <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 apple-font-mono">
+            <button onClick={exportToExcelMerged} title="导出真正的 Excel 工作簿 (.xlsx)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLSX</span></button>
+            <button onClick={exportToCSV} title="导出 CSV 数据表 (.csv)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
+            <button
+              disabled={viewMode === 'table'}
+              onClick={exportChartAsPNG}
+              title={viewMode === 'table' ? '当前为「仅透视表」模式，请切换至「表图并列」或「仅图表」视图导出图表' : '导出图表：通常 SVG；漏斗图 PNG'}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition ${
+                viewMode === 'table'
+                  ? 'opacity-35 cursor-not-allowed text-[#75715E]'
+                  : 'hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[#272822] dark:text-[#FD971F]'
+              }`}
+            >
+              <span>图表</span>
+            </button>
+            <button onClick={exportPDFReport} title="打开打印窗口，可选择另存为 PDF" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#AE81FF] font-semibold transition"><span>.PDF</span></button>
+          </div>
+
+          <button onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F92672] hover:bg-[#FF3B85] text-[#F8F8F2] text-[11px] font-semibold shadow-sm apple-transition" title="本地工作区快照、演示角色与分享配置">
+            <FolderOpen className="w-3.5 h-3.5" />
+            <span>工作区 · {currentUser.name.split(' ')[0]}</span>
           </button>
 
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5">
@@ -137,39 +183,6 @@ export function HeaderBar({
             </button>
           </div>
 
-          <button onClick={() => { soundEngine?.playClick(640); setShowTestSuiteModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-font-mono apple-transition">
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#A6E22E]" />
-            <span>内置校验({liveEngineTestResults.filter((r) => r.passed).length}/5)</span>
-          </button>
-
-          <button onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#FD971F] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-transition">
-            <Palette className="w-3.5 h-3.5 text-[#FD971F]" />
-            <span>格式与数值</span>
-          </button>
-
-          <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 apple-font-mono">
-            <button onClick={exportToExcelMerged} title="导出真正的 Excel 工作簿 (.xlsx)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLSX</span></button>
-            <button onClick={exportToCSV} title="导出 CSV 数据表 (.csv)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
-            <button
-              disabled={viewMode === 'table'}
-              onClick={exportChartAsPNG}
-              title={viewMode === 'table' ? '当前为「仅透视表」模式，请切换至「表图并列」或「仅图表」视图导出图表' : '导出图表：通常 SVG；漏斗图 PNG'}
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition ${
-                viewMode === 'table'
-                  ? 'opacity-35 cursor-not-allowed text-[#75715E]'
-                  : 'hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[#272822] dark:text-[#FD971F]'
-              }`}
-            >
-              <span>图表</span>
-            </button>
-            <button onClick={exportPDFReport} title="打开打印窗口，可选择另存为 PDF" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#AE81FF] font-semibold transition"><span>.PDF</span></button>
-          </div>
-
-          <button onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#F92672] hover:bg-[#FF3B85] text-[#F8F8F2] text-[11px] font-semibold shadow-sm apple-transition" title="本地工作区快照、演示角色与分享配置">
-            <FolderOpen className="w-3.5 h-3.5" />
-            <span>工作区 · {currentUser.name.split(' ')[0]}</span>
-          </button>
-
           <button
             onClick={() => {
               const next = !soundEnabled;
@@ -180,6 +193,7 @@ export function HeaderBar({
               }
             }}
             title={soundEnabled ? '微交互声效已开启 (点击静音)' : '微交互声效已静音 (点击开启)'}
+            aria-label={soundEnabled ? '关闭声效' : '开启声效'}
             className="p-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#66D9EF] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] transition"
           >
             {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-[#A6E22E]" /> : <VolumeX className="w-3.5 h-3.5 text-[#75715E]" />}
@@ -188,6 +202,14 @@ export function HeaderBar({
           <button onClick={() => { soundEngine?.playClick(480); setDarkMode((prev) => !prev); }} title={darkMode ? '当前：Monokai Pro Dark (点击切换暖纸浅色)' : '当前：Monokai Light (点击切换经典暗色)'} className="p-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#E6DB74] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] transition" aria-label="切换主题">
             {darkMode ? <Sun className="w-3.5 h-3.5 text-[#E6DB74]" /> : <Moon className="w-3.5 h-3.5 text-[#AE81FF]" />}
           </button>
+        </div>
+        <button
+          type="button"
+          onClick={scrollToolbar}
+          aria-label="更多工具，滚动到末尾后返回开头"
+          title="查看更多工具"
+          className="xl:hidden shrink-0 rounded-md border border-[#49483E] px-2 py-2 text-[#0088A3] dark:text-[#66D9EF] hover:border-[#66D9EF]"
+        ><ChevronRight className="w-4 h-4" /></button>
         </div>
       </header>
 
