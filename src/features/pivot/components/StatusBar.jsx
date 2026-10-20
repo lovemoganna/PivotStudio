@@ -8,6 +8,7 @@ export function StatusBar({
   splitRatioPct,
   pivotResult,
   duckdbThreshold,
+  isWorkerComputing,
 }) {
   return (
     <footer className="h-7 bg-[#EFECE1] dark:bg-[#191A17] border-t border-[#D6D4C8] dark:border-[#3E3D32] px-4 flex items-center justify-between gap-4 text-[10px] apple-font-mono shrink-0 print:hidden">
@@ -47,6 +48,12 @@ export function StatusBar({
       </div>
 
       <div className="flex items-center gap-2.5 shrink-0">
+        {isWorkerComputing && (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#66D9EF]/20 text-[#0088A3] dark:text-[#66D9EF] text-[9px] font-bold animate-pulse apple-font-mono">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#66D9EF] animate-ping" />
+            <span>Worker 异步计算中…</span>
+          </span>
+        )}
         {pivotResult.totalCount >= duckdbThreshold && (
           <span className="px-1.5 py-0.2 rounded bg-[#A6E22E]/20 text-[#4A7500] dark:text-[#A6E22E] font-bold">
             JS_LOCAL: {pivotResult.totalCount.toLocaleString()} ROWS

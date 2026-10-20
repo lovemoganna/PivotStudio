@@ -408,15 +408,72 @@ export default function PivotWorkbench() {
     };
   }, [keynotePlaying, applyKeynoteShot]);
 
-  const pivotResult = useMemo(
-    () => calculatePivot(currentDataset, pivotConfig),
-    [currentDataset, pivotConfig]
-  );
+  // Web Worker async computation pipeline for large datasets with main-thread fallback
+  const workerRef = useRef(null);
+  const reqIdRef = useRef(0);
+  const [isWorkerComputing, setIsWorkerComputing] = useState(false);
+  const [activeResults, setActiveResults] = useState(() => {
+    const initP = calculatePivot(RETAIL_TEST_DATASET, buildDefaultPivotConfig(RETAIL_TEST_DATASET));
+    const initC = buildUnifiedChartSpec(RETAIL_TEST_DATASET, initP, 'bar', {
+      primaryValueId: '', secondaryValueId: '', sortMode: 'none', topN: 0,
+      missingValueMode: 'zero', lineDerivedMetric: 'none', showDataLabels: true,
+      showAvgReferenceLine: true, clickLinkMode: 'highlight', histogramBins: 0, stickyRowHeaders: true,
+    });
+    return { pivotResult: initP, unifiedChartSpec: initC };
+  });
 
-  const unifiedChartSpec = useMemo(
-    () => buildUnifiedChartSpec(currentDataset, pivotResult, chartType, chartSpecConfig),
-    [currentDataset, pivotResult, chartType, chartSpecConfig]
-  );
+  useEffect(() => {
+    let worker = null;
+    try {
+      worker = new Worker(new URL('./engine/pivotWorker.js', import.meta.url), { type: 'module' });
+      worker.onmessage = (e) => {
+        const { id, success, pivotResult: pRes, unifiedChartSpec: cSpec } = e.data || {};
+        if (id === reqIdRef.current) {
+          setIsWorkerComputing(false);
+          if (success && pRes && cSpec) {
+            if (pRes.cellRecordsMap && !(pRes.cellRecordsMap instanceof Map)) {
+              pRes.cellRecordsMap = new Map(Object.entries(pRes.cellRecordsMap));
+            }
+            setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+          }
+        }
+      };
+      workerRef.current = worker;
+    } catch {
+      workerRef.current = null;
+    }
+    return () => {
+      if (worker) worker.terminate();
+    };
+  }, []);
+
+  useEffect(() => {
+    // Fast path for small datasets: calculate synchronously for immediate 0ms UI feedback
+    if (!currentDataset?.rows || currentDataset.rows.length <= 2500) {
+      setIsWorkerComputing(false);
+      const pRes = calculatePivot(currentDataset, pivotConfig);
+      const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
+      setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+      return;
+    }
+
+    // Heavy path (>2500 rows, e.g. 100K dataset): offload to Web Worker to keep UI thread 100% smooth
+    const nextId = ++reqIdRef.current;
+    if (workerRef.current) {
+      setIsWorkerComputing(true);
+      workerRef.current.postMessage({
+        id: nextId,
+        payload: { dataset: currentDataset, pivotConfig, chartType, chartSpecConfig },
+      });
+    } else {
+      const pRes = calculatePivot(currentDataset, pivotConfig);
+      const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
+      setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+    }
+  }, [currentDataset, pivotConfig, chartType, chartSpecConfig]);
+
+  const pivotResult = activeResults.pivotResult;
+  const unifiedChartSpec = activeResults.unifiedChartSpec;
 
   const liveEngineTestResults = useMemo(() => {
     const scenarios = [
@@ -1294,6 +1351,7 @@ export default function PivotWorkbench() {
           splitRatioPct={splitRatioPct}
           pivotResult={pivotResult}
           duckdbThreshold={duckdbThreshold}
+          isWorkerComputing={isWorkerComputing}
         />
 
         {/* Modals */}

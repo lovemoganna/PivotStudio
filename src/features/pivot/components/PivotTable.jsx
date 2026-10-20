@@ -46,6 +46,12 @@ export function PivotTable({
           </button>
         </div>
       )}
+      {pivotResult.allColGroups.length > 35 && (
+        <div className="bg-[#66D9EF]/10 border-b border-[#66D9EF]/25 px-4 py-1.5 flex items-center justify-between text-[10px] apple-font-mono text-[#0088A3] dark:text-[#66D9EF]">
+          <span>提示：当前生成了 {pivotResult.allColGroups.length} 组交叉列头，已启用水平滚动视图</span>
+          <span className="hidden sm:inline">按住 Shift + 鼠标滚轮可快速横向浏览</span>
+        </div>
+      )}
       <div ref={tableContainerRef} onScroll={(e) => setScrollTop?.(e.currentTarget.scrollTop)} className="flex-1 h-full min-h-0 overflow-auto relative">
         <table id="pivot-main-html-table" className="w-full border-separate border-spacing-0 text-[11px] text-left select-text tabular-nums">
           <thead className="sticky top-0 z-20 bg-[#EFECE1]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-md text-[#272822] dark:text-[#F8F8F2] shadow-sm">
