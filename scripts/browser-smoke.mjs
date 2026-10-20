@@ -32,6 +32,7 @@ try{
   const pending=new Map();
   ws.addEventListener('message',ev=>{
     const msg=JSON.parse(String(ev.data));
+    if(msg.method==='Runtime.exceptionThrown')console.error('CHROME_EXCEPTION',JSON.stringify(msg.params).slice(0,1500));
     const p=pending.get(msg.id);if(!p)return;
     pending.delete(msg.id);msg.error?p.reject(Error(JSON.stringify(msg.error))):p.resolve(msg.result);
   });
@@ -49,8 +50,11 @@ try{
   const clickText=(label)=>evaluate('(() => { const b=[...document.querySelectorAll("button")].find(x=>x.textContent.trim().includes('+JSON.stringify(label)+')); if(!b)return false; b.click(); return true; })()');
   await send('Page.enable');
   await send('Runtime.enable');
-  await send('Page.navigate',{url:'http://127.0.0.1:5173/'});
-  await waitFor(async()=>(await evaluate("document.querySelector('h1')?.textContent || ''")).includes('PivotStudio'),'React app');
+  const navigation=await send('Page.navigate',{url:'http://127.0.0.1:5173/'});
+  console.log('BROWSER_NAVIGATION',JSON.stringify(navigation));
+  await sleep(2500);
+  console.log('BROWSER_BOOT',JSON.stringify(await evaluate('({url:location.href,ready:document.readyState,title:document.title,body:document.body?.innerText.slice(0,500),html:document.documentElement?.outerHTML.slice(0,800)})')));
+  await waitFor(async()=>(await evaluate("document.querySelector('h1')?.textContent || ''")).includes('PivotStudio'),'React app',12000);
   const errors=[];
   for(const [name,width,height] of [['mobile',390,844],['tablet',768,900],['desktop',1440,900]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
