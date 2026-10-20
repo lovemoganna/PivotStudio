@@ -306,45 +306,17 @@ export function ChartStudio({
             })()}
           </div>
         ) : chartType === 'funnel' ? (
-          <div className="w-full h-full flex flex-col justify-center gap-2 py-2 px-3 overflow-y-auto">
-            {unifiedChartSpec.funnelItems.map((fItem, fIdx) => {
-              const isHighlighted = highlightedRowKey === fItem.rowKey;
-              const totalShare = unifiedChartSpec.primaryStats.total > 0
-                ? ((fItem.value / unifiedChartSpec.primaryStats.total) * 100).toFixed(1)
-                : '0.0';
-              return (
-                <div
-                  key={fItem.rowKey}
-                  onClick={() => {
-                    soundEngine?.playClick(520);
-                    handleChartPointClick(fItem);
-                  }}
-                  onDoubleClick={() => handleChartPointClick(fItem)}
-                  className="flex items-center gap-3 cursor-pointer group"
-                >
-                  <div className="w-24 text-right text-[11px] font-medium truncate shrink-0 flex flex-col items-end">
-                    <span className="truncate text-[#272822] dark:text-[#F8F8F2] font-semibold">{fItem.name}</span>
-                    <span className="text-[9px] text-[#75715E] dark:text-[#908E80] apple-font-mono">占总量 {totalShare}%</span>
-                  </div>
-                  <div className="flex-1 flex flex-col items-center">
-                    <div
-                      style={{
-                        width: `${fItem.widthPct}%`,
-                        background: `linear-gradient(135deg, ${fItem.fill} 0%, ${fItem.fill}CC 100%)`,
-                        clipPath: 'polygon(0% 0%, 100% 0%, 96% 100%, 4% 100%)',
-                      }}
-                      className={`h-8 px-4 flex items-center justify-between text-[#1E1F1C] text-[10px] apple-font-mono font-bold shadow-sm group-hover:scale-[1.01] apple-transition ${isHighlighted ? 'ring-2 ring-[#F8F8F2]' : ''}`}
-                    >
-                      <span>{fItem.formattedValue}</span>
-                      <span className="px-1.5 py-0.2 rounded bg-black/25 text-[#F8F8F2] text-[9px]">{fItem.conversionFormatted}</span>
-                    </div>
-                  </div>
-                  <div className="w-14 text-left text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono shrink-0">
-                    S_0{fIdx + 1}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="w-full h-full overflow-auto">
+            <svg data-chart-svg="true" role="img" aria-label="漏斗图" width="800" height={Math.max(220,unifiedChartSpec.funnelItems.length*54+24)}>
+              {unifiedChartSpec.funnelItems.map((item,index) => {
+                const width = item.widthPct*5.5, x=180+(550-width)/2, y=12+index*54;
+                return <g key={item.rowKey} onClick={() => handleChartPointClick(item)} role="button" tabIndex={0} aria-label={`${item.name}: ${item.formattedValue}`}>
+                  <text x="8" y={y+24} fontSize="12" fill={darkMode?'#F8F8F2':'#272822'}>{item.name}</text>
+                  <polygon points={`${x},${y} ${x+width},${y} ${x+width-8},${y+40} ${x+8},${y+40}`} fill={item.fill} stroke={highlightedRowKey===item.rowKey?'#FD971F':'transparent'} strokeWidth="3" />
+                  <text x={x+12} y={y+25} fontSize="12" fill="#1E1F1C">{item.formattedValue} · {item.conversionFormatted}</text>
+                </g>;
+              })}
+            </svg>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%" minHeight={160}>

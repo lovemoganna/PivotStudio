@@ -41,3 +41,7 @@ Added actual SVG matrix heatmap (not just table conditional formatting). Chart c
 ### R5
 
 Chromium verified named snapshot persistence, deleting the final snapshot and reload, configuration-only share, fresh-tab empty state and restoring average aggregation after manual import. Share projection excludes dataset/record properties; links use URL fragments so configuration is not included in the initial HTTP request. Legacy query-token input remains supported.
+
+### R6
+
+29 Node tests passed, including Excel number-format vs UI formatter parity for positive/negative/zero, currency, percentages and unit suffixes. Chromium compared filtered/sorted CSV and formatted XLSX against rendered cells, then downloaded PNG and SVG for bar/line/pie/heatmap/funnel. PNG signatures checked; SVG is standalone without foreignObject, includes inline styles and legend. Custom funnel now renders as SVG too. Mobile PNG canvas dimensions capped at 8192 per axis; SVG remains available.

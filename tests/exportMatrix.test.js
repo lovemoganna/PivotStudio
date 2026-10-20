@@ -24,3 +24,20 @@ test('CSV protects untrusted formula strings and preserves numbers',()=>{
   assert.equal(encodeCsvCell(-4),'"-4"');
   assert.equal(encodeCsvCell('a,b'),'"a,b"');
 });
+
+test('formatted export matches table decimals currency percentages and baseline',async()=>{
+  const {formatCellNumber}=await import('../src/utils/formatters.js');
+  const {excelNumberFormat}=await import('../src/utils/exportMatrix.js');
+  const XLSX=await import('xlsx');
+  for(const metric of [
+    {id:'v',field:'amount',agg:'sum',format:{decimals:2,currency:'¥',thousands:true}},
+    {id:'v',field:'amount',agg:'sum',showAs:'pct_grand',format:{}},
+    {id:'v',field:'latency_ms',agg:'avg',format:{decimals:1}},
+  ]) {
+    for(const value of [1234.56,-1234.56,0]) {
+      const display=formatCellNumber({display:value},metric);
+      const cell={t:'n',v:value,z:excelNumberFormat(metric)};
+      assert.equal(XLSX.utils.format_cell(cell),display);
+    }
+  }
+});

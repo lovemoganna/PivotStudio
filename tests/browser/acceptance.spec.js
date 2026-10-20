@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import * as XLSX from 'xlsx';
+import { encodeView } from '../../src/utils/viewConfig.js';
+import { parseCSVRecords } from '../../src/utils/csvParser.js';
 const upload = (page, buffer, name='data.csv') => page.locator('input[type=file]').first().setInputFiles({name,mimeType:'text/csv',buffer:Buffer.isBuffer(buffer)?buffer:Buffer.from(buffer)});
 const preview = page => page.getByRole('dialog',{name:'文件数据预览与类型校准',exact:true});
 const ready = async page => { await expect(page.locator('progress[aria-label="计算进度"]')).toHaveCount(0); };
@@ -11,7 +15,7 @@ test('R1 500k CSV responds, shows progress, and cancels',async({page})=>{
   await expect(page.locator('progress[aria-label="导入进度"]')).toBeVisible();
   await expect(preview(page)).toContainText('500000 行');
   await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
-  await expect(page.getByText(/500,000 \/ 500,000 行/).first()).toBeVisible();
+  await expect(page.locator('[role=status]').filter({hasText:/500,000 \/ 500,000 行/}).first()).toBeVisible();
   await ready(page);
   await page.getByRole('button',{name:'切换主题',exact:true}).click();
   expect(await page.evaluate(()=>window.ticks)).toBeGreaterThan(10);
@@ -123,4 +127,34 @@ test('R5 local named views, last deletion and data-free share restore',async({pa
   await expect(page.getByText('保存或切换本机工作区快照 (0)',{exact:true})).toBeVisible();
   await page.reload();
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pivotstudio_workspaces_v1')).length)).toBe(0);
+});
+
+
+test('R6 filtered sorted formatted CSV/XLSX and real PNG/SVG downloads',async({page})=>{
+  const config={fullConfig:{rows:[{id:'r',field:'区域',sort:'desc'}],columns:[],filters:[{id:'f',field:'区域',selectedValues:['华东','华南']}],values:[{id:'v',field:'金额',agg:'sum',format:{decimals:2,currency:'¥',thousands:true}}]}};
+  await page.goto('/#share_token='+encodeURIComponent(encodeView(config)));
+  await upload(page,'区域,金额\n华东,1234.56\n华南,-2000.25\n华北,99999');
+  await expect(preview(page)).toBeVisible();
+  await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
+  await expect(page.locator('[role=status]').filter({hasText:/2 \/ 3 行/}).first()).toBeVisible(); await ready(page);
+  const expected=await page.getByTestId('pivot-value-cell').allTextContents();
+  const csvPromise=page.waitForEvent('download'); await page.getByRole('button',{name:'.CSV',exact:true}).click();
+  const csv=parseCSVRecords(await readFile(await (await csvPromise).path(),'utf8'));
+  expect(csv.slice(1,-1).map(row=>row[1])).toEqual(expected.map(value=>value.trim()));
+  const xlsxPromise=page.waitForEvent('download'); await page.getByRole('button',{name:'.XLSX',exact:true}).click();
+  const book=XLSX.read(await readFile(await (await xlsxPromise).path()),{cellNF:true});
+  const sheet=book.Sheets[book.SheetNames[0]];
+  expect(XLSX.utils.sheet_to_json(sheet,{header:1,raw:false}).slice(1,-1).map(row=>row[1])).toEqual(csv.slice(1,-1).map(row=>row[1]));
+  for(const kind of ['bar','line','pie','heatmap','funnel']) {
+    await page.getByLabel('选择图表类型',{exact:true}).selectOption(kind); await ready(page);
+    // Recharts animations are visual only; wait for the final geometry before image export.
+    await page.waitForTimeout(1600);
+    for(const format of ['SVG','PNG']) {
+      const promise=page.waitForEvent('download'); await page.getByRole('button',{name:'.'+format,exact:true}).click();
+      const download=await promise; const bytes=await readFile(await download.path());
+      expect(download.suggestedFilename()).toMatch(new RegExp('\\.'+format.toLowerCase()+'$'));
+      if(format==='PNG') expect([...bytes.subarray(0,8)]).toEqual([137,80,78,71,13,10,26,10]);
+      else { expect(bytes.toString()).toContain('<svg'); expect(bytes.toString()).not.toContain('foreignObject'); }
+    }
+  }
 });

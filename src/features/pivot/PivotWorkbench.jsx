@@ -14,6 +14,7 @@ import {
   exportToCSV as doExportCSV,
   exportToExcelMerged as doExportExcel,
   exportChartAsPNG as doExportPNG,
+  exportChartAsSVG as doExportSVG,
   exportPDFReport as doExportPDF
 } from '../../utils/exportUtils';
 import { calculatePivot } from './engine/calculatePivot';
@@ -1088,6 +1089,10 @@ export default function PivotWorkbench() {
     doExportPNG(currentDataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast);
   }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode]);
 
+  const exportChartAsSVG = useCallback(() => {
+    doExportSVG(currentDataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast);
+  }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode]);
+
   const exportPDFReport = useCallback(() => {
     doExportPDF(setIsPrintingReport);
   }, []);
@@ -1255,6 +1260,7 @@ export default function PivotWorkbench() {
           exportToExcelMerged={exportToExcelMerged}
           exportToCSV={exportToCSV}
           exportChartAsPNG={exportChartAsPNG}
+          exportChartAsSVG={exportChartAsSVG}
           exportPDFReport={exportPDFReport}
           showToast={showToast}
           toastMessage={toastMessage}

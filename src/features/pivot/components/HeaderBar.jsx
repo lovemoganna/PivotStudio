@@ -38,6 +38,7 @@ export function HeaderBar({
   exportToExcelMerged,
   exportToCSV,
   exportChartAsPNG,
+  exportChartAsSVG,
   exportPDFReport,
   showToast,
   toastMessage,
@@ -153,15 +154,16 @@ export function HeaderBar({
             <button
               disabled={viewMode === 'table'}
               onClick={exportChartAsPNG}
-              title={viewMode === 'table' ? '当前为「仅透视表」模式，请切换至「表图并列」或「仅图表」视图导出图表' : '导出图表：通常 SVG；漏斗图 PNG'}
+              title={viewMode === 'table' ? '当前为「仅透视表」模式，请切换至「表图并列」或「仅图表」视图导出图表' : '导出 PNG 图表'}
               className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition ${
                 viewMode === 'table'
                   ? 'opacity-35 cursor-not-allowed text-[#75715E]'
                   : 'hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[#272822] dark:text-[#FD971F]'
               }`}
             >
-              <span>图表</span>
+              <span>.PNG</span>
             </button>
+            <button disabled={viewMode === 'table'} onClick={exportChartAsSVG} title="导出 SVG 矢量图表" className="px-2 py-1 text-[10px] text-[#FD971F] disabled:opacity-35">.SVG</button>
             <button onClick={exportPDFReport} title="打开打印窗口，可选择另存为 PDF" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#AE81FF] font-semibold transition"><span>.PDF</span></button>
           </div>
 
