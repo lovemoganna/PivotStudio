@@ -139,7 +139,7 @@ try{
   assert.equal(await clickText('分析视角'),true);
 
   // Every advertised chart type must remain switchable and preserve the workbench.
-  const kinds=await evaluate('Array.from(document.querySelector('select[aria-label="选择图表类型"]').options).map(x=>x.value)');
+  const kinds=await evaluate(`Array.from(document.querySelector('select[aria-label="选择图表类型"]').options).map(x=>x.value)`);
   for(const kind of kinds) {
     const selected=await evaluate('(() => {const el=document.querySelector(\'select[aria-label="选择图表类型"]\'); el.value='+JSON.stringify(kind)+';el.dispatchEvent(new Event("change",{bubbles:true}));return el.value;})()');
     await sleep(140);
