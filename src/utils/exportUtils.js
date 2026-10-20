@@ -31,7 +31,7 @@ export function exportToExcelMerged(dataset, pivotResult, showToast) {
     }
     const table = document.getElementById('pivot-main-html-table');
     // Preserve visual merged headers when every row is actually rendered.
-    const fullTableRendered = Boolean(table) && pivotResult.tableRows.length <= 80;
+    const fullTableRendered = false;
     const workbook = fullTableRendered
       ? XLSX.utils.table_to_book(table, { sheet: '透视表' })
       : XLSX.utils.book_new();

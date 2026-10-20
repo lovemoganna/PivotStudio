@@ -903,8 +903,7 @@ export function PivotTable({
 
                       {/* Interactive Column Resize Handle */}
                       <div
-                        role="separator"
-                        aria-orientation="vertical"
+                        aria-hidden="true"
                         onMouseDown={(e) => handleResizeStart(e, rowColKey, colW)}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
@@ -984,8 +983,7 @@ export function PivotTable({
 
                       {/* Interactive Column Resize Handle */}
                       <div
-                        role="separator"
-                        aria-orientation="vertical"
+                        aria-hidden="true"
                         onMouseDown={(e) => handleResizeStart(e, valColKey, colW)}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
