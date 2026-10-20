@@ -17,6 +17,7 @@ import {
 } from '../../utils/exportUtils';
 import { calculatePivot } from './engine/calculatePivot';
 import { buildUnifiedChartSpec } from './engine/buildChartSpec';
+import { calculateAutoFitColumnWidths } from '../../utils/tableAutoFit';
 
 // Modular UI Components
 import { HeaderBar } from './components/HeaderBar';
@@ -94,6 +95,14 @@ export default function PivotWorkbench() {
     customRuleColor: 'red',
   });
 
+  const [tableSettings, setTableSettings] = useState({
+    density: 'normal', // 'compact' (28px) | 'normal' (36px) | 'relaxed' (44px) | 'auto' (auto row height & wrap)
+    dataAlignment: 'center', // 'center' (default) | 'left' | 'right'
+    showZebra: true,
+    wrapText: false,
+    customColWidths: {},
+  });
+
   const [draggingPayload, setDraggingPayload] = useState(null);
   const [dragOverZone, setDragOverZone] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null);
@@ -130,6 +139,7 @@ export default function PivotWorkbench() {
       chartType: 'bar',
       condFormat: { colorScale: 'none', showDataBar: true, customRuleEnabled: false, customRuleOp: 'gt', customRuleValue: 100000, customRuleColor: 'red' },
       chartSpecConfig: { primaryValueId: 'v_init_1', secondaryValueId: 'v_init_2', sortMode: 'none', topN: 0, missingValueMode: 'zero', lineDerivedMetric: 'none' },
+      tableSettings: { density: 'normal', dataAlignment: 'center', showZebra: true, wrapText: false, customColWidths: {} },
       pivotConfig: {
         filters: [],
         rows: [
@@ -1033,6 +1043,7 @@ export default function PivotWorkbench() {
       if (decoded.csc) setChartSpecConfig((p) => ({ ...p, ...decoded.csc }));
       if (decoded.vm) setViewMode(decoded.vm);
       if (decoded.ct) setChartType(decoded.ct);
+      if (decoded.ts) setTableSettings((p) => ({ ...p, ...decoded.ts }));
       showToast('已从 Share Token 成功还原透视工作台视图！');
       return true;
     } catch {
@@ -1071,11 +1082,20 @@ export default function PivotWorkbench() {
       { id: 'cmd_theme', category: '外观与导出', label: darkMode ? '切换为 Monokai Light 暖纸浅色主题' : '切换为 Monokai Pro 经典暗黑主题', shortcut: 'Theme', run: () => setDarkMode((p) => !p) },
       { id: 'cmd_excel', category: '外观与导出', label: '导出 Excel 工作簿 (.xlsx)', shortcut: 'XLS', run: exportToExcelMerged },
       { id: 'cmd_csv', category: '外观与导出', label: '导出标准 UTF-8 CSV 数据表 (.csv)', shortcut: 'CSV', run: exportToCSV },
+      { id: 'cmd_autofit_cols', category: '透视表排版与对齐', label: '透视表：一键自动优化调整行高与列宽 (Auto-Fit)', shortcut: 'Fit', run: () => { const newWidths = calculateAutoFitColumnWidths(pivotResult, tableSettings.customColWidths); setTableSettings((p) => ({ ...p, customColWidths: newWidths })); showToast('已自动计算并自适应优化全部行高与列宽'); } },
+      { id: 'cmd_align_center', category: '透视表排版与对齐', label: '透视表：设置数据与表头居中对齐 (Centered 默认)', shortcut: 'Align', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'center' })); showToast('数据已设置为居中对齐'); } },
+      { id: 'cmd_align_left', category: '透视表排版与对齐', label: '透视表：设置数据靠左对齐 (Left)', shortcut: 'Left', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'left' })); showToast('数据已设置为靠左对齐'); } },
+      { id: 'cmd_align_right', category: '透视表排版与对齐', label: '透视表：设置数据靠右对齐 (Right)', shortcut: 'Right', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'right' })); showToast('数据已设置为靠右对齐'); } },
+      { id: 'cmd_density_compact', category: '透视表排版与对齐', label: '透视表行高：切换为紧凑规格 (28px)', shortcut: 'Dense', run: () => { setTableSettings((p) => ({ ...p, density: 'compact', wrapText: false })); showToast('行高已切换为紧凑规格 (28px)'); } },
+      { id: 'cmd_density_normal', category: '透视表排版与对齐', label: '透视表行高：切换为标准规格 (36px)', shortcut: 'Normal', run: () => { setTableSettings((p) => ({ ...p, density: 'normal', wrapText: false })); showToast('行高已切换为标准规格 (36px)'); } },
+      { id: 'cmd_density_relaxed', category: '透视表排版与对齐', label: '透视表行高：切换为宽松规格 (44px)', shortcut: 'Spacious', run: () => { setTableSettings((p) => ({ ...p, density: 'relaxed', wrapText: false })); showToast('行高已切换为宽松规格 (44px)'); } },
+      { id: 'cmd_density_auto', category: '透视表排版与对齐', label: '透视表行高：启用自适应换行 (随内容展开行高)', shortcut: 'Wrap', run: () => { setTableSettings((p) => ({ ...p, density: 'auto', wrapText: true })); showToast('已启用自适应换行与动态行高'); } },
+      { id: 'cmd_toggle_zebra', category: '透视表排版与对齐', label: '透视表：切换隔行轻柔斑马纹', shortcut: 'Zebra', run: () => { setTableSettings((p) => ({ ...p, showZebra: !p.showZebra })); showToast('已切换斑马纹显示'); } },
     ];
     if (!commandQuery.trim()) return list;
     const q = commandQuery.toLowerCase();
     return list.filter((item) => item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q));
-  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery]);
+  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, pivotResult, tableSettings, showToast]);
 
   // Default and synchronized height matching the PivotTable's rendered dimension
   const defaultTableHeight = useMemo(() => {
@@ -1110,8 +1130,10 @@ export default function PivotWorkbench() {
     return () => ro.disconnect();
   }, [pivotResult]);
 
-  const ROW_HEIGHT = 32;
-  const isVirtualized = pivotResult.tableRows.length > 80 && !isPrintingReport;
+  const rowHeightMap = { compact: 28, normal: 36, relaxed: 44, auto: 44 };
+  const currentDensity = tableSettings.density || 'normal';
+  const ROW_HEIGHT = rowHeightMap[currentDensity] || 36;
+  const isVirtualized = pivotResult.tableRows.length > 80 && !isPrintingReport && currentDensity !== 'auto' && !tableSettings.wrapText;
 
   const visibleRowWindow = useMemo(() => {
     if (!isVirtualized) {
@@ -1285,6 +1307,10 @@ export default function PivotWorkbench() {
                 setDrillPage={setDrillPage}
                 setDrillDownModal={setDrillDownModal}
                 soundEngine={soundEngine}
+                tableSettings={tableSettings}
+                setTableSettings={setTableSettings}
+                copyTextToClipboard={copyTextToClipboard}
+                showToast={showToast}
               />
             </div>
           )}
@@ -1421,6 +1447,8 @@ export default function PivotWorkbench() {
           setCondFormat={setCondFormat}
           pivotConfig={pivotConfig}
           setPivotConfig={setPivotConfig}
+          tableSettings={tableSettings}
+          setTableSettings={setTableSettings}
           onClose={() => setActiveFormatModal(false)}
         />
 
@@ -1479,6 +1507,8 @@ export default function PivotWorkbench() {
           setChartSpecConfig={setChartSpecConfig}
           pivotConfig={pivotConfig}
           setPivotConfig={setPivotConfig}
+          tableSettings={tableSettings}
+          setTableSettings={setTableSettings}
           applyShareTokenPayload={applyShareTokenPayload}
           copyTextToClipboard={copyTextToClipboard}
           showToast={showToast}

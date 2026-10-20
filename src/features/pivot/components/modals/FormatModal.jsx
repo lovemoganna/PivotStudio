@@ -1,6 +1,6 @@
 import React from 'react';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
-import { Palette, X } from 'lucide-react';
+import { Palette, X, AlignCenter, AlignLeft, AlignRight, Rows, Table } from 'lucide-react';
 import { SHOW_AS_MODES } from '../../../../constants/pivotConstants';
 
 export function FormatModal({
@@ -9,6 +9,8 @@ export function FormatModal({
   setCondFormat,
   pivotConfig,
   setPivotConfig,
+  tableSettings,
+  setTableSettings,
   onClose,
 }) {
   const dialogRef = useDialogFocus(Boolean(isOpen), onClose);
@@ -28,13 +30,14 @@ export function FormatModal({
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
             <Palette className="w-4 h-4 text-[#FD971F]" />
-            <span>FORMAT_STUDIO // 条件格式、色阶数据条与数值显示方式</span>
+            <span>FORMAT_STUDIO // 格式、数据居中对齐、行高列宽与显示</span>
           </h3>
           <button onClick={onClose} aria-label="关闭数值与条件格式设置" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-5 space-y-5 overflow-y-auto text-xs">
+          {/* Section 1: Conditional Formatting */}
           <div className="space-y-3">
             <div className="font-bold text-[#F92672] apple-font-mono">1. 透视表条件格式 (色阶 / 数据条 / 阈值标红)</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -95,8 +98,91 @@ export function FormatModal({
             )}
           </div>
 
+          {/* Section 2: Table Layout, Alignment & Density */}
+          {tableSettings && setTableSettings && (
+            <div className="space-y-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-4">
+              <div className="font-bold text-[#A6E22E] apple-font-mono flex items-center gap-1.5">
+                <Table className="w-3.5 h-3.5" />
+                <span>2. 透视表数据对齐方式与行高密度设置</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">
+                    数据与表头对齐方式:
+                  </label>
+                  <div className="flex items-center bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-1">
+                    {[
+                      { id: 'center', label: '居中对齐 (默认)', icon: AlignCenter },
+                      { id: 'left', label: '靠左对齐', icon: AlignLeft },
+                      { id: 'right', label: '靠右对齐', icon: AlignRight },
+                    ].map((al) => {
+                      const Icon = al.icon;
+                      const active = (tableSettings.dataAlignment || 'center') === al.id;
+                      return (
+                        <button
+                          key={al.id}
+                          type="button"
+                          onClick={() => setTableSettings((p) => ({ ...p, dataAlignment: al.id }))}
+                          className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[10px] font-semibold transition ${
+                            active
+                              ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-sm'
+                              : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+                          }`}
+                        >
+                          <Icon className="w-3 h-3" />
+                          <span>{al.id === 'center' ? '居中' : al.id === 'left' ? '靠左' : '靠右'}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">
+                    行高密度规格:
+                  </label>
+                  <select
+                    value={tableSettings.density || 'normal'}
+                    onChange={(e) => {
+                      const nextD = e.target.value;
+                      setTableSettings((p) => ({ ...p, density: nextD, wrapText: nextD === 'auto' }));
+                    }}
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] apple-font-mono"
+                  >
+                    <option value="compact">紧凑 (28px - 大数据紧凑扫描)</option>
+                    <option value="normal">标准 (36px - 经典平衡)</option>
+                    <option value="relaxed">宽松 (44px - 舒适触摸阅读)</option>
+                    <option value="auto">自适应换行 (随内容行数自适应高度)</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col justify-end gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer apple-font-mono">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(tableSettings.showZebra)}
+                      onChange={(e) => setTableSettings((p) => ({ ...p, showZebra: e.target.checked }))}
+                      className="rounded accent-[#A6E22E]"
+                    />
+                    <span>启用隔行轻柔斑马纹</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer apple-font-mono">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(tableSettings.wrapText)}
+                      onChange={(e) => setTableSettings((p) => ({ ...p, wrapText: e.target.checked }))}
+                      className="rounded accent-[#FD971F]"
+                    />
+                    <span>允许长文本自动折行</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 3: Values & Formatting */}
           <div className="space-y-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-4">
-            <div className="font-bold text-[#66D9EF] apple-font-mono">2. 值字段显示方式 (占比/环比) 与数值精度</div>
+            <div className="font-bold text-[#66D9EF] apple-font-mono">3. 值字段显示方式 (占比/环比) 与数值精度</div>
             {pivotConfig.values.length === 0 ? (
               <div className="text-[#75715E] italic apple-font-mono">/* 当前值区域为空，请先拖入值指标 */</div>
             ) : (

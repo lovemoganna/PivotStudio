@@ -29,6 +29,8 @@ export function WorkspaceModal({
   setChartSpecConfig,
   pivotConfig,
   setPivotConfig,
+  tableSettings,
+  setTableSettings,
   applyShareTokenPayload,
   copyTextToClipboard,
   showToast,
@@ -104,6 +106,7 @@ export function WorkspaceModal({
                     condFormat,
                     chartSpecConfig,
                     pivotConfig,
+                    tableSettings,
                   };
                   setSavedWorkspaces((prev) => [snap, ...prev]);
                   setActiveWorkspaceId(snap.id);
@@ -133,6 +136,7 @@ export function WorkspaceModal({
                         if (ws.condFormat) setCondFormat(ws.condFormat);
                         if (ws.chartSpecConfig) setChartSpecConfig((p) => ({ ...p, ...ws.chartSpecConfig }));
                         if (ws.pivotConfig) setPivotConfig(ws.pivotConfig);
+                        if (ws.tableSettings && setTableSettings) setTableSettings(ws.tableSettings);
                         setActiveWorkspaceId(ws.id);
                         onClose();
                         showToast?.(`已加载工作区「${ws.name}」`);
@@ -168,6 +172,7 @@ export function WorkspaceModal({
                       cf: condFormat,
                       csc: chartSpecConfig,
                       fullConfig: pivotConfig,
+                      ts: tableSettings,
                     })
                   )
                 )

@@ -110,3 +110,64 @@ test('SQL template groups by transformed year expression', () => {
   assert.match(sql, /FROM "sales-data"/);
   assert.match(sql, /TEMPLATE ONLY/);
 });
+test('handles extreme values, negatives, zero and NaN gracefully', () => {
+  const rows = [
+    { cat: 'A', val: -100.5 },
+    { cat: 'A', val: 0 },
+    { cat: 'B', val: 200.5 },
+    { cat: 'B', val: 'NaN' },
+    { cat: 'B', val: -Infinity },
+    { cat: 'B', val: 50 },
+  ];
+  const ds = {
+    fields: [{ name: 'cat', type: 'text' }, { name: 'val', type: 'number' }],
+    rows,
+  };
+  const cfg = {
+    rows: [{ field: 'cat' }],
+    columns: [],
+    values: [
+      { id: 'v_sum', field: 'val', agg: 'sum' },
+      { id: 'v_min', field: 'val', agg: 'min' },
+      { id: 'v_max', field: 'val', agg: 'max' },
+    ],
+  };
+  const res = calculatePivot(ds, cfg);
+  // Row A: -100.5 + 0 = -100.5
+  assert.equal(res.rawValueMatrix['A@@__GRAND_TOTAL_COL__@@v_sum'], -100.5);
+  assert.equal(res.rawValueMatrix['A@@__GRAND_TOTAL_COL__@@v_min'], -100.5);
+  assert.equal(res.rawValueMatrix['A@@__GRAND_TOTAL_COL__@@v_max'], 0);
+  // Row B: 200.5 + 50 = 250.5 (NaN and -Infinity filtered by computeAggregation)
+  assert.equal(res.rawValueMatrix['B@@__GRAND_TOTAL_COL__@@v_sum'], 250.5);
+  assert.equal(res.rawValueMatrix['B@@__GRAND_TOTAL_COL__@@v_min'], 50);
+  assert.equal(res.rawValueMatrix['B@@__GRAND_TOTAL_COL__@@v_max'], 200.5);
+  // Grand total: -100.5 + 250.5 = 150
+  assert.equal(res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v_sum'], 150);
+});
+
+test('handles completely empty dataset and all-filtered rows safely', () => {
+  const emptyDs = { fields: [{ name: 'a', type: 'text' }], rows: [] };
+  const resEmpty = calculatePivot(emptyDs, { rows: [{ field: 'a' }], values: [{ id: 'v1', field: 'a', agg: 'count' }] });
+  assert.equal(resEmpty.filteredCount, 0);
+  assert.equal(resEmpty.tableRows.length, 1); // Grand total row
+  assert.equal(resEmpty.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v1'], 0);
+
+  const ds = { fields: [{ name: 'dim', type: 'text' }, { name: 'n', type: 'number' }], rows: [{ dim: 'X', n: 10 }] };
+  const resFilteredOut = calculatePivot(ds, {
+    rows: [{ field: 'dim' }],
+    values: [{ id: 'v1', field: 'n', agg: 'sum' }],
+    filters: [{ field: 'dim', selectedValues: ['Y'] }]
+  });
+  assert.equal(resFilteredOut.filteredCount, 0);
+  assert.equal(resFilteredOut.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v1'], 0);
+});
+
+test('type inference respects 70% threshold consistently', () => {
+  // 7 out of 10 valid numbers = 70% -> should be 'number'
+  const sheetNum = parseCSVTextToSheet('col\n10\n20\n30\n40\n50\n60\n70\nabc\ndef\nghi');
+  assert.equal(sheetNum.fields[0].type, 'number');
+
+  // 6 out of 10 valid numbers = 60% -> under 70% threshold -> should fall back to 'text'
+  const sheetText = parseCSVTextToSheet('col\n10\n20\n30\n40\n50\n60\nabc\ndef\nghi\njkl');
+  assert.equal(sheetText.fields[0].type, 'text');
+});
