@@ -1,34 +1,37 @@
-# PivotStudio · Global Design Quality Review
+# PivotStudio 全局设计质量审查
 
-Date: 2026-10-20
-Baseline: `8a9eb40ced893fde061b3b7f35a7d64d953d9836`
-Review scope: current source code and GitHub Actions. Live interactive browser comparison and screenshots were **not available** in this execution environment.
+日期：2026-10-20。初始基线：`8a9eb40`。本记录以已提交源码、GitHub Actions 构建日志、真实 Chromium 交互测试及桌面/平板/移动端截图为证据。
 
-## Quality target
+## 质量目标与界限
 
-Aim for the level of polish demonstrated by excellent comparable interactive web applications across Awwwards, The Webby Awards and FWA. This is an internal quality ambition, **not** an award or external certification.
+以 Awwwards、The Webby Awards、FWA 中优秀交互式数据产品的综合完成度为比较目标，不宣称已经获奖或达到该等级。Webby 官方评审涵盖内容、结构及导航、视觉、功能、互动、创新和整体体验：https://www.webbyawards.com/judging-criteria/
 
-Webby official criteria include content, structure/navigation, visual design, functionality, interactivity, innovation and overall experience: https://www.webbyawards.com/judging-criteria/
+不能通过仅改变颜色、圆角、阴影，或仅让 CI 通过，来替代全局设计质量验收。保留稳定的 Monokai 视觉语言和已运行的分析功能。
 
-## Verified issues and changes in round 1
+## 已执行的独立改进循环
 
-1. The default `.apple-font-sans` applied JetBrains Mono before the system UI fonts to all body text. This compromised typography hierarchy and readability. Fixed: UI text uses system sans first; data/code retains monospace.
-2. `.apple-transition` used `transition: all`, which animates geometry and can produce visual instability during resizing. Fixed: limited transitions to visual properties.
-3. Existing focus outline used a bright cyan for both light and dark modes. Fixed: contrast-aware focus token per theme.
-4. Added consistent disabled cursor/opacity and reduced mobile card-shadow visual noise.
-5. Kept the existing Monokai color identity, data model, chart engine, layouts and working features.
+| 循环 | 已定位差距 | 实际修复 | 证据 |
+| --- | --- | --- | --- |
+| 第一轮 | 界面正文采用等宽字体、全局 transition: all、焦点对比不稳 | 分离正文和代码字体、限制动画属性、区分明暗焦点 | 代码变更及 CI 构建 |
+| 第二轮 | 移动端固定视口和嵌套滚动、图表切换重建、复制结果虚报 | 改造响应式页面结构、保持组件稳定、处理剪贴板异常、键盘分栏 | Chromium 390/768/1440px，表图切换与分栏 |
+| 第三轮 | 字段与分析配置遮挡移动端首屏、桌面工具栏拥挤 | 移动端分区折叠、桌面去重、工具栏单行横向操作 | 真实 Chromium 截图与布局断言 |
+| 第四轮 | 大表虚拟化导致 Excel 只取部分 DOM 行 | 全量透视矩阵导出、CSV 公式注入防护、单元测试 | 120 行导出矩阵回归及 CI |
+| 第五轮 | 功能/获奖暗示造成误导、弹窗键盘支持不足 | 更准确的品牌和内部规范文案、部分弹窗焦点约束 | 真实浏览器弹窗打开、Escape、明暗主题 |
+| 第六轮 | 移动端图表横轴标签挤压重叠 | 响应式横轴刻度抽样，数据仍完整保留 | Chromium 刻度数量与截图回归 |
 
-## Still unverified or unresolved
+## 已验证范围
 
-1. Browser-level full workflow regression across desktop, tablet and mobile, including import, pivot, charts, export and dialogs.
-2. Screenshots of comparable award-level data products and side-by-side visual evaluation.
-3. Header toolbar density, narrow viewport controls and small-text legibility. Requires browser evidence before restructuring.
-4. Modal focus trapping, keyboard-only operation and screen-reader labels.
-5. Performance with 100k synthetic rows; calculation still runs in JavaScript on the UI thread.
-6. Data source and connector limitations in `docs/FEATURE_STATUS.md`.
+GitHub Actions 运行 `npm ci`、`npm test`、`npm run build` 和真实 Chromium 烟测。浏览器视口覆盖 390×844、768×900、1440×900。检查首屏横向溢出、表和图显示、表图模式切换、移动字段与分析配置展开、键盘分栏、未实现 SQL 的真实状态提示、弹窗焦点与 Escape、明暗主题切换、移动端图表通过正常滚动可达及图表横轴密度。截图保存在对应 CI workflow 的 `pivotstudio-browser-evidence` artifact。
 
-## Global repeatable review protocol
+## 当前仍未通过的最终验收项
 
-For every iteration: inspect the **entire** application, reproduce a real issue, capture a baseline, change the minimum necessary code, run tests/build, inspect actual desktop/tablet/mobile UI, compare the whole app again, and record evidence. Do not claim an award-level result based only on CI. Do not change already-stable features for cosmetic novelty.
+1. 尚未实施全面的真实业务数据上传、复杂透视组合、所有图表类型、文件导出后重新导入的浏览器端到端验收。
+2. 100,000 行性能、内存、长任务阻塞和极端数据规模未建立量化指标；JavaScript 仍在主线程执行。
+3. 尚未完成与真实获奖级同类作品逐屏直接比较、专业评委级评分、完整对比证据。
+4. 高密度专业数据界面仍有小字号、控件密度、窄屏深层操作复杂性；还需逐屏检查。
+5. 部分弹窗仍需焦点陷阱、完整键盘可达性及屏幕阅读器测试，不能宣称完整无障碍合规。
+6. 私有 Google Sheets、SQL 代理、DuckDB 实际执行、跨设备工作区协作仍未实现；参见 `FEATURE_STATUS.md`。
 
-Exit only when functionality, typography, spacing, interaction, responsive behavior, consistency, accessibility and visual identity have no obvious unresolved gaps in actual browser comparison. If live browser inspection cannot be completed, explicitly report that the quality target is **not yet verified**.
+## 不可跳过的后续验收
+
+每次变更重新执行整个已建浏览器烟测、单元测试、构建，比较真实桌面、平板、移动端截图；新增问题须先记录证据，再最小修复。所有完整性和性能主张必须用执行结果证明。只有功能、视觉、交互、响应式、细节和整体作品的明显短板均被证据排除，才可以宣布达到高水平奖项竞争标准。目前不能宣布完成。
