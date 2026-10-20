@@ -120,7 +120,7 @@ try{
     const after=await evaluate('document.querySelector("[role=separator]")?.getAttribute("aria-valuenow")');
     if(Number(after)!==Math.min(75,Number(before)+5))errors.push('keyboard splitter did not update');
   }
-  assert.equal(await clickText('SQL（未接入）'),true);
+  assert.equal(await clickText('SQL未接入'),true);
   await sleep(160);
   const sql=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
   if(!sql.includes('尚未实现'))errors.push('SQL integration misrepresented');

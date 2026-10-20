@@ -140,9 +140,9 @@ export function FieldShelf({
                   <Globe className="w-3 h-3 text-[#66D9EF]" />
                   <span>GSheet</span>
                 </button>
-                <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[10px] font-medium flex items-center justify-center gap-1 transition">
+                <button title="SQL 数据库连接尚未实现" onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[10px] font-medium flex items-center justify-center gap-1 transition">
                   <Server className="w-3 h-3 text-[#FD971F]" />
-                  <span>SQL（未接入）</span>
+                  <span className="whitespace-nowrap">SQL未接入</span>
                 </button>
                 <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }} className="px-2 py-1.5 rounded-lg bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 hover:bg-[#AE81FF]/25 text-[10px] font-semibold flex items-center justify-center gap-1 transition">
                   <Zap className="w-3 h-3 text-[#AE81FF]" />
