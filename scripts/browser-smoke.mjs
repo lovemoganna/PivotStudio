@@ -117,6 +117,22 @@ try{
   assert.equal(await evaluate('!!document.getElementById("pivot-main-html-table")'),true);
   assert.equal(await clickText('表图并列'),true,'split button');
   await sleep(200);
+  // Verify every declared chart can be selected using the actual workbench control.
+  const chartOptions=await evaluate('Array.from(document.querySelector("select[aria-label=\\\"选择图表类型\\\"]")?.options || []).map(o=>({value:o.value,label:o.textContent}))');
+  if(chartOptions.length!==15)errors.push('Expected 15 declared chart types, found '+chartOptions.length);
+  for (const option of chartOptions) {
+    await evaluate('(() => {const s=document.querySelector("select[aria-label=\\\"选择图表类型\\\"]"); const set=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set;set.call(s,'+JSON.stringify(option.value)+');s.dispatchEvent(new Event("change",{bubbles:true}));})()');
+    await sleep(130);
+    const chartTitle=await evaluate('document.querySelector("#pivot-chart-container h3")?.textContent || ""');
+    if(!chartTitle.includes(option.label))errors.push('Chart type failed to switch: '+option.value+' => '+chartTitle);
+    if(['pie','scatter','histogram','funnel'].includes(option.value)){
+      const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+      await writeFile('artifacts/browser/chart-'+option.value+'.png',Buffer.from(shot.data,'base64'));
+    }
+  }
+  console.log('CHART_TYPE_SWEEP',JSON.stringify({count:chartOptions.length,types:chartOptions.map(o=>o.value)}));
+  await evaluate('(() => {const s=document.querySelector("select[aria-label=\\\"选择图表类型\\\"]"); const set=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value").set;set.call(s,"bar");s.dispatchEvent(new Event("change",{bubbles:true}));})()');
+  await sleep(180);
   const before=await evaluate('(() => { const e=document.querySelector("[role=separator]"); if(!e)return null; const v=e.getAttribute("aria-valuenow"); e.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true}));return v; })()');
   if(before===null)errors.push('keyboard separator missing');
   else {
