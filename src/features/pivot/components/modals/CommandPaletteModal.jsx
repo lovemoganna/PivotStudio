@@ -1,3 +1,4 @@
+import { t } from '../../../../i18n.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
@@ -51,7 +52,7 @@ export function CommandPaletteModal({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="全局指令面板"
+      aria-label={t("全局指令面板")}
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-start justify-center pt-24 p-4"
     >
       <div
@@ -67,7 +68,7 @@ export function CommandPaletteModal({
             value={commandQuery}
             onChange={(e) => setCommandQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入指令名称、图表类型或分镜动作... (↑↓ 选择，Enter 执行)"
+            placeholder={t("输入指令名称、图表类型或分镜动作... (↑↓ 选择，Enter 执行)")}
             className="flex-1 bg-transparent border-none text-xs apple-font-mono focus:outline-none text-[#272822] dark:text-[#F8F8F2]"
             aria-autocomplete="list"
             role="combobox"
@@ -79,7 +80,7 @@ export function CommandPaletteModal({
         </div>
         <div id="command-palette-list" role="listbox" className="flex-1 overflow-y-auto p-2 space-y-1">
           {commandActions.length === 0 ? (
-            <div className="p-6 text-center text-xs text-[#75715E] apple-font-mono">未找到匹配的快捷指令</div>
+            <div className="p-6 text-center text-xs text-[#75715E] apple-font-mono">{t("未找到匹配的快捷指令")}</div>
           ) : (
             commandActions.map((cmd, idx) => {
               const isSelected = idx === selectedIndex;
@@ -103,9 +104,9 @@ export function CommandPaletteModal({
                 >
                   <div className="min-w-0">
                     <div className={`font-semibold truncate transition-colors ${isSelected ? 'text-[#F92672]' : 'text-[#272822] dark:text-[#F8F8F2]'}`}>
-                      {cmd.label}
+                      {t(cmd.label)}
                     </div>
-                    <div className="text-[10px] text-[#75715E] dark:text-[#908E80]">{cmd.category}</div>
+                    <div className="text-[10px] text-[#75715E] dark:text-[#908E80]">{t(cmd.category)}</div>
                   </div>
                   {cmd.shortcut && (
                     <kbd className={`px-2 py-0.5 rounded border text-[10px] font-bold shrink-0 apple-font-mono ${

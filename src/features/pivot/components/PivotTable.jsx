@@ -1,3 +1,4 @@
+import { t } from '../../../i18n.js';
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   ArrowUp, ArrowDown, ArrowUpDown, Sparkles, StretchHorizontal,
@@ -453,7 +454,7 @@ export function PivotTable({
       {/* 0 matching records alert */}
       {pivotResult.filteredCount === 0 && (
         <div className="bg-[#FD971F]/15 border-b border-[#FD971F]/30 px-4 py-2 flex items-center justify-between text-xs shrink-0">
-          <span className="text-[#C86400] dark:text-[#FD971F] apple-font-mono">当前筛选条件下匹配 0 条记录</span>
+          <span className="text-[#C86400] dark:text-[#FD971F] apple-font-mono">{t("当前筛选条件下匹配 0 条记录")}</span>
           <button
             onClick={() => setPivotConfig((prev) => ({
               ...prev,
@@ -462,17 +463,15 @@ export function PivotTable({
               columns: prev.columns.map((c) => ({ ...c, excludedValues: [] })),
             }))}
             className="px-2.5 py-0.5 rounded bg-[#F92672] text-[#F8F8F2] text-[10px] font-semibold apple-font-mono hover:bg-[#FF3B85] transition"
-          >
-            重置全部筛选
-          </button>
+          >{' ' + t("重置全部筛选") + ' '}</button>
         </div>
       )}
 
       {/* Horizontal scroll helper note */}
       {pivotResult.allColGroups.length > 35 && (
         <div className="bg-[#66D9EF]/10 border-b border-[#66D9EF]/25 px-4 py-1.5 flex items-center justify-between text-[10px] apple-font-mono text-[#0088A3] dark:text-[#66D9EF] shrink-0">
-          <span>提示：当前生成了 {pivotResult.allColGroups.length} 组交叉列头，已启用水平滚动视图</span>
-          <span className="hidden sm:inline">按住 Shift + 鼠标滚轮可快速横向浏览</span>
+          <span>{t("提示：当前生成了") + ' '}{pivotResult.allColGroups.length}{' ' + t("组交叉列头，已启用水平滚动视图")}</span>
+          <span className="hidden sm:inline">{t("按住 Shift + 鼠标滚轮可快速横向浏览")}</span>
         </div>
       )}
 
@@ -481,9 +480,9 @@ export function PivotTable({
         <div className="bg-[#FAF8F1] dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1.5 flex items-center gap-2 overflow-x-auto text-[10px] apple-font-mono shrink-0 select-none">
           <div className="flex items-center gap-1.5 shrink-0 text-[#75715E] dark:text-[#908E80] font-bold">
             <Filter className="w-3 h-3 text-[#A6E22E]" />
-            <span className="hidden sm:inline">切片器:</span>
+            <span className="hidden sm:inline">{t("切片器:")}</span>
             <select
-              aria-label="选择字段切片器"
+              aria-label={t("选择字段切片器")}
               value={activeSlicerField}
               onChange={(e) => {
                 soundEngine?.playClick?.(500);
@@ -505,9 +504,7 @@ export function PivotTable({
                   ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
                   : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
               }`}
-            >
-              全部 (All)
-            </button>
+            >{' ' + t("全部 (All)") + ' '}</button>
             {slicerValuePills.map((p) => {
               const isSelected = currentSlicerSelected.includes(p.label);
               return (
@@ -537,27 +534,27 @@ export function PivotTable({
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 shadow-xs">
             <span className="px-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] font-semibold flex items-center gap-1">
               <Columns className="w-3 h-3 text-[#66D9EF]" />
-              <span className="hidden sm:inline">列宽</span>
+              <span className="hidden sm:inline">{t("列宽")}</span>
             </span>
             <button
               onClick={handleAutoFitAll}
-              title="根据当前数据和表头内容，一键自动优化所有列宽"
+              title={t("根据当前数据和表头内容，一键自动优化所有列宽")}
               className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#66D9EF]/15 text-[#0088A3] dark:text-[#66D9EF] hover:bg-[#66D9EF]/25 active:scale-95 transition"
             >
               <Sparkles className="w-2.5 h-2.5" />
-              <span>自适应列宽</span>
+              <span>{t("自适应列宽")}</span>
             </button>
             <button
               onClick={handleEqualizeColumns}
-              title="在可视窗口内均分指标列宽"
+              title={t("在可视窗口内均分指标列宽")}
               className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-black/5 dark:hover:bg-white/5 transition"
             >
               <StretchHorizontal className="w-2.5 h-2.5" />
-              <span>均分</span>
+              <span>{t("均分")}</span>
             </button>
             <button
               onClick={handleResetColWidths}
-              title="恢复默认列宽"
+              title={t("恢复默认列宽")}
               className="px-1.5 py-0.5 rounded-md text-[10px] text-[#75715E] dark:text-[#908E80] hover:text-[#F92672] hover:bg-black/5 dark:hover:bg-white/5 transition"
             >
               <RotateCcw className="w-2.5 h-2.5" />
@@ -568,7 +565,7 @@ export function PivotTable({
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 shadow-xs">
             <span className="px-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] font-semibold flex items-center gap-1">
               <Rows className="w-3 h-3 text-[#FD971F]" />
-              <span className="hidden sm:inline">行高</span>
+              <span className="hidden sm:inline">{t("行高")}</span>
             </span>
             {[
               { id: 'compact', label: '紧凑' },
@@ -593,21 +590,21 @@ export function PivotTable({
                     : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
                 }`}
               >
-                {d.label}
+                {t(d.label)}
               </button>
             ))}
           </div>
 
           {/* 数据对齐方式 (居中默认) */}
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 shadow-xs">
-            <span className="px-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] font-semibold">对齐</span>
+            <span className="px-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] font-semibold">{t("对齐")}</span>
             <button
               onClick={() => {
                 soundEngine?.playClick?.(500);
                 setTableSettings((p) => ({ ...p, dataAlignment: 'center' }));
                 showToast?.('数据已设置为居中对齐');
               }}
-              title="数据居中对齐 (当前默认推荐)"
+              title={t("数据居中对齐 (当前默认推荐)")}
               className={`px-1.5 py-0.5 rounded-md flex items-center gap-1 text-[10px] font-semibold transition ${
                 currentAlignment === 'center'
                   ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
@@ -615,7 +612,7 @@ export function PivotTable({
               }`}
             >
               <AlignCenter className="w-3 h-3" />
-              <span>居中</span>
+              <span>{t("居中")}</span>
             </button>
             <button
               onClick={() => {
@@ -623,7 +620,7 @@ export function PivotTable({
                 setTableSettings((p) => ({ ...p, dataAlignment: 'left' }));
                 showToast?.('数据已设置为靠左对齐');
               }}
-              title="数据靠左对齐"
+              title={t("数据靠左对齐")}
               className={`p-1 rounded-md transition ${
                 currentAlignment === 'left'
                   ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
@@ -638,7 +635,7 @@ export function PivotTable({
                 setTableSettings((p) => ({ ...p, dataAlignment: 'right' }));
                 showToast?.('数据已设置为靠右对齐');
               }}
-              title="数据靠右对齐"
+              title={t("数据靠右对齐")}
               className={`p-1 rounded-md transition ${
                 currentAlignment === 'right'
                   ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
@@ -654,25 +651,23 @@ export function PivotTable({
         <div className="flex items-center gap-2">
           {selectionRange && (
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-[#0088A3] dark:text-[#66D9EF] text-[10px] font-semibold">
-              <span>
-                选区: {Math.abs(selectionRange.endRow - selectionRange.startRow) + 1}行 × {Math.abs(selectionRange.endCol - selectionRange.startCol) + 1}列
-              </span>
-              <kbd className="px-1 py-0.2 rounded bg-black/10 dark:bg-white/10 text-[9px]">⌘C 复制</kbd>
+              <span>{' ' + t("选区:") + ' '}{Math.abs(selectionRange.endRow - selectionRange.startRow) + 1}{t("行 ×") + ' '}{Math.abs(selectionRange.endCol - selectionRange.startCol) + 1}{t("列") + ' '}</span>
+              <kbd className="px-1 py-0.2 rounded bg-black/10 dark:bg-white/10 text-[9px]">{t("⌘C 复制")}</kbd>
               <button
                 onClick={() => setSelectionRange(null)}
                 className="hover:text-[#F92672] px-1 text-xs font-bold leading-none"
-                title="清除选区 (Esc)"
-                aria-label="清除选区"
+                title={t("清除选区 (Esc)")}
+                aria-label={t("清除选区")}
               >
                 ×
               </button>
             </div>
           )}
 
-          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="开启或隐藏行分组多级小计 (Subtotals)">
+          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("开启或隐藏行分组多级小计 (Subtotals)")}>
             <input
               type="checkbox"
-              aria-label="显示行分组多级小计"
+              aria-label={t("显示行分组多级小计")}
               checked={Boolean(pivotConfig?.showSubtotals)}
               onChange={(e) => {
                 soundEngine?.playClick?.(520);
@@ -682,29 +677,29 @@ export function PivotTable({
               }}
               className="rounded accent-[#AE81FF]"
             />
-            <span>分组小计</span>
+            <span>{t("分组小计")}</span>
           </label>
 
-          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="标注每列最高值(●)与负数语义色">
+          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("标注每列最高值(●)与负数语义色")}>
             <input
               type="checkbox"
-              aria-label="标注每列最高值与极值锚点"
+              aria-label={t("标注每列最高值与极值锚点")}
               checked={Boolean(tableSettings.showExtremes)}
               onChange={(e) => setTableSettings((p) => ({ ...p, showExtremes: e.target.checked }))}
               className="rounded accent-[#A6E22E]"
             />
-            <span>极值锚点</span>
+            <span>{t("极值锚点")}</span>
           </label>
 
-          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="开启或隐藏隔行斑马纹背景">
+          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("开启或隐藏隔行斑马纹背景")}>
             <input
               type="checkbox"
-              aria-label="启用表格隔行斑马纹背景"
+              aria-label={t("启用表格隔行斑马纹背景")}
               checked={Boolean(tableSettings.showZebra)}
               onChange={(e) => setTableSettings((p) => ({ ...p, showZebra: e.target.checked }))}
               className="rounded accent-[#A6E22E]"
             />
-            <span>斑马纹</span>
+            <span>{t("斑马纹")}</span>
           </label>
 
           {/* Quick Heatmap Color Scale Toggle */}
@@ -723,10 +718,10 @@ export function PivotTable({
                   ? 'bg-[#FD971F]/20 text-[#C86400] dark:text-[#FD971F] border-[#FD971F]/50 shadow-xs'
                   : 'bg-[#FFFDF7] dark:bg-[#272822] border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
               }`}
-              title="一键循环切换矩阵热力色阶 (红黄绿三色热力 / 冰川青 / 关闭)"
+              title={t("一键循环切换矩阵热力色阶 (红黄绿三色热力 / 冰川青 / 关闭)")}
             >
               <Palette className="w-3 h-3 text-[#FD971F]" />
-              <span className="hidden sm:inline">热力色阶</span>
+              <span className="hidden sm:inline">{t("热力色阶")}</span>
             </button>
           )}
 
@@ -746,8 +741,7 @@ export function PivotTable({
           )}
 
           <span className="px-1.5 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.05] text-[9px] text-[#75715E] dark:text-[#908E80]">
-            {pivotResult.tableRows.length}行 × {pivotResult.allColGroups.length * Math.max(1, pivotResult.valConfigs.length)}列
-          </span>
+            {pivotResult.tableRows.length}{t("行 ×") + ' '}{pivotResult.allColGroups.length * Math.max(1, pivotResult.valConfigs.length)}{t("列") + ' '}</span>
         </div>
       </div>
 
@@ -806,7 +800,7 @@ export function PivotTable({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span>列维度：{pivotResult.colConfigs.map((c) => getDimDisplayLabel(c)).join(' / ')}</span>
+                        <span>{t("列维度：")}{pivotResult.colConfigs.map((c) => getDimDisplayLabel(c)).join(' / ')}</span>
                       </div>
                     </th>
                   )}
@@ -849,9 +843,7 @@ export function PivotTable({
                       colSpan={pivotResult.valConfigs.length}
                       rowSpan={pivotResult.colHeaderRows.length}
                       className="border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#E5E2D5] dark:bg-[#2D2E27] px-3.5 py-2 text-center font-bold text-[#6B38FB] dark:text-[#AE81FF] apple-font-mono whitespace-nowrap"
-                    >
-                      行总计
-                    </th>
+                    >{' ' + t("行总计") + ' '}</th>
                   )}
                 </tr>
               ))
@@ -872,7 +864,7 @@ export function PivotTable({
                       key={rDim.id}
                       tabIndex={0}
                       aria-sort={rDim.sort === 'asc' ? 'ascending' : rDim.sort === 'desc' ? 'descending' : 'none'}
-                      title="点击切换排序 · 拖拽右侧分界线调宽 · 双击自适应"
+                      title={t("点击切换排序 · 拖拽右侧分界线调宽 · 双击自适应")}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
@@ -911,7 +903,7 @@ export function PivotTable({
                           handleAutoFitSingle(rowColKey);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        title="左右拖动调整行维度列宽 · 双击自适应内容"
+                        title={t("左右拖动调整行维度列宽 · 双击自适应内容")}
                         className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-[#F92672] group-hover:bg-[#F92672]/30 transition z-20 flex items-center justify-center select-none"
                       >
                         <div className="w-[1px] h-3.5 bg-black/20 dark:bg-white/20 group-hover:bg-[#F92672]" />
@@ -930,9 +922,7 @@ export function PivotTable({
                   className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-[#F92672] ${
                     chartSpecConfig.stickyRowHeaders ? 'sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]' : ''
                   }`}
-                >
-                  汇总维度
-                </th>
+                >{' ' + t("汇总维度") + ' '}</th>
               )}
 
               {/* Value Metric Headers - Centered by default matching data */}
@@ -950,7 +940,7 @@ export function PivotTable({
                       key={valColKey}
                       tabIndex={0}
                       aria-sort={isSortedCol ? (pivotConfig.valueSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      title="点击切换排序 · 拖拽右侧分界线调宽 · 双击自适应"
+                      title={t("点击切换排序 · 拖拽右侧分界线调宽 · 双击自适应")}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
@@ -991,7 +981,7 @@ export function PivotTable({
                           handleAutoFitSingle(valColKey);
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        title="左右拖动调整指标列宽 · 双击自适应内容"
+                        title={t("左右拖动调整指标列宽 · 双击自适应内容")}
                         className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-[#F92672] group-hover:bg-[#F92672]/30 transition z-20 flex items-center justify-center select-none"
                       >
                         <div className="w-[1px] h-3.5 bg-black/20 dark:bg-white/20 group-hover:bg-[#F92672]" />
@@ -1270,7 +1260,7 @@ export function PivotTable({
                             {isColMax && (
                               <span
                                 className="inline-block w-1.5 h-1.5 rounded-full bg-[#A6E22E] shadow-[0_0_6px_#A6E22E] mr-1 shrink-0"
-                                title="该指标列当前最高峰值 (Max)"
+                                title={t("该指标列当前最高峰值 (Max)")}
                               />
                             )}
                             <span>{formattedText}</span>
@@ -1279,8 +1269,7 @@ export function PivotTable({
                           {/* Instant Feedback on Copy */}
                           {copiedCellKey === cellKey && (
                             <span className="absolute inset-0 z-20 flex items-center justify-center bg-[#A6E22E]/90 text-[#1E1F1C] font-bold text-[10px] rounded animate-pulse">
-                              <Check className="w-3 h-3 mr-0.5" /> 已复制
-                            </span>
+                              <Check className="w-3 h-3 mr-0.5" />{' ' + t("已复制") + ' '}</span>
                           )}
                         </td>
                       );
@@ -1313,8 +1302,8 @@ export function PivotTable({
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span>总计 (Grand Total)</span>
-                    <span className="text-[9px] text-[#75715E] dark:text-[#908E80] font-normal font-mono">全量聚合</span>
+                    <span>{t("总计 (Grand Total)")}</span>
+                    <span className="text-[9px] text-[#75715E] dark:text-[#908E80] font-normal font-mono">{t("全量聚合")}</span>
                   </div>
                 </td>
                 {pivotResult.allColGroups.map((cGroup) =>

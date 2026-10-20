@@ -1,3 +1,4 @@
+import { t } from '../../../i18n.js';
 import React from 'react';
 import { Database, Plus, X, Zap, Activity } from 'lucide-react';
 
@@ -23,7 +24,7 @@ export function DatasetTabStrip({
       <div className="flex items-center gap-1.5 min-w-0">
         <div className="flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] font-bold uppercase tracking-wider shrink-0 mr-1">
           <Database className="w-3.5 h-3.5 text-[#66D9EF]" />
-          <span className="hidden sm:inline">工作区数据集:</span>
+          <span className="hidden sm:inline">{t("工作区数据集:")}</span>
         </div>
 
         {datasets.map((ds) => {
@@ -48,19 +49,18 @@ export function DatasetTabStrip({
                 {ds.name}
               </span>
               <span className="text-[9.5px] opacity-60">
-                ({(ds.rows?.length || 0).toLocaleString()}行)
-              </span>
+                ({(ds.rows?.length || 0).toLocaleString()}{t("行)") + ' '}</span>
 
               <button
                 type="button"
-                aria-label="卸载该数据集"
+                aria-label={t("卸载该数据集")}
                 onClick={(e) => {
                   e.stopPropagation();
                   soundEngine?.playClick?.(480);
                   unloadDataset(ds.id);
                 }}
                 className="ml-0.5 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 opacity-40 group-hover:opacity-100 transition"
-                title="卸载该数据集"
+                title={t("卸载该数据集")}
               >
                 <X className="w-3 h-3 text-[#75715E] hover:text-[#F92672]" />
               </button>
@@ -70,16 +70,16 @@ export function DatasetTabStrip({
 
         <button
           type="button"
-          aria-label="添加数据集或打开介绍主页"
+          aria-label={t("添加数据集或打开介绍主页")}
           onClick={() => {
             soundEngine?.playClick?.(520);
             onOpenIntro();
           }}
           className="flex items-center gap-1 px-2 py-1 rounded-lg border border-dashed border-[#ACA99A] dark:border-[#49483E] text-[#66D9EF] hover:border-[#66D9EF] text-[10.5px] font-medium transition shrink-0"
-          title="切换至系统介绍主页，选择更多测试预设或上传文件"
+          title={t("切换至系统介绍主页，选择更多测试预设或上传文件")}
         >
           <Plus className="w-3 h-3" />
-          <span>添加 / 介绍主页</span>
+          <span>{t("添加 / 介绍主页")}</span>
         </button>
       </div>
 
@@ -95,16 +95,16 @@ export function DatasetTabStrip({
               ? 'bg-[#E6DB74]/15 border-[#E6DB74]/40 text-[#948400] dark:text-[#E6DB74]'
               : 'bg-[#FD971F]/15 border-[#FD971F]/40 text-[#C86400] dark:text-[#FD971F]'
           }`}
-          title="透视计算管线实时性能遥测"
+          title={t("透视计算管线实时性能遥测")}
         >
           <Zap className="w-3 h-3" />
           <span>
             {isWorkerComputing
-              ? 'Worker 异步聚合中...'
+              ? t("Worker 异步聚合中...")
               : `${elapsed}ms`}
           </span>
           <span className="text-[#D6D4C8] dark:text-[#49483E]">|</span>
-          <span>{pivotResult?.filteredCount?.toLocaleString() || 0} 行就绪</span>
+          <span>{pivotResult?.filteredCount?.toLocaleString() || 0}{' ' + t("行就绪")}</span>
         </div>
       </div>
     </div>

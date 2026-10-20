@@ -1,3 +1,4 @@
+import { t } from '../../../i18n.js';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Upload, Globe, Server, Zap, GripVertical, ArrowUp, ArrowDown,
@@ -129,8 +130,8 @@ export function FieldShelf({
                     showToast?.('已展开左侧侧边栏 (⌘B)');
                   }}
                   className="p-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] hover:border-[#66D9EF] text-[#0088A3] dark:text-[#66D9EF] transition shadow-xs"
-                  title="展开模型与配置侧栏 (快捷键: ⌘B / Ctrl+B)"
-                  aria-label="展开侧边栏"
+                  title={t("展开模型与配置侧栏 (快捷键: ⌘B / Ctrl+B)")}
+                  aria-label={t("展开侧边栏")}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -138,10 +139,8 @@ export function FieldShelf({
                   className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] tracking-widest cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2] transition"
                   style={{ writingMode: 'vertical-rl' }}
                   onClick={() => setIsSidebarCollapsed(false)}
-                  title="点击展开侧边栏"
-                >
-                  数据模型 · 透视结构
-                </div>
+                  title={t("点击展开侧边栏")}
+                >{' ' + t("数据模型 · 透视结构") + ' '}</div>
               </div>
 
               {/* Mini Status Badges */}
@@ -167,14 +166,11 @@ export function FieldShelf({
               <div className="hidden md:flex items-center justify-between pb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/60">
                 <div className="flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-[#0088A3] dark:text-[#66D9EF]" />
-                  <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono tracking-tight">
-                    数据模型与透视配置
-                  </span>
+                  <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono tracking-tight">{' ' + t("数据模型与透视配置") + ' '}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-[#4A7500] dark:text-[#A6E22E] apple-font-mono">
-                    {(currentDataset?.rows?.length || 0).toLocaleString()} 行
-                  </span>
+                    {(currentDataset?.rows?.length || 0).toLocaleString()}{' ' + t("行") + ' '}</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -183,11 +179,11 @@ export function FieldShelf({
                       showToast?.('已折叠左侧侧边栏，为主工作区释放宽度 (⌘B)');
                     }}
                     className="hidden md:flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-[#75715E] dark:text-[#908E80] hover:text-[#F92672] hover:bg-black/5 dark:hover:bg-white/5 transition"
-                    title="收起左侧模型侧边栏 (快捷键: ⌘B / Ctrl+B)"
-                    aria-label="收起侧边栏"
+                    title={t("收起左侧模型侧边栏 (快捷键: ⌘B / Ctrl+B)")}
+                    aria-label={t("收起侧边栏")}
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
-                    <span>收起</span>
+                    <span>{t("收起")}</span>
                   </button>
                 </div>
               </div>
@@ -196,7 +192,7 @@ export function FieldShelf({
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
                   <select
-                    aria-label="选择当前数据集"
+                    aria-label={t("选择当前数据集")}
                     value={activeDatasetId || ''}
                     onChange={(e) => {
                       soundEngine?.playClick(540);
@@ -218,7 +214,7 @@ export function FieldShelf({
                     className="flex-1 min-w-0 px-2 py-1 md:py-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-xs font-medium text-[#272822] dark:text-[#E6DB74] apple-font-mono focus:outline-none focus:border-[#F92672]"
                   >
                     {datasets.length === 0 && (
-                      <option value="">-- 暂无数据集 --</option>
+                      <option value="">{t("-- 暂无数据集 --")}</option>
                     )}
                     {datasets.map((ds) => (
                       <option key={ds.id} value={ds.id} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">
@@ -226,7 +222,7 @@ export function FieldShelf({
                       </option>
                     ))}
                     {datasets.length > 0 && (
-                      <option value="">-- 卸载当前视图 (返回介绍页) --</option>
+                      <option value="">{t("-- 卸载当前视图 (返回介绍页) --")}</option>
                     )}
                   </select>
                   {unloadCurrentDataset && currentDataset && (
@@ -237,8 +233,8 @@ export function FieldShelf({
                         unloadCurrentDataset();
                       }}
                       className="p-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] hover:border-[#F92672] text-[#75715E] hover:text-[#F92672] transition shrink-0"
-                      title="卸载当前数据集，返回系统介绍主页"
-                      aria-label="卸载当前数据集"
+                      title={t("卸载当前数据集，返回系统介绍主页")}
+                      aria-label={t("卸载当前数据集")}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -248,7 +244,7 @@ export function FieldShelf({
                 <div className="flex gap-1.5">
                   <label className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1 md:py-1.5 rounded-lg focus-within:ring-2 focus-within:ring-[#66D9EF] border border-dashed border-[#ACA99A] dark:border-[#75715E] bg-[#FFFDF7]/60 dark:bg-[#1E1F1C]/70 hover:border-[#F92672] dark:hover:border-[#F92672] cursor-pointer text-[10.5px] font-medium transition ${isReadOnly ? 'opacity-40 pointer-events-none' : ''}`}>
                     <Upload className="w-3.5 h-3.5 text-[#F92672] shrink-0" />
-                    <span className="truncate">上传 CSV / Excel</span>
+                    <span className="truncate">{t("上传 CSV / Excel")}</span>
                     <input type="file" accept=".csv,.txt,.xls,.xlsx" onChange={handleFileUpload} className="hidden" disabled={isReadOnly} />
                   </label>
                   <button
@@ -273,10 +269,8 @@ export function FieldShelf({
                       }
                     }}
                     className="px-2 py-1 md:py-1.5 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
-                    title="无需本地文件，一键加载内置零售样例以体验字段类型推断与预览"
-                  >
-                    样例预览
-                  </button>
+                    title={t("无需本地文件，一键加载内置零售样例以体验字段类型推断与预览")}
+                  >{' ' + t("样例预览") + ' '}</button>
                 </div>
 
                 {uploadProgress && (
@@ -298,11 +292,11 @@ export function FieldShelf({
                   </button>
                   <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-1.5 py-1 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[9.5px] font-medium flex items-center justify-center gap-1 transition">
                     <Server className="w-2.5 h-2.5 text-[#FD971F]" />
-                    <span>SQL代理</span>
+                    <span>{t("SQL代理")}</span>
                   </button>
                   <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }} className="px-1.5 py-1 rounded-md bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 hover:bg-[#AE81FF]/25 text-[9.5px] font-semibold flex items-center justify-center gap-1 transition">
                     <Zap className="w-2.5 h-2.5 text-[#AE81FF]" />
-                    <span>100K压测</span>
+                    <span>{t("100K压测")}</span>
                   </button>
                 </div>
               </div>
@@ -316,8 +310,8 @@ export function FieldShelf({
                   onClick={() => setShowMobileSchema((expanded) => !expanded)}
                   className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 text-left text-[11px] font-semibold flex items-center justify-between"
                 >
-                  <span>字段列表（{currentDataset?.fields?.length || 0}）</span>
-                  <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileSchema ? '收起' : '展开'}</span>
+                  <span>{t("字段列表（")}{currentDataset?.fields?.length || 0}）</span>
+                  <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileSchema ? t("收起") : t("展开")}</span>
                 </button>
               </div>
 
@@ -327,10 +321,9 @@ export function FieldShelf({
                 className={`${showMobileSchema ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-h-[140px] border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-bold tracking-tight apple-font-mono">
-                    可用字段 ({filteredFields.length}/{currentDataset?.fields?.length || 0})
+                  <span className="text-[11px] font-bold tracking-tight apple-font-mono">{' ' + t("可用字段 (")}{filteredFields.length}/{currentDataset?.fields?.length || 0})
                   </span>
-                  <span className="text-[9.5px] text-[#75715E] dark:text-[#908E80] apple-font-mono">拖拽或点击</span>
+                  <span className="text-[9.5px] text-[#75715E] dark:text-[#908E80] apple-font-mono">{t("拖拽或点击")}</span>
                 </div>
 
                 {/* Field Search & Category Filter */}
@@ -339,17 +332,17 @@ export function FieldShelf({
                     <Search className="w-3 h-3 text-[#75715E] absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
-                      aria-label="搜索可用字段名称"
+                      aria-label={t("搜索可用字段名称")}
                       value={fieldSearchQuery}
                       onChange={(e) => setFieldSearchQuery(e.target.value)}
-                      placeholder="搜索字段名称..."
+                      placeholder={t("搜索字段名称...")}
                       className="w-full pl-6 pr-5 py-1 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] text-[10.5px] placeholder-[#75715E] text-[#272822] dark:text-[#F8F8F2] focus:outline-none focus:border-[#66D9EF] apple-font-mono"
                     />
                     {fieldSearchQuery && (
                       <button
                         onClick={() => setFieldSearchQuery('')}
                         className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-[#75715E] hover:text-[#F92672]"
-                        aria-label="清空搜索"
+                        aria-label={t("清空搜索")}
                       >
                         <X className="w-2.5 h-2.5" />
                       </button>
@@ -361,20 +354,17 @@ export function FieldShelf({
                     <button
                       onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('all'); }}
                       className={`flex-1 py-0.5 rounded text-center font-medium transition ${fieldCategoryTab === 'all' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] shadow-2xs' : 'text-[#75715E] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
-                    >
-                      全部 ({currentDataset?.fields?.length || 0})
+                    >{' ' + t("全部 (")}{currentDataset?.fields?.length || 0})
                     </button>
                     <button
                       onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('dimension'); }}
                       className={`flex-1 py-0.5 rounded text-center font-medium transition ${fieldCategoryTab === 'dimension' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#0088A3] dark:text-[#66D9EF] shadow-2xs' : 'text-[#75715E] hover:text-[#0088A3] dark:hover:text-[#66D9EF]'}`}
-                    >
-                      维度 ({dimensionCount})
+                    >{' ' + t("维度 (")}{dimensionCount})
                     </button>
                     <button
                       onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('measure'); }}
                       className={`flex-1 py-0.5 rounded text-center font-medium transition ${fieldCategoryTab === 'measure' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#C86400] dark:text-[#FD971F] shadow-2xs' : 'text-[#75715E] hover:text-[#C86400] dark:hover:text-[#FD971F]'}`}
-                    >
-                      度量 ({measureCount})
+                    >{' ' + t("度量 (")}{measureCount})
                     </button>
                   </div>
                 </div>
@@ -383,14 +373,12 @@ export function FieldShelf({
                 <div className="flex-1 overflow-y-auto space-y-1 pr-0.5 min-h-[90px] max-h-[190px] md:max-h-[220px]">
                   {filteredFields.length === 0 ? (
                     <div className="py-4 text-center text-xs text-[#75715E] apple-font-mono space-y-1">
-                      <p>无匹配字段</p>
+                      <p>{t("无匹配字段")}</p>
                       {fieldSearchQuery && (
                         <button
                           onClick={() => setFieldSearchQuery('')}
                           className="text-[10px] text-[#66D9EF] hover:underline"
-                        >
-                          清空搜索条件
-                        </button>
+                        >{' ' + t("清空搜索条件") + ' '}</button>
                       )}
                     </div>
                   ) : (
@@ -437,15 +425,15 @@ export function FieldShelf({
                             <span className="font-medium truncate max-w-[110px]">{field.name}</span>
                             {field.role && (
                               <span className="text-[8px] px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 text-[#75715E] shrink-0">
-                                {field.role === 'measure' ? '度量' : '维度'}
+                                {field.role === 'measure' ? t("度量") : t("维度")}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 shrink-0 apple-font-mono text-[8.5px]">
-                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('rows', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] font-semibold transition" title="添加到行维度">+行</button>
-                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('columns', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] font-semibold transition" title="添加到列维度">+列</button>
-                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('values', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] font-semibold transition" title="添加到数值指标">+值</button>
-                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('filters', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] font-semibold transition" title="添加到筛选条件">+筛</button>
+                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('rows', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] font-semibold transition" title={t("添加到行维度")}>{t("+行")}</button>
+                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('columns', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] font-semibold transition" title={t("添加到列维度")}>{t("+列")}</button>
+                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('values', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] font-semibold transition" title={t("添加到数值指标")}>{t("+值")}</button>
+                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('filters', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] font-semibold transition" title={t("添加到筛选条件")}>{t("+筛")}</button>
                           </div>
                         </div>
                       );
@@ -463,8 +451,8 @@ export function FieldShelf({
                   onClick={() => setShowMobileConfig((expanded) => !expanded)}
                   className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 text-left text-[11px] font-semibold flex items-center justify-between"
                 >
-                  <span>分析配置 · 行 / 列 / 值 / 筛选</span>
-                  <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileConfig ? '收起' : '展开'}</span>
+                  <span>{t("分析配置 · 行 / 列 / 值 / 筛选")}</span>
+                  <span className="text-[#0088A3] dark:text-[#66D9EF]">{showMobileConfig ? t("收起") : t("展开")}</span>
                 </button>
               </div>
 
@@ -474,17 +462,15 @@ export function FieldShelf({
                 className={`${showMobileConfig ? 'flex' : 'hidden'} md:flex flex-col border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2 shrink-0`}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold tracking-tight apple-font-mono text-[#75715E] dark:text-[#908E80]">
-                    透视结构放置区
-                  </span>
+                  <span className="text-[11px] font-bold tracking-tight apple-font-mono text-[#75715E] dark:text-[#908E80]">{' ' + t("透视结构放置区") + ' '}</span>
                   <button
                     disabled={isReadOnly}
                     onClick={transposeRowsAndColumns}
                     className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] hover:text-[#FD971F] text-[9px] font-semibold transition disabled:opacity-40"
-                    title="一键互换行维度与列维度 (快捷键: R)"
+                    title={t("一键互换行维度与列维度 (快捷键: R)")}
                   >
                     <RotateCcw className="w-2.5 h-2.5 text-[#FD971F]" />
-                    <span>行列互换</span>
+                    <span>{t("行列互换")}</span>
                   </button>
                 </div>
 
@@ -497,7 +483,7 @@ export function FieldShelf({
                       <div
                         key={z.key}
                         data-testid={`zone-${z.key}`}
-                        role="group" aria-label={z.title || z.key}
+                        role="group" aria-label={t(z.label)}
                         onDragOver={(e) => { e.preventDefault(); setDragOverZone(z.key); }}
                         onDragLeave={() => setDragOverZone(null)}
                         onDrop={(e) => {
@@ -526,15 +512,13 @@ export function FieldShelf({
                         }`}
                       >
                         <div className="flex items-center justify-between text-[10px] font-bold apple-font-mono shrink-0">
-                          <span className={z.badgeColor}>{z.label}</span>
+                          <span className={z.badgeColor}>{t(z.label)}</span>
                           <span className="text-[#75715E] dark:text-[#908E80]">[{items.length}]</span>
                         </div>
 
                         <div className="flex-1 overflow-y-auto space-y-1 pr-0.5">
                           {items.length === 0 ? (
-                            <span className="text-[9.5px] text-[#75715E] italic block py-2 text-center apple-font-mono">
-                              /* 拖拽至此 */
-                            </span>
+                            <span className="text-[9.5px] text-[#75715E] italic block py-2 text-center apple-font-mono">{' ' + t("/* 拖拽至此 */") + ' '}</span>
                           ) : (
                             items.map((it, itemIdx) => {
                               const fMeta = currentDataset?.fields?.find((f) => f.name === it.field);
@@ -580,7 +564,7 @@ export function FieldShelf({
                                         }`}
                                         title={isFiltered ? `已选${it.selectedValues.length}项` : '全部'}
                                       >
-                                        {isFiltered ? `${it.selectedValues.length}项` : '全部'}
+                                        {isFiltered ? `${it.selectedValues.length}项` : t("全部")}
                                       </button>
                                     )}
 
@@ -597,11 +581,11 @@ export function FieldShelf({
                                             }));
                                           }}
                                           className="bg-transparent text-[#C86400] dark:text-[#FD971F] apple-font-mono font-bold focus:outline-none cursor-pointer disabled:opacity-40 text-[9px]"
-                                          title="切换聚合口径"
-                                          aria-label="切换聚合口径"
+                                          title={t("切换聚合口径")}
+                                          aria-label={t("切换聚合口径")}
                                         >
                                           {AGG_METHODS.map((m) => (
-                                            <option key={m.value} value={m.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{m.short}</option>
+                                            <option key={m.value} value={m.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t(m.short)}</option>
                                           ))}
                                         </select>
                                         <select
@@ -619,16 +603,16 @@ export function FieldShelf({
                                               ? 'bg-[#AE81FF]/20 text-[#6B38FB] dark:text-[#AE81FF] border-[#AE81FF]/40'
                                               : 'bg-black/[0.04] dark:bg-white/[0.06] text-[#75715E] dark:text-[#908E80] border-transparent'
                                           }`}
-                                          title="快捷表计算 (普通值 / 占总计% / 占行% / 占列% / 环比差 / 环比增长率 / 累计求和)"
-                                          aria-label="快捷表计算"
+                                          title={t("快捷表计算 (普通值 / 占总计% / 占行% / 占列% / 环比差 / 环比增长率 / 累计求和)")}
+                                          aria-label={t("快捷表计算")}
                                         >
-                                          <option value="normal" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">普通</option>
-                                          <option value="pct_grand" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">%总计</option>
-                                          <option value="pct_row" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">%行</option>
-                                          <option value="pct_col" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">%列</option>
-                                          <option value="prev_diff" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">环比差</option>
-                                          <option value="pct_prev_diff" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">环比%</option>
-                                          <option value="running_total" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">累计Σ</option>
+                                          <option value="normal" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("普通")}</option>
+                                          <option value="pct_grand" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("%总计")}</option>
+                                          <option value="pct_row" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("%行")}</option>
+                                          <option value="pct_col" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("%列")}</option>
+                                          <option value="prev_diff" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("环比差")}</option>
+                                          <option value="pct_prev_diff" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("环比%")}</option>
+                                          <option value="running_total" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("累计Σ")}</option>
                                         </select>
                                       </div>
                                     )}
@@ -641,10 +625,8 @@ export function FieldShelf({
                                           setActiveBinModal({ zone: z.key, item: it, fieldType: fMeta.type });
                                         }}
                                         className="px-1 rounded bg-[#66D9EF]/15 text-[#0088A3] dark:text-[#66D9EF] text-[8.5px] hover:underline disabled:opacity-40 apple-font-mono"
-                                        title="分组设置"
-                                      >
-                                        组
-                                      </button>
+                                        title={t("分组设置")}
+                                      >{' ' + t("组") + ' '}</button>
                                     )}
 
                                     {(z.key === 'rows' || z.key === 'columns') && (
@@ -652,7 +634,7 @@ export function FieldShelf({
                                         onClick={() => toggleDimensionSort(z.key, it.id)}
                                         className={`hover:text-[#F92672] transition ${it.sort && it.sort !== 'none' ? 'text-[#F92672]' : 'text-[#75715E]'}`}
                                         title={`维度排序: ${it.sort === 'asc' ? '升序' : it.sort === 'desc' ? '降序' : '默认'}`}
-                                        aria-label="排序"
+                                        aria-label={t("排序")}
                                       >
                                         {it.sort === 'asc' ? <ArrowUp className="w-2.5 h-2.5" /> : it.sort === 'desc' ? <ArrowDown className="w-2.5 h-2.5" /> : <ArrowUpDown className="w-2.5 h-2.5" />}
                                       </button>
@@ -665,8 +647,8 @@ export function FieldShelf({
                                           setActiveHeaderFilterModal({ zone: z.key, dim: it });
                                         }}
                                         className={`hover:text-[#A6E22E] transition ${isFiltered ? 'text-[#A6E22E]' : 'text-[#75715E]'}`}
-                                        title="勾选筛选值"
-                                        aria-label="筛选值"
+                                        title={t("勾选筛选值")}
+                                        aria-label={t("筛选值")}
                                       >
                                         <Filter className="w-2.5 h-2.5" />
                                       </button>
@@ -675,10 +657,10 @@ export function FieldShelf({
                                     {!isReadOnly && items.length > 1 && (
                                       <span className="inline-flex items-center text-[8.5px] text-[#75715E]">
                                         {itemIdx > 0 && (
-                                          <button onClick={() => moveZoneItem(z.key, itemIdx, -1)} className="hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="前移">←</button>
+                                          <button onClick={() => moveZoneItem(z.key, itemIdx, -1)} className="hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("前移")}>←</button>
                                         )}
                                         {itemIdx < items.length - 1 && (
-                                          <button onClick={() => moveZoneItem(z.key, itemIdx, 1)} className="hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="后移">→</button>
+                                          <button onClick={() => moveZoneItem(z.key, itemIdx, 1)} className="hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("后移")}>→</button>
                                         )}
                                       </span>
                                     )}
@@ -687,8 +669,8 @@ export function FieldShelf({
                                       <button
                                         onClick={() => removeZoneItem(z.key, it.id)}
                                         className="text-[#75715E] hover:text-[#F92672]"
-                                        title="移除字段"
-                                        aria-label="移除字段"
+                                        title={t("移除字段")}
+                                        aria-label={t("移除字段")}
                                       >
                                         <X className="w-2.5 h-2.5" />
                                       </button>
@@ -722,10 +704,10 @@ export function FieldShelf({
                     showToast?.('已展开左侧侧边栏 (⌘B)');
                   }}
                   className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-xs font-semibold text-[#0088A3] dark:text-[#66D9EF] transition shadow-xs"
-                  title="展开左侧模型与透视配置侧边栏 (快捷键: ⌘B / Ctrl+B)"
+                  title={t("展开左侧模型与透视配置侧边栏 (快捷键: ⌘B / Ctrl+B)")}
                 >
                   <PanelLeft className="w-3.5 h-3.5" />
-                  <span>展开侧边栏</span>
+                  <span>{t("展开侧边栏")}</span>
                   <span className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono">⌘B</span>
                 </button>
               )}
@@ -743,20 +725,20 @@ export function FieldShelf({
                     aria-pressed={viewMode === m.id}
                     className={`px-3 py-1 rounded-md text-[10px] font-semibold transition ${viewMode === m.id ? 'bg-[#F92672] text-[#F8F8F2] shadow-sm' : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
                   >
-                    {m.label}
+                    {t(m.label)}
                   </button>
                 ))}
               </div>
 
               {/* Chart Type Selector */}
               <select
-                aria-label="选择图表类型"
+                aria-label={t("选择图表类型")}
                 value={chartType}
                 onChange={(e) => { soundEngine?.playClick(560); setChartType(e.target.value); }}
                 className="px-3 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#66D9EF] text-[10px] font-semibold apple-font-mono focus:outline-none focus:border-[#F92672]"
               >
-                {VISUAL_CHART_TYPES.map((t) => (
-                  <option key={t.value} value={t.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t.label}</option>
+                {VISUAL_CHART_TYPES.map((type) => (
+                  <option key={type.value} value={type.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t(type.label)}</option>
                 ))}
               </select>
 
@@ -764,33 +746,33 @@ export function FieldShelf({
               <label className="inline-flex items-center gap-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
                 <input
                   type="checkbox"
-                  aria-label="显示多级小计"
+                  aria-label={t("显示多级小计")}
                   checked={pivotConfig.showSubtotals}
                   onChange={(e) => setPivotConfig((p) => ({ ...p, showSubtotals: e.target.checked }))}
                   className="rounded accent-[#F92672]"
                 />
-                <span>多级小计</span>
+                <span>{t("多级小计")}</span>
               </label>
 
               <label className="inline-flex items-center gap-1.5 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
                 <input
                   type="checkbox"
-                  aria-label="冻结行表头"
+                  aria-label={t("冻结行表头")}
                   checked={chartSpecConfig.stickyRowHeaders}
                   onChange={(e) => setChartSpecConfig((p) => ({ ...p, stickyRowHeaders: e.target.checked }))}
                   className="rounded accent-[#F92672]"
                 />
-                <span>冻结行表头</span>
+                <span>{t("冻结行表头")}</span>
               </label>
 
               <button
                 disabled={isReadOnly}
                 onClick={transposeRowsAndColumns}
                 className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] hover:text-[#F92672] text-[10px] font-medium transition disabled:opacity-40"
-                title="一键互换行维度与列维度 (快捷键: R)"
+                title={t("一键互换行维度与列维度 (快捷键: R)")}
               >
                 <RotateCcw className="w-2.5 h-2.5 text-[#FD971F]" />
-                <span>行列互换</span>
+                <span>{t("行列互换")}</span>
               </button>
 
               {unifiedChartSpec.executiveInsight && (
@@ -815,7 +797,7 @@ export function FieldShelf({
               <button
                 onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }}
                 className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[9px] text-[#75715E] dark:text-[#908E80] apple-font-mono transition"
-                title="查看 DuckDB SQL 模板（当前不执行）"
+                title={t("查看 DuckDB SQL 模板（当前不执行）")}
               >
                 <Code2 className="w-3 h-3 text-[#A6E22E]" />
                 <span>CUBE({pivotResult.rowConfigs.map((r) => r.field).join('×') || 'ALL'})</span>

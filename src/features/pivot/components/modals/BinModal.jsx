@@ -1,3 +1,4 @@
+import { t } from '../../../../i18n.js';
 import React from 'react';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { X } from 'lucide-react';
@@ -22,22 +23,21 @@ export function BinModal({
     >
       <div
         ref={dialogRef}
-        role="dialog" aria-modal="true" aria-label="字段分组设置" tabIndex={-1}
+        role="dialog" aria-modal="true" aria-label={t("字段分组设置")} tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden animate-apple-modal"
       >
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
-          <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2]">
-            GROUPING // 字段分组设置 ({activeBinModal.item.field})
+          <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2]">{' ' + t("GROUPING // 字段分组设置 (")}{activeBinModal.item.field})
           </h3>
-          <button onClick={onClose} aria-label="关闭字段分组设置" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label={t("关闭字段分组设置")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-5 space-y-4 text-xs">
           {activeBinModal.fieldType === 'date' ? (
             <div className="space-y-2">
-              <label className="block text-[11px] text-[#75715E] dark:text-[#908E80] apple-font-mono">选择日期聚合粒度:</label>
+              <label className="block text-[11px] text-[#75715E] dark:text-[#908E80] apple-font-mono">{t("选择日期聚合粒度:")}</label>
               <div className="grid grid-cols-2 gap-2">
                 {DATE_GRANULARITIES.map((g) => (
                   <button
@@ -57,7 +57,7 @@ export function BinModal({
                     }}
                     className={`px-3 py-2 rounded-lg border text-left apple-font-mono text-[11px] font-semibold transition ${activeBinModal.item.dateGranularity === g.value ? 'bg-[#66D9EF]/20 border-[#66D9EF] text-[#0088A3] dark:text-[#66D9EF]' : 'bg-[#EFECE1]/50 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32]'}`}
                   >
-                    {g.label}
+                    {t(g.label)}
                   </button>
                 ))}
               </div>
@@ -65,7 +65,7 @@ export function BinModal({
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">起始值 (Start):</label>
+                <label className="block text-[11px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">{t("起始值 (Start):")}</label>
                 <input
                   type="number"
                   value={binFormState.start}
@@ -74,7 +74,7 @@ export function BinModal({
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">区间步长 (Step &gt; 0):</label>
+                <label className="block text-[11px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">{t("区间步长 (Step > 0):")}</label>
                 <input
                   type="number"
                   value={binFormState.step}
@@ -95,9 +95,7 @@ export function BinModal({
                     showToast?.('已清除数值区间分箱');
                   }}
                   className="px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] text-[11px] apple-font-mono"
-                >
-                  清除分箱
-                </button>
+                >{' ' + t("清除分箱") + ' '}</button>
                 <button
                   onClick={() => {
                     const stepNum = Number(binFormState.step);
@@ -117,9 +115,7 @@ export function BinModal({
                     showToast?.(`已启用步长 ${stepNum} 的数值区间分组`);
                   }}
                   className="px-4 py-1.5 rounded-lg bg-[#F92672] text-[#F8F8F2] font-bold text-[11px] apple-font-mono"
-                >
-                  应用区间分组
-                </button>
+                >{' ' + t("应用区间分组") + ' '}</button>
               </div>
             </div>
           )}

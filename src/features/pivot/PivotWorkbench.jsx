@@ -1,3 +1,4 @@
+import { t, getLocale, setLocale } from '../../i18n.js';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   RETAIL_TEST_DATASET,
@@ -45,7 +46,22 @@ import { WorkspaceModal } from './components/modals/WorkspaceModal';
 import { CommandPaletteModal } from './components/modals/CommandPaletteModal';
 
 export default function PivotWorkbench() {
-  const [darkMode, setDarkMode] = useState(true);
+  const [locale, setLocaleState] = useState(getLocale);
+  useEffect(() => { document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN'; }, [locale]);
+  const [theme, setTheme] = useState(() => { try { return ['light','dark','system'].includes(localStorage.getItem('pivotstudio_theme')) ? localStorage.getItem('pivotstudio_theme') : 'system'; } catch { return 'system'; } });
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const darkMode = theme === 'system' ? systemDark : theme === 'dark';
+  const setDarkMode = useCallback((value) => setTheme((previous) => {
+    const current = previous === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : previous === 'dark';
+    return (typeof value === 'function' ? value(current) : value) ? 'dark' : 'light';
+  }), []);
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = (event) => setSystemDark(event.matches);
+    query.addEventListener('change',update);
+    return () => query.removeEventListener('change',update);
+  }, []);
+  useEffect(() => { try { localStorage.setItem('pivotstudio_theme',theme); } catch { /* Controls still work with session-only preferences. */ } }, [theme]);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [keynotePlaying, setKeynotePlaying] = useState(false);
   const [keynoteShotIdx, setKeynoteShotIdx] = useState(0);
@@ -1223,12 +1239,14 @@ export default function PivotWorkbench() {
     <div className={darkMode && !isPrintingReport ? 'dark' : ''}>
       <div className={`min-h-[100dvh] h-auto md:h-[100dvh] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans print:bg-white print:text-black apple-transition ${isPrintingReport ? 'overflow-visible' : 'overflow-x-hidden md:overflow-hidden'}`}>
         <div className="hidden print:block px-6 py-4 border-b border-black/15">
-          <h1 className="text-base font-semibold tracking-tight text-black">PivotEngine Studio [Monokai Pro] 数据透视分析报告 — {currentDataset?.name || '空白工程'}</h1>
-          <p className="text-[11px] text-[#75715E] mt-1">导出时间: {new Date().toLocaleString('zh-CN')} · 有效记录: {pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()} 行 · 导出人: {currentUser.name}</p>
+          <h1 className="text-base font-semibold tracking-tight text-black">{t("PivotEngine Studio [Monokai Pro] 数据透视分析报告 —") + ' '}{currentDataset?.name || '空白工程'}</h1>
+          <p className="text-[11px] text-[#75715E] mt-1">{t("导出时间:") + ' '}{new Date().toLocaleString('zh-CN')}{' ' + t("· 有效记录:") + ' '}{pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()}{' ' + t("行 · 导出人:") + ' '}{currentUser.name}</p>
         </div>
 
         {/* Modular Header Bar */}
         <HeaderBar
+          theme={theme} setTheme={setTheme}
+          locale={locale} onLocaleChange={(value) => { const saved = setLocale(value); setLocaleState(value); if (!saved) showToast('无法保存语言偏好，当前标签页内仍有效', 'error'); }}
           canUndo={canUndo}
           canRedo={canRedo}
           undo={undo}
@@ -1269,10 +1287,10 @@ export default function PivotWorkbench() {
 
         {(uploadProgress || isWorkerComputing) && (
           <div className="flex items-center gap-3 px-4 py-2 shrink-0" role="status">
-            <span>{uploadProgress ? `正在导入 ${uploadProgress.fileName}` : '正在计算'}</span>
-            <progress aria-label={uploadProgress ? '导入进度' : '计算进度'} max="100" value={uploadProgress?.pct ?? computeProgress} className="flex-1" />
+            <span>{uploadProgress ? `正在导入 ${uploadProgress.fileName}` : t("正在计算")}</span>
+            <progress aria-label={uploadProgress ? t('导入进度') : t('计算进度')} max="100" value={uploadProgress?.pct ?? computeProgress} className="flex-1" />
             <span>{uploadProgress?.pct ?? computeProgress}%</span>
-            <button onClick={() => { if (uploadProgress) importTaskRef.current?.cancel(); else stopCalculation(); showToast('已取消，保留上次计算结果'); }}>取消</button>
+            <button onClick={() => { if (uploadProgress) importTaskRef.current?.cancel(); else stopCalculation(); showToast('已取消，保留上次计算结果'); }}>{t("取消")}</button>
           </div>
         )}
 
@@ -1290,7 +1308,7 @@ export default function PivotWorkbench() {
 
         <div role="status" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
           <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#66D9EF]" />
-          <span className="truncate">数据来源：{!currentDataset ? '未载入数据集 · 等待输入以开启透视分析 · 本地 JavaScript 极速计算引擎就绪' : currentDataset.id === RETAIL_TEST_DATASET?.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {(pivotResult?.filteredCount || 0).toLocaleString()} / {(pivotResult?.totalCount || 0).toLocaleString()} 行 · 本地 JavaScript 计算</span>
+          <span className="truncate">{t("数据来源：")}{!currentDataset ? t("未载入数据集 · 等待输入以开启透视分析 · 本地 JavaScript 极速计算引擎就绪") : currentDataset.id === RETAIL_TEST_DATASET?.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {(pivotResult?.filteredCount || 0).toLocaleString()} / {(pivotResult?.totalCount || 0).toLocaleString()}{' ' + t("行 · 本地 JavaScript 计算")}</span>
         </div>
 
         {/* Bento KPI Cards Strip with Mini Sparklines */}
@@ -1310,8 +1328,7 @@ export default function PivotWorkbench() {
                       <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold apple-font-mono ${kpi.comparison.isPositive ? 'bg-[#A6E22E]/15 text-[#4A7500] dark:text-[#A6E22E] border border-[#A6E22E]/30' : 'bg-[#F92672]/15 text-[#F92672] border border-[#F92672]/30'}`}>
                         {kpi.comparison.pctFormatted}
                       </span>
-                      <span className="text-[9px] text-[#75715E] dark:text-[#908E80] truncate max-w-[125px]" title={`较 ${kpi.comparison.baselineLabel}`}>
-                        较 {kpi.comparison.baselineLabel}
+                      <span className="text-[9px] text-[#75715E] dark:text-[#908E80] truncate max-w-[125px]" title={`较 ${kpi.comparison.baselineLabel}`}>{' ' + t("较") + ' '}{kpi.comparison.baselineLabel}
                       </span>
                     </div>
                   )}
@@ -1386,15 +1403,11 @@ export default function PivotWorkbench() {
           {pivotResult?.sanitizedInfo?.hasInvalidFields && (
             <div className="mx-2.5 sm:mx-4 mb-2 p-2.5 rounded-xl bg-[#FD971F]/15 border border-[#FD971F]/40 flex flex-wrap items-center justify-between gap-2 text-xs apple-font-mono text-[#C86400] dark:text-[#FD971F] animate-apple-modal shrink-0">
               <div className="flex items-center gap-2">
-                <span className="font-bold">⚠️ 配置自愈提示:</span>
-                <span>
-                  检测到当前数据集中不存在的失效字段
-                  {pivotResult.sanitizedInfo.ignoredFilters.length > 0 && ` [筛选: ${pivotResult.sanitizedInfo.ignoredFilters.join(', ')}]`}
+                <span className="font-bold">{t("⚠️ 配置自愈提示:")}</span>
+                <span>{' ' + t("检测到当前数据集中不存在的失效字段") + ' '}{pivotResult.sanitizedInfo.ignoredFilters.length > 0 && ` [筛选: ${pivotResult.sanitizedInfo.ignoredFilters.join(', ')}]`}
                   {pivotResult.sanitizedInfo.ignoredRows.length > 0 && ` [行: ${pivotResult.sanitizedInfo.ignoredRows.join(', ')}]`}
                   {pivotResult.sanitizedInfo.ignoredCols.length > 0 && ` [列: ${pivotResult.sanitizedInfo.ignoredCols.join(', ')}]`}
-                  {pivotResult.sanitizedInfo.ignoredVals.length > 0 && ` [指标: ${pivotResult.sanitizedInfo.ignoredVals.join(', ')}]`}
-                  ，已自动安全脱落以保障计算。
-                </span>
+                  {pivotResult.sanitizedInfo.ignoredVals.length > 0 && ` [指标: ${pivotResult.sanitizedInfo.ignoredVals.join(', ')}]`}{' ' + t("，已自动安全脱落以保障计算。") + ' '}</span>
               </div>
               <button
                 onClick={() => {
@@ -1403,9 +1416,7 @@ export default function PivotWorkbench() {
                   showToast('已重置为当前数据集的推荐默认透视配置');
                 }}
                 className="px-2.5 py-1 rounded-lg bg-[#FD971F] text-[#1E1F1C] font-bold text-[10px] shrink-0 hover:opacity-90 transition"
-              >
-                一键重置为默认透视
-              </button>
+              >{' ' + t("一键重置为默认透视") + ' '}</button>
             </div>
           )}
 
@@ -1464,7 +1475,7 @@ export default function PivotWorkbench() {
             <div
               id="split-resizer"
               role="separator"
-              aria-label="调整透视表与图表上下高度"
+              aria-label={t("调整透视表与图表上下高度")}
               aria-orientation="horizontal"
               aria-valuemin={20}
               aria-valuemax={80}
@@ -1488,7 +1499,7 @@ export default function PivotWorkbench() {
                 setSplitRatioPct(50);
                 showToast('已复位表图高度比例为 50 : 50');
               }}
-              title="上下拖拽无级调节表图高度 · 双击复位 (50:50)"
+              title={t("上下拖拽无级调节表图高度 · 双击复位 (50:50)")}
               className={`flex w-full h-2.5 rounded-full items-center justify-center cursor-row-resize focus-visible:ring-2 focus-visible:ring-[#66D9EF] select-none transition-colors shrink-0 group ${isResizingSplit ? 'bg-[#F92672]/30' : 'hover:bg-[#66D9EF]/20'}`}
             >
               <div className={`h-1 w-12 rounded-full transition-colors ${isResizingSplit ? 'bg-[#F92672]' : 'bg-[#D6D4C8] dark:bg-[#3E3D32] group-hover:bg-[#66D9EF]'}`} />

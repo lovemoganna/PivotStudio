@@ -45,3 +45,7 @@ Chromium verified named snapshot persistence, deleting the final snapshot and re
 ### R6
 
 29 Node tests passed, including Excel number-format vs UI formatter parity for positive/negative/zero, currency, percentages and unit suffixes. Chromium compared filtered/sorted CSV and formatted XLSX against rendered cells, then downloaded PNG and SVG for bar/line/pie/heatmap/funnel. PNG signatures checked; SVG is standalone without foreignObject, includes inline styles and legend. Custom funnel now renders as SVG too. Mobile PNG canvas dimensions capped at 8192 per axis; SVG remains available.
+
+### R7
+
+Chromium 390×844: system dark/light changes, manual override, locale switching and reload persistence, English start-page sample button, mobile horizontal table scroll and pinned first column all passed without page-width overflow. Added a centralized UI-copy dictionary; dataset field names and record values are never translated. The outer app now permits normal mobile vertical scrolling. No production localization library added.

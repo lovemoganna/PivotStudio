@@ -1,3 +1,4 @@
+import { t } from '../../../i18n.js';
 import React, { useState, useRef } from 'react';
 import {
   Upload,
@@ -126,24 +127,21 @@ export function IntroScreen({
           <span className="inline-block w-2 h-2 rounded-full bg-[#66D9EF] animate-pulse" />
           <span>SYSTEM READY</span>
           <span className="text-[#D6D4C8] dark:text-[#49483E]">|</span>
-          <span className="text-[#A6E22E]">纯前端本地沙箱引擎</span>
+          <span className="text-[#A6E22E]">{t("纯前端本地沙箱引擎")}</span>
           <span className="text-[#D6D4C8] dark:text-[#49483E]">|</span>
-          <span>零数据上报</span>
+          <span>{t("零数据上报")}</span>
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#272822] dark:text-[#F8F8F2] apple-font-mono">
           PivotEngine <span className="text-[#F92672]">Studio</span>
         </h1>
 
-        <p className="text-xs sm:text-sm text-[#75715E] dark:text-[#B8B5A8] leading-relaxed">
-          现代化全功能前端数据透视工作台 · 专为海量数据探索、多维度交叉汇总、动态层级折叠与交互可视化看板而生。
-          <br className="hidden sm:inline" />
-          当前系统处于<span className="font-semibold text-[#0088A3] dark:text-[#66D9EF]">「空白就绪状态」</span>，您可以载入多样化测试场景或导入业务文件全面检验系统稳定性。
-        </p>
+        <p className="text-xs sm:text-sm text-[#75715E] dark:text-[#B8B5A8] leading-relaxed">{' ' + t("现代化全功能前端数据透视工作台 · 专为海量数据探索、多维度交叉汇总、动态层级折叠与交互可视化看板而生。") + ' '}<br className="hidden sm:inline" />{' ' + t("当前系统处于")}<span className="font-semibold text-[#0088A3] dark:text-[#66D9EF]">{t("「空白就绪状态」")}</span>{t("，您可以载入多样化测试场景或导入业务文件全面检验系统稳定性。") + ' '}</p>
       </div>
 
       {/* Main Drag-and-Drop Zone & Quick Gateway */}
-      <div
+      <button type="button" onClick={() => onLoadRetailDataset?.()} className="px-4 py-2 rounded-lg bg-[#A6E22E] text-[#1E1F1C] font-semibold mb-3">{t('加载示例数据')}</button>
+        <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -163,23 +161,21 @@ export function IntroScreen({
 
           <div className="space-y-1">
             <div className="text-base font-bold text-[#272822] dark:text-[#F8F8F2] flex items-center justify-center gap-2">
-              <span>点击选择文件 或 将表格文件拖拽至此处</span>
+              <span>{t("点击选择文件 或 将表格文件拖拽至此处")}</span>
               <ArrowRight className="w-4 h-4 text-[#75715E] group-hover:translate-x-1 transition" />
             </div>
-            <p className="text-xs text-[#75715E] dark:text-[#908E80] apple-font-mono">
-              支持 .xlsx、.xls (多 Sheet 智能识别) · .csv、.txt (逗号/分号/Tab 制表符自适应)
-            </p>
+            <p className="text-xs text-[#75715E] dark:text-[#908E80] apple-font-mono">{' ' + t("支持 .xlsx、.xls (多 Sheet 智能识别) · .csv、.txt (逗号/分号/Tab 制表符自适应)") + ' '}</p>
           </div>
 
           <div className="inline-flex items-center gap-2 text-[10px] text-[#A6E22E] bg-[#A6E22E]/10 border border-[#A6E22E]/30 px-3 py-1 rounded-full apple-font-mono">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>所有计算 100% 在本地浏览器内存中执行，商业隐私零泄露</span>
+            <span>{t("所有计算 100% 在本地浏览器内存中执行，商业隐私零泄露")}</span>
           </div>
 
           {uploadProgress && (
             <div className="w-full max-w-sm mt-3 p-2.5 rounded-xl bg-[#1E1F1C] border border-[#3E3D32] space-y-1.5 apple-font-mono text-left">
               <div className="flex justify-between text-[10px] text-[#66D9EF]">
-                <span>正在流式切片解析: {uploadProgress.fileName}</span>
+                <span>{t("正在流式切片解析:") + ' '}{uploadProgress.fileName}</span>
                 <span>{uploadProgress.pct}%</span>
               </div>
               <div className="w-full h-1.5 bg-[#272822] rounded-full overflow-hidden">
@@ -197,10 +193,8 @@ export function IntroScreen({
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs apple-font-mono">
           <span className="font-bold text-[#66D9EF] flex items-center gap-1.5">
-            <Zap className="w-4 h-4 text-[#E6DB74]" />
-            多样化真实业务测试集矩阵 (Benchmark Suite)
-          </span>
-          <span className="text-[#75715E]">点击任意场景即刻载入，验证多维度交叉与边界容错</span>
+            <Zap className="w-4 h-4 text-[#E6DB74]" />{' ' + t("多样化真实业务测试集矩阵 (Benchmark Suite)") + ' '}</span>
+          <span className="text-[#75715E]">{t("点击任意场景即刻载入，验证多维度交叉与边界容错")}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -247,10 +241,8 @@ export function IntroScreen({
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs apple-font-mono">
           <span className="font-bold text-[#A6E22E] flex items-center gap-1.5">
-            <Cpu className="w-4 h-4 text-[#A6E22E]" />
-            极限负载与外部数据输入工具
-          </span>
-          <span className="text-[#75715E]">压测虚拟滚动、Worker 线程与剪贴板</span>
+            <Cpu className="w-4 h-4 text-[#A6E22E]" />{' ' + t("极限负载与外部数据输入工具") + ' '}</span>
+          <span className="text-[#75715E]">{t("压测虚拟滚动、Worker 线程与剪贴板")}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -272,17 +264,11 @@ export function IntroScreen({
               <div className="w-8 h-8 rounded-lg bg-[#A6E22E]/15 border border-[#A6E22E]/30 text-[#4A7500] dark:text-[#A6E22E] flex items-center justify-center">
                 <Cpu className="w-4 h-4" />
               </div>
-              <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#A6E22E]/15 text-[#4A7500] dark:text-[#A6E22E] apple-font-mono">
-                100,000 Rows 压测
-              </span>
+              <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#A6E22E]/15 text-[#4A7500] dark:text-[#A6E22E] apple-font-mono">{' ' + t("100,000 Rows 压测") + ' '}</span>
             </div>
             <div>
-              <div className="text-xs font-bold text-[#272822] dark:text-[#F8F8F2] group-hover:text-[#A6E22E] transition">
-                生成 10万行极限压测数据
-              </div>
-              <p className="text-[10.5px] text-[#75715E] dark:text-[#908E80] mt-1 leading-snug">
-                验证大规模并发计算下 Web Worker 异步管线、虚拟滚动 60fps 帧率与内存稳定性。
-              </p>
+              <div className="text-xs font-bold text-[#272822] dark:text-[#F8F8F2] group-hover:text-[#A6E22E] transition">{' ' + t("生成 10万行极限压测数据") + ' '}</div>
+              <p className="text-[10.5px] text-[#75715E] dark:text-[#908E80] mt-1 leading-snug">{' ' + t("验证大规模并发计算下 Web Worker 异步管线、虚拟滚动 60fps 帧率与内存稳定性。") + ' '}</p>
             </div>
           </button>
 
@@ -297,17 +283,11 @@ export function IntroScreen({
               <div className="w-8 h-8 rounded-lg bg-[#FD971F]/15 border border-[#FD971F]/30 text-[#C86400] dark:text-[#FD971F] flex items-center justify-center">
                 <ClipboardPaste className="w-4 h-4" />
               </div>
-              <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#FD971F]/15 text-[#C86400] dark:text-[#FD971F] apple-font-mono">
-                剪贴板直接读入
-              </span>
+              <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#FD971F]/15 text-[#C86400] dark:text-[#FD971F] apple-font-mono">{' ' + t("剪贴板直接读入") + ' '}</span>
             </div>
             <div>
-              <div className="text-xs font-bold text-[#272822] dark:text-[#F8F8F2] group-hover:text-[#FD971F] transition">
-                粘贴剪贴板数据 (TSV / CSV)
-              </div>
-              <p className="text-[10.5px] text-[#75715E] dark:text-[#908E80] mt-1 leading-snug">
-                直接从 Excel 或网页复制任意表格单元格并粘贴，系统自动识别表头与数据类型。
-              </p>
+              <div className="text-xs font-bold text-[#272822] dark:text-[#F8F8F2] group-hover:text-[#FD971F] transition">{' ' + t("粘贴剪贴板数据 (TSV / CSV)") + ' '}</div>
+              <p className="text-[10.5px] text-[#75715E] dark:text-[#908E80] mt-1 leading-snug">{' ' + t("直接从 Excel 或网页复制任意表格单元格并粘贴，系统自动识别表头与数据类型。") + ' '}</p>
             </div>
           </button>
 
@@ -324,17 +304,11 @@ export function IntroScreen({
               <div className="w-8 h-8 rounded-lg bg-[#AE81FF]/15 border border-[#AE81FF]/30 text-[#6B38FB] dark:text-[#AE81FF] flex items-center justify-center">
                 <FlaskConical className="w-4 h-4" />
               </div>
-              <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] apple-font-mono">
-                8 组核心自检
-              </span>
+              <span className="px-2 py-0.5 rounded text-[9.5px] font-bold bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] apple-font-mono">{' ' + t("8 组核心自检") + ' '}</span>
             </div>
             <div>
-              <div className="text-xs font-bold text-[#272822] dark:text-[#F8F8F2] group-hover:text-[#AE81FF] transition">
-                系统内核算法自检
-              </div>
-              <p className="text-[10.5px] text-[#75715E] dark:text-[#908E80] mt-1 leading-snug">
-                查看多层级小计、百分比差异、字段自愈守卫、极值防护等 8 组算法运行状态。
-              </p>
+              <div className="text-xs font-bold text-[#272822] dark:text-[#F8F8F2] group-hover:text-[#AE81FF] transition">{' ' + t("系统内核算法自检") + ' '}</div>
+              <p className="text-[10.5px] text-[#75715E] dark:text-[#908E80] mt-1 leading-snug">{' ' + t("查看多层级小计、百分比差异、字段自愈守卫、极值防护等 8 组算法运行状态。") + ' '}</p>
             </div>
           </button>
         </div>
@@ -345,9 +319,7 @@ export function IntroScreen({
         <div className="flex items-center justify-between border-b border-[#D6D4C8] dark:border-[#3E3D32] pb-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-[#A6E22E]" />
-            <span className="font-bold text-xs apple-font-mono text-[#272822] dark:text-[#F8F8F2]">
-              企业级稳定性与高可用架构保障
-            </span>
+            <span className="font-bold text-xs apple-font-mono text-[#272822] dark:text-[#F8F8F2]">{' ' + t("企业级稳定性与高可用架构保障") + ' '}</span>
           </div>
           <span className="text-[10px] text-[#75715E] apple-font-mono">Zero Crash Architecture</span>
         </div>
@@ -356,41 +328,33 @@ export function IntroScreen({
           <div className="space-y-1.5">
             <div className="font-bold text-[#66D9EF] flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>内存与垃圾回收优化</span>
+              <span>{t("内存与垃圾回收优化")}</span>
             </div>
-            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">
-              扁平化单层哈希桶算法，避免递归造成的堆栈溢出；百万级计算后即时清理临时映射，零内存残留。
-            </p>
+            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("扁平化单层哈希桶算法，避免递归造成的堆栈溢出；百万级计算后即时清理临时映射，零内存残留。") + ' '}</p>
           </div>
 
           <div className="space-y-1.5">
             <div className="font-bold text-[#A6E22E] flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>字段失效自愈守卫</span>
+              <span>{t("字段失效自愈守卫")}</span>
             </div>
-            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">
-              切换不同结构数据集或增删字段时，失效指标与筛选器自动安全脱落，绝不引发白屏崩溃。
-            </p>
+            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("切换不同结构数据集或增删字段时，失效指标与筛选器自动安全脱落，绝不引发白屏崩溃。") + ' '}</p>
           </div>
 
           <div className="space-y-1.5">
             <div className="font-bold text-[#FD971F] flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Web Worker 异步解耦</span>
+              <span>{t("Web Worker 异步解耦")}</span>
             </div>
-            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">
-              超过 2,500 行的计算自动分派至独立后台线程，主线程始终保持 60 FPS 丝滑，界面无卡顿假死。
-            </p>
+            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("超过 2,500 行的计算自动分派至独立后台线程，主线程始终保持 60 FPS 丝滑，界面无卡顿假死。") + ' '}</p>
           </div>
 
           <div className="space-y-1.5">
             <div className="font-bold text-[#AE81FF] flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Excel 表头合并原生导出</span>
+              <span>{t("Excel 表头合并原生导出")}</span>
             </div>
-            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">
-              导出为真实合并居中的原生 .xlsx 文件，多层级行/列表头完全忠实于当前屏幕透视结构。
-            </p>
+            <p className="text-[11px] text-[#75715E] dark:text-[#908E80] leading-relaxed">{' ' + t("导出为真实合并居中的原生 .xlsx 文件，多层级行/列表头完全忠实于当前屏幕透视结构。") + ' '}</p>
           </div>
         </div>
       </div>
@@ -399,21 +363,13 @@ export function IntroScreen({
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-[#EFECE1]/50 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
         <div className="flex items-center gap-4 flex-wrap">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#A6E22E]" />
-            Web Worker: 就绪
-          </span>
+            <span className="w-2 h-2 rounded-full bg-[#A6E22E]" />{' ' + t("Web Worker: 就绪") + ' '}</span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#A6E22E]" />
-            虚拟滚动: 激活
-          </span>
+            <span className="w-2 h-2 rounded-full bg-[#A6E22E]" />{' ' + t("虚拟滚动: 激活") + ' '}</span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#A6E22E]" />
-            自愈守卫: 运行中
-          </span>
+            <span className="w-2 h-2 rounded-full bg-[#A6E22E]" />{' ' + t("自愈守卫: 运行中") + ' '}</span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#66D9EF]" />
-            本地数据安全沙箱: 100% 隔离
-          </span>
+            <span className="w-2 h-2 rounded-full bg-[#66D9EF]" />{' ' + t("本地数据安全沙箱: 100% 隔离") + ' '}</span>
         </div>
         <div>
           <span>PivotWorkbench v1.0 · Monokai Pro Edition</span>
@@ -430,20 +386,18 @@ export function IntroScreen({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="快速粘贴表格数据"
+            aria-label={t("快速粘贴表格数据")}
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl p-5 space-y-4 animate-apple-modal apple-font-sans"
           >
             <div className="flex items-center justify-between border-b border-[#D6D4C8] dark:border-[#3E3D32] pb-3">
               <div className="flex items-center gap-2">
                 <ClipboardPaste className="w-4 h-4 text-[#FD971F]" />
-                <span className="font-bold text-sm text-[#272822] dark:text-[#F8F8F2]">
-                  快速粘贴表格文本 (TSV / CSV)
-                </span>
+                <span className="font-bold text-sm text-[#272822] dark:text-[#F8F8F2]">{' ' + t("快速粘贴表格文本 (TSV / CSV)") + ' '}</span>
               </div>
               <button
                 type="button"
-                aria-label="关闭粘贴弹窗"
+                aria-label={t("关闭粘贴弹窗")}
                 onClick={() => setShowPasteModal(false)}
                 className="p-1 rounded text-[#75715E] hover:text-[#F92672] transition"
               >
@@ -452,13 +406,11 @@ export function IntroScreen({
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs text-[#75715E] dark:text-[#908E80]">
-                请将从 Excel、Google Sheets 或文本文件中复制的表格文本粘贴到下方文本框中：
-              </label>
+              <label className="block text-xs text-[#75715E] dark:text-[#908E80]">{' ' + t("请将从 Excel、Google Sheets 或文本文件中复制的表格文本粘贴到下方文本框中：") + ' '}</label>
               <textarea
                 value={pasteInputText}
                 onChange={(e) => setPasteInputText(e.target.value)}
-                placeholder="订单日期&#9;销售大区&#9;商品类别&#9;销售额&#10;2025-01-01&#9;华东&#9;智能数码&#9;35800"
+                placeholder={t("订单日期\t销售大区\t商品类别\t销售额\n2025-01-01\t华东\t智能数码\t35800")}
                 rows={8}
                 className="w-full p-3 rounded-xl bg-[#EFECE1]/50 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] text-xs apple-font-mono focus:outline-none focus:border-[#66D9EF]"
               />
@@ -469,17 +421,13 @@ export function IntroScreen({
                 type="button"
                 onClick={() => setShowPasteModal(false)}
                 className="px-4 py-2 rounded-xl border border-[#D6D4C8] dark:border-[#49483E] text-xs font-semibold hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition"
-              >
-                取消
-              </button>
+              >{' ' + t("取消") + ' '}</button>
               <button
                 type="button"
                 disabled={!pasteInputText.trim()}
                 onClick={handleQuickPasteSubmit}
                 className="px-4 py-2 rounded-xl bg-[#A6E22E] hover:bg-[#B8F03E] text-[#1E1F1C] text-xs font-bold transition disabled:opacity-40"
-              >
-                解析并导入为数据集
-              </button>
+              >{' ' + t("解析并导入为数据集") + ' '}</button>
             </div>
           </div>
         </div>

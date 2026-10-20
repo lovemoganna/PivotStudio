@@ -158,3 +158,34 @@ test('R6 filtered sorted formatted CSV/XLSX and real PNG/SVG downloads',async({p
     }
   }
 });
+
+test('R7 system/manual themes, language persistence and mobile sticky horizontal table',async({page})=>{
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/');
+  await expect(page.locator('.dark')).toHaveCount(1);
+  await page.emulateMedia({colorScheme:'light'});
+  await expect(page.locator('.dark')).toHaveCount(0);
+  await page.getByLabel('主题模式',{exact:true}).selectOption('dark');
+  await page.emulateMedia({colorScheme:'light'});
+  await expect(page.locator('.dark')).toHaveCount(1);
+  await page.getByLabel('界面语言',{exact:true}).selectOption('en');
+  await expect(page.getByRole('button',{name:'Load sample data',exact:true})).toBeVisible();
+  await expect(page.getByLabel('Theme mode',{exact:true})).toHaveValue('dark');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang','en');
+  await expect(page.getByRole('button',{name:'Load sample data',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Load sample data',exact:true}).click();
+  await expect(page.locator('#pivot-main-html-table')).toBeVisible(); await ready(page);
+  await expect(page.getByLabel('Select chart type',{exact:true})).toBeVisible();
+  const cell=page.locator('#pivot-main-html-table tbody [role=rowheader]').first();
+  const scroll=page.locator('#pivot-main-html-table').locator('..');
+  const positionBefore=await cell.evaluate(el=>el.getBoundingClientRect().left);
+  await scroll.evaluate(el=>{el.scrollLeft=el.scrollWidth});
+  const positionAfter=await cell.evaluate(el=>el.getBoundingClientRect().left);
+  expect(Math.abs(positionAfter-positionBefore)).toBeLessThan(2);
+  expect(await scroll.evaluate(el=>el.scrollWidth>el.clientWidth && el.scrollLeft>0)).toBe(true);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2)).toBe(true);
+  await page.getByLabel('Interface language',{exact:true}).selectOption('zh');
+  await expect(page.getByLabel('选择图表类型',{exact:true})).toBeVisible();
+});
