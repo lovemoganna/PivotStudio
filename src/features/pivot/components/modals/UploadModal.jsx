@@ -11,7 +11,8 @@ export function UploadModal({
   const dialogRef = useDialogFocus(Boolean(uploadPreviewModal), onClose);
   if (!uploadPreviewModal) return null;
 
-  const activeSheet = uploadPreviewModal.sheets[uploadPreviewModal.activeSheetIdx] || uploadPreviewModal.sheets[0];
+  const activeSheetIdx = uploadPreviewModal.activeSheetIdx ?? 0;
+  const activeSheet = uploadPreviewModal.sheets[activeSheetIdx] || uploadPreviewModal.sheets[0];
 
   return (
     <div
@@ -27,10 +28,10 @@ export function UploadModal({
           <div>
             <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4 text-[#A6E22E]" />
-              <span>SCHEMA_INFERENCE // 文件解析预览与字段类型校准 ({uploadPreviewModal.fileName})</span>
+              <span>文件解析预览与字段类型校准 ({uploadPreviewModal.fileName})</span>
             </h3>
             <p className="text-[10px] text-[#75715E] dark:text-[#908E80] apple-font-mono mt-0.5">
-              共解析 {activeSheet.rows.length} 行数据 · {activeSheet.fields.length} 个字段（支持手动修正字段类型，展示前 20 行预览）
+              当前工作表共 {activeSheet.rows.length} 行数据 · {activeSheet.fields.length} 个字段（支持手动校准字段类型，展示前 20 行抽样）
             </p>
           </div>
           <button onClick={onClose} aria-label="关闭文件预览" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
@@ -38,9 +39,30 @@ export function UploadModal({
           </button>
         </div>
 
+        {uploadPreviewModal.sheets.length > 1 && (
+          <div className="px-5 pt-2.5 flex items-center gap-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/40 dark:bg-[#1E1F1C]/50 overflow-x-auto">
+            <span className="text-[10px] text-[#75715E] dark:text-[#908E80] font-semibold apple-font-mono shrink-0 mr-1">选择工作表:</span>
+            {uploadPreviewModal.sheets.map((sh, sIdx) => (
+              <button
+                key={sh.name || sIdx}
+                type="button"
+                onClick={() => setUploadPreviewModal((prev) => ({ ...prev, activeSheetIdx: sIdx }))}
+                className={`px-3 py-1.5 rounded-t-lg border-t border-x text-xs font-semibold apple-font-mono transition ${
+                  activeSheetIdx === sIdx
+                    ? 'bg-[#FFFDF7] dark:bg-[#272822] border-[#D6D4C8] dark:border-[#49483E] text-[#F92672] shadow-sm'
+                    : 'border-transparent text-[#75715E] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+                }`}
+              >
+                <span>{sh.name || `Sheet ${sIdx + 1}`}</span>
+                <span className="ml-1.5 text-[9px] text-[#75715E]">({sh.rows.length}行)</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
           <div>
-            <div className="text-[11px] font-bold apple-font-mono mb-2 text-[#66D9EF]">1. 字段类型自动推断与手动修正</div>
+            <div className="text-[11px] font-bold apple-font-mono mb-2 text-[#66D9EF]">1. 字段类型自动推断与手动校准</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {activeSheet.fields.map((f, fIdx) => (
                 <div key={f.name} className="p-2 rounded-lg bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between gap-2">
@@ -51,7 +73,7 @@ export function UploadModal({
                       const nextType = e.target.value;
                       setUploadPreviewModal((prev) => {
                         const nextSheets = prev.sheets.map((sh, sIdx) => {
-                          if (sIdx !== prev.activeSheetIdx) return sh;
+                          if (sIdx !== activeSheetIdx) return sh;
                           const nextFields = sh.fields.map((fld, idx) => (idx === fIdx ? { ...fld, type: nextType } : fld));
                           return { ...sh, fields: nextFields };
                         });
@@ -104,13 +126,13 @@ export function UploadModal({
             onClick={() => confirmUploadDataset(false)}
             className="px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] text-xs font-semibold apple-font-mono hover:border-[#66D9EF] transition"
           >
-            导入并清空旧透视配置 (步骤5标准)
+            仅导入数据（清空当前透视）
           </button>
           <button
             onClick={() => confirmUploadDataset(true)}
             className="px-4 py-1.5 rounded-lg bg-[#F92672] text-[#F8F8F2] text-xs font-bold apple-font-mono hover:bg-[#FF3B85] transition"
           >
-            确认导入并自动初始化透视
+            确认导入并自动构建推荐透视
           </button>
         </div>
       </div>

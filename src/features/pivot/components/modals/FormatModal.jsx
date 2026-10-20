@@ -28,7 +28,7 @@ export function FormatModal({
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
             <Palette className="w-4 h-4 text-[#FD971F]" />
-            <span>FORMAT_STUDIO // 条件格式、色阶数据条与数值显示方式 (步骤8)</span>
+            <span>FORMAT_STUDIO // 条件格式、色阶数据条与数值显示方式</span>
           </h3>
           <button onClick={onClose} aria-label="关闭数值与条件格式设置" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />

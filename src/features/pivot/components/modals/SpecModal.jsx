@@ -48,13 +48,13 @@ export function SpecModal({ isOpen, onClose }) {
             ))}
           </div>
           <div className="p-3.5 rounded-xl bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] space-y-1.5">
-            <div className="font-bold text-[#F92672] apple-font-mono">1. 统一数据格式与纯函数透视引擎 (Steps 1–4)</div>
+            <div className="font-bold text-[#F92672] apple-font-mono">1. 统一数据契约与纯函数透视引擎</div>
             <p className="text-[11px] text-[#75715E] dark:text-[#908E80]">
               所有外部数据源均先归一化为标准的 <code className="text-[#A6E22E]">UnifiedDataset</code>，再进入零副作用的 <code className="text-[#66D9EF]">calculatePivot</code> 计算多级树状表头、合并单元格跨度（rowSpan/colSpan）与总计/小计矩阵。
             </p>
           </div>
           <div className="p-3.5 rounded-xl bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] space-y-1.5">
-            <div className="font-bold text-[#A6E22E] apple-font-mono">2. 公共 Chart Spec 与智能避让渲染层 (Steps 6–9)</div>
+            <div className="font-bold text-[#A6E22E] apple-font-mono">2. 统一 Chart Spec 与智能可视化渲染层</div>
             <p className="text-[11px] text-[#75715E] dark:text-[#908E80]">
               15 种图表统一消费 <code className="text-[#FD971F]">buildUnifiedChartSpec</code> 与 <code className="text-[#AE81FF]">UnifiedFormatter</code>，内置柱体/扇区智能防重叠标签、OLS 最小二乘回归趋势线、Z-Score 残差异常检测与 Sturges 直方图自动分箱。
             </p>

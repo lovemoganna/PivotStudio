@@ -55,7 +55,7 @@ export function FieldShelf({
   return (
     <>
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden relative">
-        {/* Left Sidebar: Schema Field Palette & Data Ingestion (Step 5) */}
+        {/* Left Sidebar: Schema Field Palette & Data Ingestion */}
         {!cinemaTheaterMode && (
           <aside className="w-full lg:w-64 max-h-[310px] lg:max-h-none bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-3.5 flex flex-col gap-3 shrink-0 print:hidden overflow-y-auto">
             <div className="space-y-2">
@@ -116,9 +116,9 @@ export function FieldShelf({
                     }
                   }}
                   className="px-2.5 py-2 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
-                  title="无需本地文件，一键体验步骤5文件解析与字段类型推断预览弹窗"
+                  title="无需本地文件，一键加载内置零售样例以体验字段类型推断与预览"
                 >
-                  模拟预览
+                  样例预览
                 </button>
               </div>
 

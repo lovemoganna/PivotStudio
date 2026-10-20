@@ -107,6 +107,8 @@ export function ChartStudio({
 
           {/* Chart Studio Popover */}
           {showChartStudioPopover && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setShowChartStudioPopover(false)} />
             <div className="absolute right-0 top-9 z-40 w-[min(20rem,calc(100vw-2rem))] p-4 rounded-xl bg-[#FFFDF7]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-2xl border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl space-y-3 text-xs animate-apple-modal">
               <div className="flex items-center justify-between border-b border-[#3E3D32]/50 pb-2">
                 <span className="font-bold text-[11px] text-[#F92672]">CHART_SPEC // 规格与衍生分析</span>
@@ -232,6 +234,7 @@ export function ChartStudio({
                 />
               </label>
             </div>
+            </>
           )}
         </div>
       </div>

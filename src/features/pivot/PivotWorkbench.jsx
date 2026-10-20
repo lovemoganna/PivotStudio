@@ -109,20 +109,7 @@ export default function PivotWorkbench() {
   const [binFormState, setBinFormState] = useState({ start: 0, step: 50000 });
   const [activeFormatModal, setActiveFormatModal] = useState(false);
   const [activeDataSourceModal, setActiveDataSourceModal] = useState(null);
-  const [gsheetAuthMode, setGsheetAuthMode] = useState('public');
-  const [gsheetOauthToken, setGsheetOauthToken] = useState('');
   const [gsheetUrlInput, setGsheetUrlInput] = useState('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#gid=0');
-  const [sqlFormState, setSqlFormState] = useState({
-    backendProxyUrl: 'http://127.0.0.1:3001/api/v1/sql',
-    host: '127.0.0.1',
-    port: '5432',
-    dbName: 'bi_warehouse',
-    user: 'readonly_analyst',
-    password: '••••••••',
-    selectedTable: 'fact_sales_orders',
-    sql: 'SELECT 日期, 地区, 城市, 产品, 类别, 销售额, 数量 FROM fact_sales_orders WHERE 销售额 > 0 LIMIT 500;',
-    connectionStatus: 'idle',
-  });
   const [duckdbThreshold] = useState(50000);
   const [showTestSuiteModal, setShowTestSuiteModal] = useState(false);
 
@@ -854,7 +841,9 @@ export default function PivotWorkbench() {
 
   const confirmUploadDataset = useCallback((autoInitPivot = true) => {
     if (!uploadPreviewModal) return;
-    const sheet = uploadPreviewModal.sheets[uploadPreviewModal.activeSheetIdx] || uploadPreviewModal.sheets[0];
+    const activeIdx = uploadPreviewModal.activeSheetIdx ?? 0;
+    const sheet = uploadPreviewModal.sheets[activeIdx] || uploadPreviewModal.sheets[0];
+    const sheetSuffix = uploadPreviewModal.sheets.length > 1 ? ` - ${sheet.name || ('Sheet ' + (activeIdx + 1))}` : '';
     const normalizedRows = sheet.rows.map((r) => {
       const next = { ...r };
       sheet.fields.forEach((f) => {
@@ -871,7 +860,7 @@ export default function PivotWorkbench() {
 
     const newDs = {
       id: `ds_upload_${Date.now()}`,
-      name: `${uploadPreviewModal.fileName} (${normalizedRows.length}行)`,
+      name: `${uploadPreviewModal.fileName}${sheetSuffix} (${normalizedRows.length}行)`,
       fields: sheet.fields,
       rows: normalizedRows,
     };
@@ -1366,14 +1355,8 @@ export default function PivotWorkbench() {
         <DataSourceModal
           activeDataSourceModal={activeDataSourceModal}
           onClose={() => setActiveDataSourceModal(null)}
-          gsheetAuthMode={gsheetAuthMode}
-          setGsheetAuthMode={setGsheetAuthMode}
           gsheetUrlInput={gsheetUrlInput}
           setGsheetUrlInput={setGsheetUrlInput}
-          gsheetOauthToken={gsheetOauthToken}
-          setGsheetOauthToken={setGsheetOauthToken}
-          sqlFormState={sqlFormState}
-          setSqlFormState={setSqlFormState}
           duckdbThreshold={duckdbThreshold}
           currentDataset={currentDataset}
           pivotConfig={pivotConfig}
