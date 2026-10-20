@@ -23,7 +23,7 @@ export function HeaderBar({
   isReadOnly,
   viewMode,
   isPrintingReport,
-  setShowAwardBadgeModal,
+  setShowSpecModal,
   setShowCommandPalette,
   setCommandQuery,
   setShowTestSuiteModal,
@@ -74,7 +74,7 @@ export function HeaderBar({
                 <span className="text-[9px] tracking-[0.08em] text-[#0088A3] dark:text-[#66D9EF] font-semibold apple-font-mono">DATA WORKBENCH</span>
               </h1>
               <button
-                onClick={() => { soundEngine?.playClick(620); setShowAwardBadgeModal(true); }}
+                onClick={() => { soundEngine?.playClick(620); setShowSpecModal(true); }}
                 className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition"
                 title="查看当前项目内部设计规范（不代表获奖）"
               >

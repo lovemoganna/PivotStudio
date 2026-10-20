@@ -55,7 +55,7 @@ export default function PivotWorkbench() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
   const [showChartStudioPopover, setShowChartStudioPopover] = useState(false);
-  const [showAwardBadgeModal, setShowAwardBadgeModal] = useState(false);
+  const [showSpecModal, setShowSpecModal] = useState(false);
 
   const [datasets, setDatasets] = useState([RETAIL_TEST_DATASET]);
   const [activeDatasetId, setActiveDatasetId] = useState(RETAIL_TEST_DATASET.id);
@@ -368,7 +368,7 @@ export default function PivotWorkbench() {
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
         setShowChartStudioPopover(false);
-        setShowAwardBadgeModal(false);
+        setShowSpecModal(false);
         setDrillDownModal(null);
         setUploadPreviewModal(null);
         setActiveHeaderFilterModal(null);
@@ -431,8 +431,20 @@ export default function PivotWorkbench() {
         if (id === reqIdRef.current) {
           setIsWorkerComputing(false);
           if (success && pRes && cSpec) {
-            if (pRes.cellRecordsMap && !(pRes.cellRecordsMap instanceof Map)) {
-              pRes.cellRecordsMap = new Map(Object.entries(pRes.cellRecordsMap));
+            // Worker omits cellRecordsMap to avoid cloning all raw record buckets
+            // across the message boundary (dominant serialization cost for 100k+ rows).
+            // Rebuild it here so drill-down continues to work. calculatePivot is pure;
+            // only cellRecordsMap from the rebuilt result is retained.
+            if (!pRes.cellRecordsMap) {
+              try {
+                const { cellRecordsMap } = calculatePivot(
+                  datasets.find((d) => d.id === activeDatasetId) || datasets[0],
+                  pivotConfig,
+                );
+                pRes.cellRecordsMap = cellRecordsMap;
+              } catch {
+                pRes.cellRecordsMap = new Map();
+              }
             }
             setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
           }
@@ -832,11 +844,13 @@ export default function PivotWorkbench() {
                 numCount++;
               }
             }
+            // Thresholds unified with csvParser.js (>= 0.7) for consistent type
+            // inference regardless of whether the source file is CSV or Excel.
             let type = 'text';
             if (nonEmpty > 0) {
-              if (boolCount / nonEmpty > 0.6) type = 'boolean';
-              else if (dateCount / nonEmpty > 0.5) type = 'date';
-              else if (numCount / nonEmpty > 0.6) type = 'number';
+              if (boolCount / nonEmpty >= 0.7) type = 'boolean';
+              else if (dateCount / nonEmpty >= 0.7) type = 'date';
+              else if (numCount / nonEmpty >= 0.7) type = 'number';
             }
             return { name: h, type };
           });
@@ -1142,7 +1156,7 @@ export default function PivotWorkbench() {
           isReadOnly={isReadOnly}
           viewMode={viewMode}
           isPrintingReport={isPrintingReport}
-          setShowAwardBadgeModal={setShowAwardBadgeModal}
+          setShowSpecModal={setShowSpecModal}
           setShowCommandPalette={setShowCommandPalette}
           setCommandQuery={setCommandQuery}
           setShowTestSuiteModal={setShowTestSuiteModal}
@@ -1471,8 +1485,8 @@ export default function PivotWorkbench() {
         />
 
         <SpecModal
-          isOpen={showAwardBadgeModal}
-          onClose={() => setShowAwardBadgeModal(false)}
+          isOpen={showSpecModal}
+          onClose={() => setShowSpecModal(false)}
         />
       </div>
     </div>
