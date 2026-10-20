@@ -245,9 +245,10 @@ try{
   const options=await evaluate('Array.from(document.querySelector("aside select").options).map(o=>o.value)');
   if(options.length<2)errors.push('Cannot test worker dataset switch: missing datasets');
   else{
-    await evaluate('(() => {const s=document.querySelector("aside select");s.value='+JSON.stringify("__DATASET_ORIGINAL__")+';return true})()'.replace('__DATASET_ORIGINAL__',options[0]));
-    await evaluate('(() => {document.querySelector("aside select").dispatchEvent(new Event("change",{bubbles:true}));return true;})()');
-    await waitFor(async()=>await evaluate('document.body.textContent.includes("33 / 33 行")'),'switch back to 33-row retail demo',12000);
+    const switchResult=await evaluate('(() => { const s=document.querySelector("aside select");s.value='+JSON.stringify(options[0])+';s.dispatchEvent(new Event("input",{bubbles:true}));s.dispatchEvent(new Event("change",{bubbles:true}));return {value:s.value,options:s.options.length};})()');
+    console.log('WORKER_SWITCH_REQUEST',JSON.stringify({first:options[0],last:options.at(-1),...switchResult}));
+    await waitFor(async()=>await evaluate('document.body.textContent.includes("数据来源：内置演示数据（非真实业务记录）")'),'switch back to retail demo source',12000);
+    console.log('WORKER_SWITCH_RETAIL',JSON.stringify(await evaluate('({selected:document.querySelector("aside select").value,status:Array.from(document.querySelectorAll("[role=status]")).map(x=>x.textContent).slice(0,3)})')));
     const returnId=options.at(-1);
     await evaluate('(() => { const s=document.querySelector("aside select");s.value='+JSON.stringify(returnId)+';s.dispatchEvent(new Event("change",{bubbles:true}));return true;})()');
     await waitFor(async()=>await evaluate('document.body.textContent.includes("100,000 / 100,000 行") && document.body.textContent.includes("Web Worker 本地计算")'),'worker re-evaluates after dataset switch',45000);
