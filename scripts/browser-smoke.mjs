@@ -73,6 +73,13 @@ try{
     if(name==='mobile') {
       const full=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
       await writeFile('artifacts/browser/mobile-full.png',Buffer.from(full.data,'base64'));
+      const scrollInfo=await evaluate('(() => { const chart=document.getElementById("pivot-chart-container"); const before=chart.getBoundingClientRect(); chart.scrollIntoView({block:"center"}); return {beforeTop:before.top,documentScroll:document.scrollingElement.scrollHeight,viewport:innerHeight}; })()');
+      await sleep(350);
+      const chartAfter=await evaluate('(() => { const r=document.getElementById("pivot-chart-container").getBoundingClientRect();return {top:r.top,bottom:r.bottom,viewport:innerHeight}; })()');
+      console.log('MOBILE_CHART_REACHABILITY',JSON.stringify({scrollInfo,chartAfter}));
+      if(chartAfter.top>=chartAfter.viewport || chartAfter.bottom<=0)errors.push('mobile chart cannot be reached by normal scrolling');
+      const chartShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+      await writeFile('artifacts/browser/mobile-chart.png',Buffer.from(chartShot.data,'base64'));
     }
     console.log(JSON.stringify({viewport:name,...result}));
   }

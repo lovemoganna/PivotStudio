@@ -63,7 +63,7 @@ export function FieldShelf({
                 <span className="text-[11px] font-bold text-[#75715E] dark:text-[#908E80] apple-font-mono">
                   ACTIVE_DATASET
                 </span>
-                <span className="text-[10px] text-[#A6E22E] apple-font-mono">
+                <span className="text-[11px] text-[#4A7500] dark:text-[#A6E22E] apple-font-mono">
                   {currentDataset.rows.length.toLocaleString()} records
                 </span>
               </div>
