@@ -1270,7 +1270,7 @@ export default function PivotWorkbench() {
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%` } : {}),
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] monokai-grid-canvas rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'min-w-0 lg:min-w-[280px] flex-1 min-h-[300px] lg:min-h-0 lg:h-full' : 'w-full flex-1 min-h-[400px] lg:min-h-0 lg:h-full'} ${isPrintingReport ? 'h-auto' : ''}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'min-w-0 lg:min-w-[280px] flex-1 min-h-[300px] lg:min-h-0 lg:h-full' : 'w-full flex-1 min-h-[400px] lg:min-h-0 lg:h-full'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
               <ChartStudio
                 chartType={chartType}
