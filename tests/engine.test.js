@@ -10,6 +10,8 @@ test('quoted CSV supports multi-line data',()=>{
 test('CSV rejects malformed and duplicate headings',()=>{
   assert.throws(()=>parseCSVRecords('a\n"broken'));
   assert.throws(()=>parseCSVTextToSheet('a,a\n1,2'));
+  assert.throws(()=>parseCSVTextToSheet('a,b\n1,2,3'), /无表头字段/);
+  assert.equal(parseCSVTextToSheet('a,b\n1').rows[0].b, '');
 });
 test('numeric aggregation ignores blank, null and invalid numbers',()=>{
   const rows=[{v:10},{v:null},{v:''},{v:'oops'},{v:20},{v:Infinity}];

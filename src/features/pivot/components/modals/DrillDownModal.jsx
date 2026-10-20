@@ -1,5 +1,7 @@
 import React from 'react';
 import { Eye, X } from 'lucide-react';
+import { encodeCsvCell } from '../../../../utils/exportMatrix';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 
 export function DrillDownModal({
   modalData,
@@ -11,6 +13,7 @@ export function DrillDownModal({
   onClose,
   showToast,
 }) {
+  const dialogRef = useDialogFocus(Boolean(modalData), onClose);
   if (!modalData) return null;
 
   const q = drillSearch.trim().toLowerCase();
@@ -27,9 +30,9 @@ export function DrillDownModal({
   const handleExportCSV = () => {
     const headers = currentDataset.fields.map((f) => f.name);
     const csvRows = [
-      headers.join(','),
+      headers.map(encodeCsvCell).join(','),
       ...modalData.records.map((r) =>
-        headers.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(',')
+        headers.map((h) => encodeCsvCell(r[h])).join(',')
       ),
     ];
     const blob = new Blob([`\uFEFF${csvRows.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
@@ -48,6 +51,7 @@ export function DrillDownModal({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label="原始交易明细下钻" tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-4xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden flex flex-col max-h-[84vh] animate-apple-modal"
       >
@@ -69,6 +73,7 @@ export function DrillDownModal({
               type="text"
               value={drillSearch}
               onChange={(e) => { setDrillSearch(e.target.value); setDrillPage(1); }}
+              aria-label="搜索下钻明细"
               placeholder="搜索明细记录..."
               className="px-2.5 py-1 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] apple-font-mono focus:outline-none focus:border-[#66D9EF]"
             />
@@ -78,7 +83,7 @@ export function DrillDownModal({
             >
               导出明细 CSV
             </button>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+            <button onClick={onClose} aria-label="关闭下钻明细" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -107,7 +112,7 @@ export function DrillDownModal({
                     </td>
                     {currentDataset.fields.map((f) => (
                       <td key={f.name} className="border border-[#D6D4C8] dark:border-[#3E3D32] px-2.5 py-1">
-                        {f.type === 'number' ? Number(rec[f.name] ?? 0).toLocaleString() : String(rec[f.name] ?? '')}
+                        {f.type === 'number' ? (rec[f.name] === null || rec[f.name] === undefined || rec[f.name] === '' ? '—' : Number.isFinite(Number(rec[f.name])) ? Number(rec[f.name]).toLocaleString() : String(rec[f.name])) : String(rec[f.name] ?? '')}
                       </td>
                     ))}
                   </tr>

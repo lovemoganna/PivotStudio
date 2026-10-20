@@ -34,7 +34,8 @@ export function parseCSVTextToSheet(csvText, sheetName = 'Sheet1') {
   if (records.length < 2) return null;
   const headers = records[0].map((h,i) => h.trim() || `字段_${i+1}`);
   if (new Set(headers).size !== headers.length) throw new Error('CSV 表头存在重复字段');
-  const rows = records.slice(1).map((cells) => {
+  const rows = records.slice(1).map((cells, rowIndex) => {
+    if (cells.length > headers.length) throw new Error(`CSV 第 ${rowIndex + 2} 行存在 ${cells.length - headers.length} 个无表头字段`);
     const row = {};
     headers.forEach((h,i) => { row[h] = cells[i] ?? ''; });
     return row;

@@ -821,6 +821,7 @@ export default function PivotWorkbench() {
       const chunkSize = 64 * 1024;
       const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
       let accumulatedText = '';
+      const decoder = new TextDecoder('utf-8', { fatal: true });
       for (let idx = 0; idx < totalChunks; idx++) {
         setUploadProgress({
           fileName: file.name,
@@ -829,9 +830,10 @@ export default function PivotWorkbench() {
           pct: Math.round(((idx + 1) / totalChunks) * 100),
         });
         const slice = file.slice(idx * chunkSize, (idx + 1) * chunkSize);
-        const chunkText = await slice.text();
-        accumulatedText += chunkText;
+        const buffer = await slice.arrayBuffer();
+        accumulatedText += decoder.decode(buffer, { stream: true });
       }
+      accumulatedText += decoder.decode();
       setUploadProgress(null);
       const sheet = parseCSVTextToSheet(accumulatedText, file.name);
       if (!sheet || sheet.rows.length === 0) {
