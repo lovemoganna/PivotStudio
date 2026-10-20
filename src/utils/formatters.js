@@ -93,7 +93,9 @@ export function formatDimensionValue(rawVal, dimCfg, fieldMeta) {
 
   if (fType === 'date' && dimCfg?.dateGranularity && dimCfg.dateGranularity !== 'raw') {
     const str = String(rawVal).trim();
-    const d = new Date(str);
+    // Calendar-only dates are local dates, not UTC midnight.
+    const calendar = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+    const d = calendar ? new Date(+calendar[1], +calendar[2] - 1, +calendar[3]) : new Date(str);
     if (!Number.isNaN(d.getTime())) {
       const yr = d.getFullYear();
       const mo = d.getMonth() + 1;

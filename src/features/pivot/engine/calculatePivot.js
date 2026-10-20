@@ -46,7 +46,8 @@ export function computeAggregation(records, fieldName, aggMethod) {
   return sum;
 }
 
-export function calculatePivot(dataset, pivotConfig) {
+export function calculatePivot(dataset, pivotConfig, onProgress) {
+  onProgress?.(5);
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const allRows = dataset?.rows || [];
   const fieldMap = new Map((dataset?.fields || []).map((f) => [f.name, f]));
@@ -124,7 +125,8 @@ export function calculatePivot(dataset, pivotConfig) {
   const showSubtotals = Boolean(pivotConfig?.showSubtotals);
 
   // 1. Filter records
-  const filteredRows = allRows.filter((record) => {
+  const filteredRows = allRows.filter((record, index) => {
+    if (index % 10000 === 0) onProgress?.(5 + Math.round(index / Math.max(1, allRows.length) * 20));
     for (let i = 0; i < filters.length; i++) {
       const f = filters[i];
       if (f.selectedValues && f.selectedValues.length > 0) {
@@ -165,6 +167,7 @@ export function calculatePivot(dataset, pivotConfig) {
   };
 
   for (let i = 0; i < filteredRows.length; i++) {
+    if (i % 10000 === 0) onProgress?.(25 + Math.round(i / Math.max(1, filteredRows.length) * 40));
     const rec = filteredRows[i];
 
     const rowPrefixes = [];
@@ -423,6 +426,7 @@ export function calculatePivot(dataset, pivotConfig) {
     });
   }
 
+  onProgress?.(70);
   const rawValueMatrix = {};
   const displayMatrix = {};
   const statsByValId = {};
@@ -432,6 +436,7 @@ export function calculatePivot(dataset, pivotConfig) {
   });
 
   for (let rIdx = 0; rIdx < tableRows.length; rIdx++) {
+    if (rIdx % 1000 === 0) onProgress?.(70 + Math.round(rIdx / Math.max(1, tableRows.length) * 25));
     const r = tableRows[rIdx];
     const lookupRowKey = r.isSubtotal ? r.rowKey.replace('__SUBTOTAL__', '') : r.rowKey;
     for (let cIdx = 0; cIdx < allColGroups.length; cIdx++) {

@@ -9,7 +9,7 @@ import {
 import * as XLSX from 'xlsx';
 import { soundEngine } from '../../services/soundEngine';
 import { formatDimensionValue } from '../../utils/formatters';
-import { parseCSVTextToSheet } from '../../utils/csvParser';
+import { startImportTask } from '../../utils/workerTask';
 import {
   exportToCSV as doExportCSV,
   exportToExcelMerged as doExportExcel,
@@ -501,99 +501,73 @@ export default function PivotWorkbench() {
     };
   }, [keynotePlaying, applyKeynoteShot]);
 
-  // Web Worker async computation pipeline for large datasets with main-thread fallback
   const workerRef = useRef(null);
+  const importTaskRef = useRef(null);
   const reqIdRef = useRef(0);
+  const [computeProgress, setComputeProgress] = useState(0);
   const [isWorkerComputing, setIsWorkerComputing] = useState(false);
   const [activeResults, setActiveResults] = useState(() => {
-    const initP = calculatePivot(null, buildDefaultPivotConfig(null));
-    const initC = buildUnifiedChartSpec(null, initP, 'bar', {
-      primaryValueId: '', secondaryValueId: '', sortMode: 'none', topN: 0,
-      missingValueMode: 'zero', lineDerivedMetric: 'none', showDataLabels: true,
-      showAvgReferenceLine: true, clickLinkMode: 'highlight', histogramBins: 0, stickyRowHeaders: true,
-    });
-    return { pivotResult: initP, unifiedChartSpec: initC };
+    const pivotResult = calculatePivot(null, buildDefaultPivotConfig(null));
+    return { pivotResult, unifiedChartSpec: buildUnifiedChartSpec(null, pivotResult, 'bar', {}) };
   });
+  const cachedDatasetRef = useRef(null);
+  const busyRef = useRef(false);
 
-  const currentDatasetRef = useRef(currentDataset);
-  const pivotConfigRef = useRef(pivotConfig);
-  const chartTypeRef = useRef(chartType);
-  const chartSpecConfigRef = useRef(chartSpecConfig);
-
-  useEffect(() => {
-    currentDatasetRef.current = currentDataset;
-    pivotConfigRef.current = pivotConfig;
-    chartTypeRef.current = chartType;
-    chartSpecConfigRef.current = chartSpecConfig;
-  }, [currentDataset, pivotConfig, chartType, chartSpecConfig]);
-
-  useEffect(() => {
-    let worker = null;
-    try {
-      worker = new Worker(new URL('./engine/pivotWorker.js', import.meta.url), { type: 'module' });
-      worker.onmessage = (e) => {
-        const { id, success, pivotResult: pRes, unifiedChartSpec: cSpec } = e.data || {};
-        if (id === reqIdRef.current) {
-          setIsWorkerComputing(false);
-          if (success && pRes && cSpec) {
-            pRes.cellRecordsMap = new Map();
-            setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
-          } else {
-            const fallbackP = calculatePivot(currentDatasetRef.current, pivotConfigRef.current);
-            const fallbackC = buildUnifiedChartSpec(currentDatasetRef.current, fallbackP, chartTypeRef.current, chartSpecConfigRef.current);
-            setActiveResults({ pivotResult: fallbackP, unifiedChartSpec: fallbackC });
-          }
-        }
-      };
-      worker.onerror = (err) => {
-        console.warn('Pivot WebWorker execution error, falling back to main-thread:', err);
-        setIsWorkerComputing(false);
-        const fallbackP = calculatePivot(currentDatasetRef.current, pivotConfigRef.current);
-        const fallbackC = buildUnifiedChartSpec(currentDatasetRef.current, fallbackP, chartTypeRef.current, chartSpecConfigRef.current);
-        setActiveResults({ pivotResult: fallbackP, unifiedChartSpec: fallbackC });
-      };
-      workerRef.current = worker;
-    } catch {
-      workerRef.current = null;
-    }
-    return () => {
-      if (worker) worker.terminate();
-    };
+  const stopCalculation = useCallback(() => {
+    ++reqIdRef.current;
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    cachedDatasetRef.current = null;
+    busyRef.current = false;
+    setIsWorkerComputing(false);
   }, []);
 
   useEffect(() => {
-    // Fast path for small datasets: calculate synchronously for immediate 0ms UI feedback
-    if (!currentDataset?.rows || currentDataset.rows.length <= 2500) {
-      setIsWorkerComputing(false);
-      const pRes = calculatePivot(currentDataset, pivotConfig);
-      const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
-      setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
-      return;
-    }
-
-    // Heavy path (>2500 rows, e.g. 100K dataset): offload to Web Worker to keep UI thread 100% smooth
-    const nextId = ++reqIdRef.current;
-    if (workerRef.current) {
-      setIsWorkerComputing(true);
-      try {
-        workerRef.current.postMessage({
-          id: nextId,
-          payload: { dataset: currentDataset, pivotConfig, chartType, chartSpecConfig },
-        });
-      } catch (postErr) {
-        console.warn('postMessage to WebWorker failed, running on main-thread:', postErr);
-        setIsWorkerComputing(false);
-        const pRes = calculatePivot(currentDataset, pivotConfig);
-        const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
-        setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+    // Superseded work is stopped immediately rather than queued behind a stale request.
+    if (busyRef.current) stopCalculation();
+    const id = ++reqIdRef.current;
+    setIsWorkerComputing(true);
+    setComputeProgress(0);
+    busyRef.current = true;
+    try {
+      if (!workerRef.current) {
+        workerRef.current = new Worker(new URL('./engine/pivotWorker.js', import.meta.url), { type: 'module' });
       }
-    } else {
-      setIsWorkerComputing(false);
-      const pRes = calculatePivot(currentDataset, pivotConfig);
-      const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
-      setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+      const worker = workerRef.current;
+      worker.onmessage = ({ data }) => {
+        if (data.id !== reqIdRef.current) return;
+        if (data.progress !== undefined) { setComputeProgress(data.progress); return; }
+        busyRef.current = false;
+        setIsWorkerComputing(false);
+        if (data.success) {
+          data.pivotResult.cellRecordsMap = new Map();
+          setActiveResults({ pivotResult: data.pivotResult, unifiedChartSpec: data.unifiedChartSpec });
+        } else showToast(`计算失败：${data.error}；请减少分组字段或拆分数据后重试`, 'error');
+      };
+      worker.onerror = () => {
+        stopCalculation();
+        showToast('本地计算进程失败，可能内存不足；请减少分组字段、关闭其他标签页后重试', 'error');
+      };
+      worker.postMessage({ id, payload: { dataset: cachedDatasetRef.current === currentDataset ? undefined : currentDataset, pivotConfig, chartType, chartSpecConfig } });
+      cachedDatasetRef.current = currentDataset;
+    } catch {
+      stopCalculation();
+      showToast('无法启动本地计算进程，请使用最新版浏览器并刷新页面重试', 'error');
     }
-  }, [currentDataset, pivotConfig, chartType, chartSpecConfig]);
+  }, [currentDataset, pivotConfig, chartType, chartSpecConfig, showToast, stopCalculation]);
+
+  useEffect(() => () => { workerRef.current?.terminate(); importTaskRef.current?.cancel(); }, []);
+
+  const runImport = useCallback(async (payload, fileName) => {
+    importTaskRef.current?.cancel();
+    const task = startImportTask(payload, (pct) => setUploadProgress({ fileName, pct, currentChunk: pct, totalChunks: 100 }));
+    importTaskRef.current = task;
+    setUploadProgress({ fileName, pct: 0, currentChunk: 0, totalChunks: 100 });
+    try { return await task.promise; }
+    finally {
+      if (importTaskRef.current === task) { importTaskRef.current = null; setUploadProgress(null); }
+    }
+  }, []);
 
   const pivotResult = activeResults.pivotResult;
   const unifiedChartSpec = activeResults.unifiedChartSpec;
@@ -935,118 +909,23 @@ export default function PivotWorkbench() {
       return;
     }
     try {
-      // 1. 如果是 Excel 工作簿文件 (.xlsx, .xls)
-      if (/\.(xlsx|xls)$/i.test(file.name)) {
-        setUploadProgress({ fileName: file.name, currentChunk: 1, totalChunks: 1, pct: 100 });
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
-        const sheets = workbook.SheetNames.map((sheetName) => {
-          const ws = workbook.Sheets[sheetName];
-          const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-          if (!rawRows || rawRows.length === 0) return null;
-          const headers = Object.keys(rawRows[0] || {});
-          const fields = headers.map((h) => {
-            let numCount = 0;
-            let dateCount = 0;
-            let boolCount = 0;
-            let nonEmpty = 0;
-            const sampleSize = Math.min(30, rawRows.length);
-            for (let i = 0; i < sampleSize; i++) {
-              const val = rawRows[i][h];
-              if (val === '' || val === null || val === undefined) continue;
-              nonEmpty++;
-              if (typeof val === 'boolean' || /^(true|false|是|否)$/i.test(String(val))) {
-                boolCount++;
-              } else if (val instanceof Date || /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(String(val))) {
-                dateCount++;
-              } else if (typeof val === 'number' || !Number.isNaN(Number(String(val).replace(/,/g, '')))) {
-                numCount++;
-              }
-            }
-            // Thresholds unified with csvParser.js (>= 0.7) for consistent type
-            // inference regardless of whether the source file is CSV or Excel.
-            let type = 'text';
-            if (nonEmpty > 0) {
-              if (boolCount / nonEmpty >= 0.7) type = 'boolean';
-              else if (dateCount / nonEmpty >= 0.7) type = 'date';
-              else if (numCount / nonEmpty >= 0.7) type = 'number';
-            }
-            return { name: h, type };
-          });
-          return {
-            name: sheetName,
-            fields,
-            rows: rawRows,
-          };
-        }).filter(Boolean);
-
-        setUploadProgress(null);
-        if (!sheets || sheets.length === 0) {
-          showToast('未能从 Excel 工作簿中解析出有效数据行', 'error');
-          return;
-        }
-        setUploadPreviewModal({
-          fileName: file.name,
-          activeSheetIdx: 0,
-          sheets,
-        });
-        if (e?.target && 'value' in e.target) e.target.value = '';
-        return;
-      }
-
-      // 2. CSV / TSV / 文本表格文件
-      const chunkSize = 64 * 1024;
-      const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
-      let accumulatedText = '';
-      const decoder = new TextDecoder('utf-8', { fatal: true });
-      for (let idx = 0; idx < totalChunks; idx++) {
-        setUploadProgress({
-          fileName: file.name,
-          currentChunk: idx + 1,
-          totalChunks,
-          pct: Math.round(((idx + 1) / totalChunks) * 100),
-        });
-        const slice = file.slice(idx * chunkSize, (idx + 1) * chunkSize);
-        const buffer = await slice.arrayBuffer();
-        accumulatedText += decoder.decode(buffer, { stream: true });
-      }
-      accumulatedText += decoder.decode();
-      setUploadProgress(null);
-      const sheet = parseCSVTextToSheet(accumulatedText, file.name);
-      if (!sheet || sheet.rows.length === 0) {
-        showToast('未能从文件中解析出有效数据行', 'error');
-        return;
-      }
-      setUploadPreviewModal({
-        fileName: file.name,
-        activeSheetIdx: 0,
-        sheets: [sheet],
-      });
-    } catch {
-      setUploadProgress(null);
-      showToast('文件读取失败，请上传标准 CSV 或 Excel 表格文件', 'error');
+      if (!/\.(csv|tsv|txt|xlsx|xls)$/i.test(file.name)) throw new Error('不支持此文件格式，请另存为 CSV、TSV 或 Excel 后重试');
+      const sheets = await runImport({ file }, file.name);
+      setUploadPreviewModal({ fileName: file.name, activeSheetIdx: 0, sheets });
+    } catch (error) {
+      if (error.name !== 'AbortError') showToast(`导入失败：${error.message}`, 'error');
     }
     if (e?.target && 'value' in e.target) e.target.value = '';
-  }, [showToast]);
+  }, [showToast, runImport]);
 
-  const confirmUploadDataset = useCallback((autoInitPivot = true) => {
+  const confirmUploadDataset = useCallback(async (autoInitPivot = true) => {
     if (!uploadPreviewModal) return;
     const activeIdx = uploadPreviewModal.activeSheetIdx ?? 0;
     const sheet = uploadPreviewModal.sheets[activeIdx] || uploadPreviewModal.sheets[0];
     const sheetSuffix = uploadPreviewModal.sheets.length > 1 ? ` - ${sheet.name || ('Sheet ' + (activeIdx + 1))}` : '';
-    const normalizedRows = sheet.rows.map((r) => {
-      const next = { ...r };
-      sheet.fields.forEach((f) => {
-        if (f.type === 'number') {
-          const raw = String(r[f.name] ?? '').trim();
-          const n = raw ? Number(raw.replace(/,/g, '')) : null;
-          next[f.name] = n === null || Number.isFinite(n) ? n : null;
-        } else if (f.type === 'boolean') {
-          next[f.name] = /^(true|1|是|yes)$/i.test(String(r[f.name] ?? '').trim());
-        }
-      });
-      return next;
-    });
+    let normalizedRows;
+    try { normalizedRows = (await runImport({ sheets: [sheet], normalize: true }, uploadPreviewModal.fileName))[0].rows; }
+    catch (error) { if (error.name !== 'AbortError') showToast(error.message, 'error'); return; }
 
     const newDs = {
       id: `ds_upload_${Date.now()}`,
@@ -1067,7 +946,7 @@ export default function PivotWorkbench() {
     setUploadPreviewModal(null);
     soundEngine.playTransitionChord();
     showToast(`成功导入数据集「${newDs.name}」`);
-  }, [uploadPreviewModal, showToast]);
+  }, [uploadPreviewModal, showToast, runImport]);
 
   const generate100kDataset = useCallback((count = 100000) => {
     const regions = ['华东', '华南', '华北', '西南', '华中', '西北'];
@@ -1162,23 +1041,13 @@ export default function PivotWorkbench() {
     unloadDataset(activeDatasetId);
   }, [activeDatasetId, unloadDataset]);
 
-  const handlePasteText = useCallback((text) => {
-    if (!text || !text.trim()) return;
+  const handlePasteText = useCallback(async (text) => {
+    if (!text?.trim()) return;
     try {
-      const sheet = parseCSVTextToSheet(text, '剪贴板数据');
-      if (!sheet || sheet.rows.length === 0) {
-        showToast('未能从粘贴内容中识别出有效表格行', 'error');
-        return;
-      }
-      setUploadPreviewModal({
-        fileName: 'Clipboard_Data.csv',
-        activeSheetIdx: 0,
-        sheets: [sheet],
-      });
-    } catch (err) {
-      showToast(`解析失败: ${err.message}`, 'error');
-    }
-  }, [showToast]);
+      const sheets = await runImport({ text }, 'Clipboard_Data.csv');
+      setUploadPreviewModal({ fileName: 'Clipboard_Data.csv', activeSheetIdx: 0, sheets });
+    } catch (error) { if (error.name !== 'AbortError') showToast(`解析失败：${error.message}`, 'error'); }
+  }, [showToast, runImport]);
 
   const exportToCSV = useCallback(() => {
     doExportCSV(currentDataset, pivotResult, showToast);
@@ -1362,6 +1231,15 @@ export default function PivotWorkbench() {
           toastMessage={toastMessage}
           setToastMessage={setToastMessage}
         />
+
+        {(uploadProgress || isWorkerComputing) && (
+          <div className="flex items-center gap-3 px-4 py-2 shrink-0" role="status">
+            <span>{uploadProgress ? `正在导入 ${uploadProgress.fileName}` : '正在计算'}</span>
+            <progress aria-label={uploadProgress ? '导入进度' : '计算进度'} max="100" value={uploadProgress?.pct ?? computeProgress} className="flex-1" />
+            <span>{uploadProgress?.pct ?? computeProgress}%</span>
+            <button onClick={() => { if (uploadProgress) importTaskRef.current?.cancel(); else stopCalculation(); showToast('已取消，保留上次计算结果'); }}>取消</button>
+          </div>
+        )}
 
         {/* Workspace Dataset Tab Strip */}
         <DatasetTabStrip
