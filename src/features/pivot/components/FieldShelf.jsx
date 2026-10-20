@@ -339,6 +339,7 @@ export function FieldShelf({
                     <Search className="w-3 h-3 text-[#75715E] absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
+                      aria-label="搜索可用字段名称"
                       value={fieldSearchQuery}
                       onChange={(e) => setFieldSearchQuery(e.target.value)}
                       placeholder="搜索字段名称..."

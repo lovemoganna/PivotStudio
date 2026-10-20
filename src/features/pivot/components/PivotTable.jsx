@@ -482,6 +482,7 @@ export function PivotTable({
             <Filter className="w-3 h-3 text-[#A6E22E]" />
             <span className="hidden sm:inline">切片器:</span>
             <select
+              aria-label="选择字段切片器"
               value={activeSlicerField}
               onChange={(e) => {
                 soundEngine?.playClick?.(500);
@@ -670,6 +671,7 @@ export function PivotTable({
           <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="开启或隐藏行分组多级小计 (Subtotals)">
             <input
               type="checkbox"
+              aria-label="显示行分组多级小计"
               checked={Boolean(pivotConfig?.showSubtotals)}
               onChange={(e) => {
                 soundEngine?.playClick?.(520);
@@ -685,6 +687,7 @@ export function PivotTable({
           <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="标注每列最高值(●)与负数语义色">
             <input
               type="checkbox"
+              aria-label="标注每列最高值与极值锚点"
               checked={Boolean(tableSettings.showExtremes)}
               onChange={(e) => setTableSettings((p) => ({ ...p, showExtremes: e.target.checked }))}
               className="rounded accent-[#A6E22E]"
@@ -692,9 +695,10 @@ export function PivotTable({
             <span>极值锚点</span>
           </label>
 
-          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]">
+          <label className="inline-flex items-center gap-1 text-[10px] text-[#75715E] dark:text-[#908E80] cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title="开启或隐藏隔行斑马纹背景">
             <input
               type="checkbox"
+              aria-label="启用表格隔行斑马纹背景"
               checked={Boolean(tableSettings.showZebra)}
               onChange={(e) => setTableSettings((p) => ({ ...p, showZebra: e.target.checked }))}
               className="rounded accent-[#A6E22E]"
