@@ -976,7 +976,11 @@ export default function PivotWorkbench() {
     }
   }, [showToast, currentDataset]);
 
+  const initialShareCheckedRef = useRef(false);
   useEffect(() => {
+    // URL share configuration is an initial-load import, not a persistent state override.
+    if (initialShareCheckedRef.current) return;
+    initialShareCheckedRef.current = true;
     const token = new URLSearchParams(window.location.search).get('share_token');
     if (token) applyShareTokenPayload(token);
   }, [applyShareTokenPayload]);

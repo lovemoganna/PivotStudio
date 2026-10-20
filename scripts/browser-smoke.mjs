@@ -165,6 +165,15 @@ try{
     await writeFile('artifacts/browser/real-csv-import.png',Buffer.from(importShot.data,'base64'));
     console.log('REAL_CSV_IMPORT',JSON.stringify({datasetVisible:importedState.text,pivotHasExpectedTotal:importedState.total.includes('300')}));
   }
+  // Read-only preview must not expose active editing affordances.
+  assert.equal(await clickText('工作区 ·'),true,'workspace access');
+  await sleep(130);
+  assert.equal(await clickText('访客预览账户'),true,'read-only role demo');
+  await evaluate('document.querySelector("button[aria-label=\\\"关闭工作区\\\"]")?.click()');
+  await sleep(170);
+  const readonly=await evaluate('({uploadDisabled:!!document.querySelector("aside input[type=file]")?.disabled,quickFields:[...document.querySelectorAll(".ps-field-action")].every(b=>b.disabled),count:document.querySelectorAll(".ps-field-action").length})');
+  if(!readonly.uploadDisabled || !readonly.quickFields || readonly.count===0)errors.push('read-only control affordances are not disabled: '+JSON.stringify(readonly));
+  console.log('READONLY_AFFORDANCE',JSON.stringify(readonly));
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){
