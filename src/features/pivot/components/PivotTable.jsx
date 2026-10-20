@@ -30,6 +30,7 @@ export function PivotTable({
   hoveredCellTelemetry,
   setHoveredCellTelemetry,
   handleChartPointClick,
+  requestDrillDown,
   setDrillSearch,
   setDrillPage,
   setDrillDownModal,
@@ -1169,21 +1170,18 @@ export function PivotTable({
                       const openCellDetail = () => {
                         soundEngine?.playTransitionChord();
                         const effectiveRowKey = row.isSubtotal ? row.rowKey.replace('__SUBTOTAL__', '') : row.rowKey;
-                        const rawRecs = (pivotResult?.cellRecordsMap?.get ? pivotResult.cellRecordsMap.get(`${effectiveRowKey}@@${cGroup.key}`) : null) || [];
-                        setDrillSearch?.('');
-                        setDrillPage?.(1);
-                        setDrillDownModal?.({
+                        requestDrillDown?.(effectiveRowKey, cGroup.key, {
                           rowLabel: row.label,
                           colLabel: cGroup.isTotal ? '总计' : cGroup.pathLabels.join(' / '),
-                          valLabel: `${vCfg.field} (${vCfg.agg})`,
-                          valueFormatted: formattedText,
-                          records: rawRecs,
+                          valLabel: `${vCfg.field} (${vCfg.agg})`, valueFormatted: formattedText,
                         });
                       };
 
                       return (
                         <td
                           role="cell"
+                          data-testid="pivot-value-cell"
+                          data-row-key={row.rowKey}
                           key={cellKey}
                           tabIndex={isKeyboardDrill ? 0 : undefined}
                           aria-label={`${row.label}，${cGroup.isTotal ? '行总计' : cGroup.pathLabels.join(' / ')}，${vCfg.field}(${vCfg.agg})：${formattedText}${isKeyboardDrill ? '。双击查看明细，Alt+单击复制' : ''}`}

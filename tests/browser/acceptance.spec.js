@@ -68,3 +68,35 @@ test('R3 four-zone drag/drop, aggregations, history and 100k refresh budget',asy
   await page.getByRole('button',{name:'重做',exact:true}).click();
   await expect(page.getByLabel('快捷表计算',{exact:true}).first()).toHaveValue('pct_grand');
 });
+
+test('R4 chart drilldown, table highlight and four chart types',async({page})=>{
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto('/');
+  await upload(page,'区域,金额\n'+Array.from({length:120},(_,i)=>`${i<80?'华东':'华南'},${i}`).join('\n'));
+  await expect(preview(page)).toBeVisible();
+  await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
+  await expect(page.locator('#pivot-main-html-table')).toBeVisible();
+  await ready(page);
+  const cell=page.getByTestId('pivot-value-cell').first();
+  await cell.click({position:{x:10,y:10}});
+  await expect(page.locator('#pivot-chart-container path[stroke="#FD971F"]').first()).toBeVisible();
+  await expect(page.getByRole('dialog',{name:'原始交易明细下钻',exact:true})).toHaveCount(0);
+  await page.locator('#pivot-chart-container .recharts-bar-rectangle').first().click();
+  const detail=page.getByRole('dialog',{name:'原始交易明细下钻',exact:true});
+  await expect(detail).toContainText('80 条记录');
+  await expect(detail.locator('tbody tr')).toHaveCount(50);
+  await page.keyboard.press('Escape');
+  await cell.dblclick({position:{x:10,y:10}});
+  await expect(detail).toContainText('80 条记录');
+  await page.keyboard.press('Escape');
+  for(const type of ['line','pie','heatmap','bar']) {
+    await page.getByLabel('选择图表类型',{exact:true}).selectOption(type);
+    await ready(page);
+    await expect(page.locator('#pivot-chart-container svg').first()).toBeVisible();
+    if(type==='heatmap') {
+      await page.locator('svg[data-chart-svg] [role=button]').first().click();
+      await expect(detail).toContainText('80 条记录');
+      await page.keyboard.press('Escape');
+    }
+  }
+});

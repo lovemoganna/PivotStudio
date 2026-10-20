@@ -8,7 +8,7 @@ import {
   LabelList, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend
 } from 'recharts';
 import { CHART_COLORS, VISUAL_CHART_TYPES, KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
-import { UnifiedFormatter, formatAxisTickLabel } from '../../../utils/formatters';
+import { UnifiedFormatter, formatAxisTickLabel, formatCellNumber } from '../../../utils/formatters';
 import { UnifiedChartTooltip } from './UnifiedChartTooltip';
 import { renderSmartPieLabel, renderSmartBarLabel } from './SmartChartLabels';
 
@@ -45,7 +45,7 @@ export function ChartStudio({
   const axisMaxLabels = compactAxis ? 4 : 8;
   const categoryTickInterval = Math.max(0, Math.ceil((unifiedChartSpec.items?.length || 0) / axisMaxLabels) - 1);
   return (
-    <div className="flex-1 flex flex-col h-full min-h-0">
+    <div data-highlighted-row={highlightedRowKey || ''} className="flex-1 flex flex-col h-full min-h-0">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
         <div>
           <h3 className="text-xs font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2 apple-font-mono">
@@ -81,7 +81,7 @@ export function ChartStudio({
             }}
             className={`px-2.5 py-1 rounded-md text-[10px] font-semibold border transition ${chartSpecConfig.clickLinkMode === 'filter' ? 'bg-[#FD971F]/15 text-[#FD971F] border-[#FD971F]/40' : 'bg-[#EFECE1] dark:bg-[#1E1F1C] text-[#75715E] dark:text-[#908E80] border-[#D6D4C8] dark:border-[#3E3D32]'}`}
           >
-            联动: {chartSpecConfig.clickLinkMode === 'filter' ? '全局筛选' : '高亮定位'}
+            联动: {chartSpecConfig.clickLinkMode === 'filter' ? '全局筛选' : '明细下钻'}
           </button>
           <button
             onClick={() => {
@@ -276,6 +276,35 @@ export function ChartStudio({
           <div className="text-center text-xs text-[#75715E] dark:text-[#908E80] py-12 apple-font-mono">
             /* 当前筛选条件下暂无可展示的数据行 */
           </div>
+        ) : chartType === 'heatmap' ? (
+          <div className="w-full h-full overflow-auto">
+            {(() => {
+              const rows = pivotResult.tableRows.filter((row) => !row.isTotal && !row.isSubtotal);
+              const shownRows = rows.length ? rows.slice(0,200) : pivotResult.tableRows;
+              const groups = pivotResult.leafColGroups.length ? pivotResult.leafColGroups : pivotResult.allColGroups;
+              const metric = unifiedChartSpec.primaryValCfg;
+              const magnitude = Math.max(1,...shownRows.flatMap((row) => groups.map((group) => Math.abs(pivotResult.displayMatrix[`${row.rowKey}@@${group.key}@@${metric.id}`]?.display || 0))));
+              return <>
+                {rows.length > 200 && <p>热力图展示前 200 个分组，请筛选或减少分组以查看其他数据。</p>}
+                <svg data-chart-svg="true" role="img" aria-label="矩阵热力图" width={Math.max(500,160+groups.length*110)} height={Math.max(180,60+shownRows.length*38)}>
+                  {groups.map((group,index) => <text key={group.key} x={165+index*110} y={22} fill={darkMode?'#F8F8F2':'#272822'} fontSize="11">{group.pathLabels?.join(' / ') || '总计'}</text>)}
+                  {shownRows.map((row,r) => <g key={row.rowKey}>
+                    <text x="4" y={58+r*38} fill={darkMode?'#F8F8F2':'#272822'} fontSize="11">{row.label.slice(0,18)}</text>
+                    {groups.map((group,c) => {
+                      const cell = pivotResult.displayMatrix[`${row.rowKey}@@${group.key}@@${metric.id}`];
+                      const formatted = formatCellNumber(cell,metric);
+                      return <g key={group.key} role="button" tabIndex={0} aria-label={`${row.label} / ${group.label}: ${formatted}`} data-highlighted={highlightedRowKey===row.rowKey}
+                        onClick={() => handleChartPointClick({ rowKey:row.rowKey, colKey:group.key, name:row.label, formattedValue:formatted })}
+                        onKeyDown={(event) => { if(event.key==='Enter'||event.key===' ') {event.preventDefault();handleChartPointClick({rowKey:row.rowKey,colKey:group.key,name:row.label});} }}>
+                        <rect x={160+c*110} y={34+r*38} width="106" height="34" rx="3" fill={cell?.display<0?'#F92672':'#66D9EF'} fillOpacity={0.2+0.8*Math.abs(cell?.display||0)/magnitude} stroke={highlightedRowKey===row.rowKey?'#FD971F':'transparent'} strokeWidth="3" />
+                        <text x={168+c*110} y={56+r*38} fontSize="11" fill={darkMode?'#F8F8F2':'#272822'}>{formatted}</text>
+                      </g>;
+                    })}
+                  </g>)}
+                </svg>
+              </>;
+            })()}
+          </div>
         ) : chartType === 'funnel' ? (
           <div className="w-full h-full flex flex-col justify-center gap-2 py-2 px-3 overflow-y-auto">
             {unifiedChartSpec.funnelItems.map((fItem, fIdx) => {
@@ -290,7 +319,7 @@ export function ChartStudio({
                     soundEngine?.playClick(520);
                     handleChartPointClick(fItem);
                   }}
-                  onDoubleClick={() => setDrillDownModal?.({ rowLabel: fItem.name, colLabel: '漏斗转化阶段', valLabel: unifiedChartSpec.primarySeriesKey, valueFormatted: `${fItem.formattedValue} (${fItem.conversionFormatted})`, records: fItem.matchedRows || [] })}
+                  onDoubleClick={() => handleChartPointClick(fItem)}
                   className="flex items-center gap-3 cursor-pointer group"
                 >
                   <div className="w-24 text-right text-[11px] font-medium truncate shrink-0 flex flex-col items-end">
@@ -360,8 +389,8 @@ export function ChartStudio({
                     dataKey={sm.key}
                     stroke={sm.color}
                     strokeWidth={2.6}
-                    dot={{ r: 4, strokeWidth: 2, fill: darkMode ? '#272822' : '#FFFDF7', cursor: 'pointer' }}
-                    activeDot={{ r: 6, onClick: (_, payload) => handleChartPointClick(payload?.payload || payload) }}
+                    dot={({cx,cy,payload}) => <circle cx={cx} cy={cy} r={highlightedRowKey===payload?.rowKey?7:4} fill={highlightedRowKey===payload?.rowKey?'#FD971F':sm.color} data-highlighted={highlightedRowKey===payload?.rowKey} onClick={() => handleChartPointClick({...payload,colKey:sm.colKey})} />}
+                    activeDot={{ r: 6, onClick: (_, payload) => handleChartPointClick({...payload?.payload,colKey:sm.colKey}) }}
                   >
                     {chartSpecConfig.showDataLabels && idx === 0 && unifiedChartSpec.items.length <= 12 && (
                       <LabelList dataKey="_compactPrimaryLabel" position="top" style={{ fontSize: 9, fontWeight: 600, fill: darkMode ? '#F8F8F2' : '#272822' }} />
@@ -674,8 +703,9 @@ export function ChartStudio({
                       fill={`url(#${sm.gradId})`}
                       radius={isStacked ? [0, 0, 0, 0] : chartType === 'horizontal_bar' ? [0, 5, 5, 0] : [5, 5, 0, 0]}
                       cursor="pointer"
-                      onClick={(d) => handleChartPointClick(d)}
+                      onClick={(d) => handleChartPointClick({ ...d, colKey: sm.colKey })}
                     >
+                      {unifiedChartSpec.items.map((item) => <Cell key={item.rowKey} data-highlighted={highlightedRowKey===item.rowKey} stroke={highlightedRowKey===item.rowKey?'#FD971F':'none'} strokeWidth={3} fillOpacity={highlightedRowKey && highlightedRowKey!==item.rowKey?0.35:1} />)}
                       {chartSpecConfig.showDataLabels && (idx === 0 || !isStacked) && unifiedChartSpec.seriesMetaList.length <= 3 && (
                         <LabelList
                           dataKey={idx === 0 && !isStacked ? '_compactPrimaryLabel' : sm.key}
@@ -702,7 +732,7 @@ export function ChartStudio({
             className="text-[#0088A3] dark:text-[#66D9EF] font-semibold px-2 py-1 rounded border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]"
           >分析视角 {showLensPresets ? '收起' : '展开'}</button>
           <span className="text-[#75715E] dark:text-[#B8B5A8] hidden sm:inline">
-            双击单元格或图表数据点查看原始明细
+            单击图表查看明细；单击表格高亮，双击查看明细
           </span>
         </div>
         {showLensPresets && <div id="pivot-lens-presets" className="flex items-center gap-1.5 overflow-x-auto pb-1">

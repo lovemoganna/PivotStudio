@@ -33,3 +33,7 @@ Results are added per requirement; untested browsers are not claimed as verified
 ### R3
 
 Retained existing four zones, all requested aggregations, percentage modes and history. Fixed cross-zone movement to be one history transaction. Chromium 100k-row CSV: real drag/drop into all four zones; count/avg/distinct/sum refresh 411/444/323/334ms from browser action through completed Worker rendering; percentage Undo/Redo passed. These measurements use a low-cardinality fixture and are not a guarantee for every matrix cardinality or phone.
+
+### R4
+
+Added actual SVG matrix heatmap (not just table conditional formatting). Chart click drills into retained Worker buckets; table click highlights bar/line/pie/heatmap and double-click requests complete details. Preserved optional global-filter interaction. Chromium passed four type switches and 80-record drilldown with 50-row pagination (full 80 retained). Heatmap explicitly labels its 200-group display limit. Corrected audit: baseline had table heat coloring, not a separate heatmap chart.

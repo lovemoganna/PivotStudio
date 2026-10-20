@@ -535,6 +535,10 @@ export default function PivotWorkbench() {
       }
       const worker = workerRef.current;
       worker.onmessage = ({ data }) => {
+        if (data.kind === 'drill') {
+          if (data.generation === reqIdRef.current) setDrillDownModal({ ...data.metadata, records: data.records });
+          return;
+        }
         if (data.id !== reqIdRef.current) return;
         if (data.progress !== undefined) { setComputeProgress(data.progress); return; }
         busyRef.current = false;
@@ -840,12 +844,22 @@ export default function PivotWorkbench() {
     });
   }, [isReadOnly]);
 
+  const requestDrillDown = useCallback((rowKey, colKey = '__GRAND_TOTAL_COL__', metadata = {}) => {
+    if (busyRef.current || !workerRef.current) { showToast('请等待本次计算完成后再查看明细', 'error'); return; }
+    setDrillSearch(''); setDrillPage(1);
+    workerRef.current.postMessage({ kind: 'drill', generation: reqIdRef.current, rowKey: rowKey.replace('__SUBTOTAL__', ''), colKey, metadata });
+  }, [showToast]);
+
+  const handleTablePointClick = useCallback((point) => {
+    setHighlightedRowKey(point.rowKey);
+  }, []);
+
   const handleChartPointClick = useCallback((pointData) => {
     const now = Date.now();
     if (now - lastChartClickRef.current < 90) return;
     lastChartClickRef.current = now;
     const rk = pointData?.rowKey || pointData?.payload?.rowKey;
-    if (!rk || rk === '__GRAND_TOTAL_ROW__') return;
+    if (!rk) return;
 
     if (chartSpecConfig.clickLinkMode === 'filter') {
       const activeDim = pivotConfig.rows.length > 0 ? pivotConfig.rows[0] : (pivotConfig.columns.length > 0 ? pivotConfig.columns[0] : null);
@@ -881,21 +895,14 @@ export default function PivotWorkbench() {
         };
       });
     } else {
-      setHighlightedRowKey((prev) => {
-        const nextKey = prev === rk ? null : rk;
-        if (nextKey && tableContainerRef.current) {
-          const rowIndex = pivotResult.tableRows.findIndex((r) => r.rowKey === nextKey);
-          if (rowIndex >= 0) {
-            tableContainerRef.current.scrollTo({
-              top: Math.max(0, rowIndex * 35 - 72),
-              behavior: 'smooth',
-            });
-          }
-        }
-        return nextKey;
+      setHighlightedRowKey(rk);
+      const onlyColumns = !pivotResult.rowConfigs.length && pivotResult.colConfigs.length;
+      requestDrillDown(onlyColumns ? '__GRAND_TOTAL_ROW__' : rk, onlyColumns ? rk : pointData.colKey || '__GRAND_TOTAL_COL__', {
+        rowLabel: pointData.name || rk, colLabel: pointData.colKey || '总计',
+        valLabel: unifiedChartSpec.primarySeriesKey, valueFormatted: pointData.formattedValue || '',
       });
     }
-  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotResult.tableRows, showToast]);
+  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotConfig.columns, pivotResult, showToast, requestDrillDown, unifiedChartSpec.primarySeriesKey]);
 
   const handleFileUpload = useCallback(async (e) => {
     let file = null;
@@ -1422,7 +1429,8 @@ export default function PivotWorkbench() {
                 highlightedRowKey={highlightedRowKey}
                 hoveredCellTelemetry={hoveredCellTelemetry}
                 setHoveredCellTelemetry={setHoveredCellTelemetry}
-                handleChartPointClick={handleChartPointClick}
+                handleChartPointClick={handleTablePointClick}
+                requestDrillDown={requestDrillDown}
                 setDrillSearch={setDrillSearch}
                 setDrillPage={setDrillPage}
                 setDrillDownModal={setDrillDownModal}

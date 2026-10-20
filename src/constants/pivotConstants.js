@@ -59,6 +59,7 @@ export const DATE_GRANULARITIES = [
 export const CHART_COLORS = ['#F92672', '#A6E22E', '#66D9EF', '#FD971F', '#AE81FF', '#E6DB74', '#FF6188', '#78DCE8'];
 
 export const VISUAL_CHART_TYPES = [
+  { value: 'heatmap', label: '矩阵热力图 (Heatmap)', short: '热力图', category: 'heatmap' },
   { value: 'bar', label: '分组柱状图 (Bar)', short: '柱状', category: 'bar' },
   { value: 'horizontal_bar', label: '横向条形图 (Horizontal)', short: '条形', category: 'bar' },
   { value: 'stacked_bar', label: '堆叠柱状图 (Stacked)', short: '堆叠柱', category: 'bar' },
