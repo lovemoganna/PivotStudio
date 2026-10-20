@@ -70,6 +70,10 @@ try{
     if(!result.tableVisible||!result.chartVisible||!result.datasetLabel)errors.push(name+': missing work surface '+JSON.stringify(result));
     const img=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     await writeFile('artifacts/browser/'+name+'.png',Buffer.from(img.data,'base64'));
+    if(name==='mobile') {
+      const full=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+      await writeFile('artifacts/browser/mobile-full.png',Buffer.from(full.data,'base64'));
+    }
     console.log(JSON.stringify({viewport:name,...result}));
   }
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
@@ -103,11 +107,23 @@ try{
   await sleep(160);
   const sql=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
   if(!sql.includes('尚未实现'))errors.push('SQL integration misrepresented');
-  await evaluate('document.querySelector("button[aria-label=\\"关闭数据源\\"]")?.click()');
+  const modalFocused=await evaluate('document.querySelector("[role=dialog]")?.contains(document.activeElement) ?? false');
+  if(!modalFocused)errors.push('SQL dialog failed initial keyboard focus');
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
+  await sleep(160);
+  if(await evaluate('!!document.querySelector("[role=dialog]")'))errors.push('Escape did not close SQL dialog');
   assert.equal(await clickText('GSheet'),true);
   await sleep(160);
   const gsheet=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
   if(!gsheet.includes('公开'))errors.push('GSheet access limits missing');
+  await evaluate('document.querySelector("button[aria-label=\\"关闭数据源\\"]")?.click()');
+  const themeBefore=await evaluate('!!document.querySelector(".dark")');
+  await evaluate('document.querySelector("button[aria-label=\\"切换主题\\"]")?.click()');
+  await sleep(250);
+  const themeAfter=await evaluate('!!document.querySelector(".dark")');
+  if(themeBefore===themeAfter)errors.push('theme toggle not responding');
+  const light=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+  await writeFile('artifacts/browser/desktop-light.png',Buffer.from(light.data,'base64'));
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){
