@@ -37,7 +37,7 @@ export function buildPivotExportRows(pivotResult, { formatted = false } = {}) {
 /** Defend spreadsheet users from untrusted leading-formula strings. */
 export function encodeCsvCell(value, numericDisplay = false) {
   const raw = value === null || value === undefined ? '' : String(value);
-  const safeNumeric = numericDisplay && /^[-+]?(?:[¥$€£元])?\d[\d,]*(?:\.\d+)?(?:%| [A-Za-z%°\u4e00-\u9fff]+)?$/.test(raw);
+  const safeNumeric = numericDisplay && (raw === '-' || /^[-+]?(?:[¥$€£元])?\d[\d,]*(?:\.\d+)?(?:%| [A-Za-z%°\u4e00-\u9fff]+)?$/.test(raw));
   const safe = !safeNumeric && typeof value === 'string' && /^\s*[=+\-@\t\r]/.test(raw) ? "'" + raw : raw;
   return '"' + safe.replace(/"/g, '""') + '"';
 }

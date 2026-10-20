@@ -23,6 +23,7 @@ test('CSV protects untrusted formula strings and preserves numbers',()=>{
   assert.equal(encodeCsvCell('-4'),'"\'-4"');
   assert.equal(encodeCsvCell(-4),'"-4"');
   assert.equal(encodeCsvCell('a,b'),'"a,b"');
+  assert.equal(encodeCsvCell('-',true),'"-"');
 });
 
 test('formatted export matches table decimals currency percentages and baseline',async()=>{
