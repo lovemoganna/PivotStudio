@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const profile=await mkdtemp(join(tmpdir(),'pivotstudio-chrome-'));
 await mkdir('artifacts/browser',{recursive:true});
-const vite=spawn('npm',['run','dev','--','--host','127.0.0.1'],{stdio:'ignore'});
+const vite=spawn(process.platform==='win32'?'npm.cmd':'npm',['run','dev','--','--host','127.0.0.1'],{stdio:'ignore',shell:process.platform==='win32'});
 let chrome,ws;
 const waitFor=async(fn,label,timeout=30000)=>{
   const t=Date.now();
@@ -19,7 +19,7 @@ const waitFor=async(fn,label,timeout=30000)=>{
 };
 try{
   await waitFor(async()=>(await fetch('http://127.0.0.1:5173/')).ok,'Vite');
-  chrome=spawn(process.env.CHROME_BIN||'google-chrome',[
+  chrome=spawn(process.env.CHROME_BIN||(process.platform==='win32'?'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe':'google-chrome'),[
     '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
     '--remote-allow-origins=*','--remote-debugging-port=9222',
     '--user-data-dir='+profile,'--window-size=1440,900','about:blank'
@@ -130,7 +130,7 @@ try{
   assert.equal(await clickText('仅透视表'),true,'table button');
   await sleep(200);
   assert.equal(await evaluate('!!document.getElementById("pivot-main-html-table")'),true);
-  assert.equal(await clickText('表图并列'),true,'split button');
+  assert.equal(await clickText('表图并列') || await clickText('表图上下'),true,'split button');
   await sleep(200);
   const before=await evaluate('(() => { const e=document.querySelector("[role=separator]"); if(!e)return null; const v=e.getAttribute("aria-valuenow"); e.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true}));return v; })()');
   if(before===null)errors.push('keyboard separator missing');

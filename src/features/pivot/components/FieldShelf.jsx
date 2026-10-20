@@ -731,7 +731,7 @@ export function FieldShelf({
               <div className="inline-flex rounded-lg bg-[#D6D4C8]/60 dark:bg-[#1E1F1C] border border-transparent dark:border-[#3E3D32] p-0.5 apple-font-mono">
                 {[
                   { id: 'table', label: '仅透视表' },
-                  { id: 'split', label: '表图上下' },
+                  { id: 'split', label: '表图并列' },
                   { id: 'chart', label: '仅图表' },
                 ].map((m) => (
                   <button

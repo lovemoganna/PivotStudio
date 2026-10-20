@@ -1539,9 +1539,9 @@ export default function PivotWorkbench() {
               aria-valuenow={splitRatioPct}
               tabIndex={0}
               onKeyDown={(e) => {
-                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
                   e.preventDefault();
-                  setSplitRatioPct((pct) => Math.max(20, Math.min(80, pct + (e.key === 'ArrowDown' ? 5 : -5))));
+                  setSplitRatioPct((pct) => Math.max(20, Math.min(80, pct + (e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 5 : -5))));
                 } else if (e.key === 'Home') {
                   e.preventDefault();
                   setSplitRatioPct(20);
