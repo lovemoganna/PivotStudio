@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
-import { parseCSVTextToSheet } from '../../../utils/csvParser.js';
+import { parseCSVTextToSheet, decodeCSVBuffer } from '../../../utils/csvParser.js';
 
-self.onmessage = async ({ data: { file, text, sheets, normalize } }) => {
+self.onmessage = async ({ data: { file, text, sheets, normalize, options = {} } }) => {
   const progress = (pct) => self.postMessage({ progress: pct });
   try {
     progress(5);
@@ -30,17 +30,19 @@ self.onmessage = async ({ data: { file, text, sheets, normalize } }) => {
       result = workbook.SheetNames.map((name, index) => {
         progress(35 + Math.round(index / workbook.SheetNames.length * 50));
         const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[name]);
-        return parseCSVTextToSheet(csv, name);
+        return parseCSVTextToSheet(csv, name, { delimiter: ',', header: 'yes' });
       }).filter(Boolean);
     } else {
       let content = text;
+      let encoding = options.encoding || 'utf-8';
       if (file) {
         const buffer = await file.arrayBuffer();
         progress(30);
-        content = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+        const decoded = decodeCSVBuffer(buffer, options.encoding || 'auto');
+        content = decoded.text; encoding = decoded.encoding;
       }
       progress(50);
-      result = [parseCSVTextToSheet(content, file?.name || '剪贴板数据')].filter(Boolean);
+      result = [parseCSVTextToSheet(content, file?.name || '剪贴板数据', { ...options, encoding })].filter(Boolean);
     }
     if (!result.length) throw new Error('没有可用数据行，请添加表头和至少一行数据后重试');
     progress(100);

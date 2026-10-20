@@ -7,6 +7,8 @@ export function UploadModal({
   setUploadPreviewModal,
   confirmUploadDataset,
   onClose,
+  onReparse,
+  isImporting,
 }) {
   const dialogRef = useDialogFocus(Boolean(uploadPreviewModal), onClose);
   if (!uploadPreviewModal) return null;
@@ -61,6 +63,23 @@ export function UploadModal({
         )}
 
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {activeSheet.importMeta && !/\.(xlsx|xls)$/i.test(uploadPreviewModal.fileName) && (
+            <div className="flex flex-wrap gap-3 items-center">
+              <span>自动识别：{activeSheet.importMeta.encoding.toUpperCase()} · {activeSheet.importMeta.hasHeader ? '有表头' : '无表头'}（识别有误可修改）</span>
+              {[
+                ['encoding', '编码', [['auto','自动'],['utf-8','UTF-8'],['gbk','GBK']]],
+                ['delimiter', '分隔符', [['auto','自动'],[',','逗号'],[';','分号'],['\t','制表符'],['|','竖线']]],
+                ['header', '表头', [['auto','自动'],['yes','有表头'],['no','无表头']]],
+              ].map(([key,label,choices]) => (
+                <label key={key}>{label} <select aria-label={label} disabled={isImporting} value={uploadPreviewModal.options?.[key] || 'auto'}
+                  onChange={(event) => onReparse?.({ ...uploadPreviewModal.options, [key]: event.target.value })}
+                  className="bg-[#FFFDF7] dark:bg-[#272822] border rounded p-1">
+                  {choices.map(([value,text]) => <option key={value} value={value}>{text}</option>)}
+                </select></label>
+              ))}
+            </div>
+          )}
+
           <div>
             <div className="text-[11px] font-bold apple-font-mono mb-2 text-[#66D9EF]">1. 字段类型自动推断与手动校准</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -123,12 +142,14 @@ export function UploadModal({
 
         <div className="px-5 py-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] flex flex-wrap items-center justify-end gap-2">
           <button
+            disabled={isImporting}
             onClick={() => confirmUploadDataset(false)}
             className="px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] text-xs font-semibold apple-font-mono hover:border-[#66D9EF] transition"
           >
             仅导入数据（清空当前透视）
           </button>
           <button
+            disabled={isImporting}
             onClick={() => confirmUploadDataset(true)}
             className="px-4 py-1.5 rounded-lg bg-[#F92672] text-[#F8F8F2] text-xs font-bold apple-font-mono hover:bg-[#FF3B85] transition"
           >

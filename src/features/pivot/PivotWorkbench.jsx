@@ -6,7 +6,6 @@ import {
   VISUAL_CHART_TYPES,
   buildDefaultPivotConfig
 } from '../../constants/pivotConstants';
-import * as XLSX from 'xlsx';
 import { soundEngine } from '../../services/soundEngine';
 import { formatDimensionValue } from '../../utils/formatters';
 import { startImportTask } from '../../utils/workerTask';
@@ -503,6 +502,7 @@ export default function PivotWorkbench() {
 
   const workerRef = useRef(null);
   const importTaskRef = useRef(null);
+  const importSourceRef = useRef(null);
   const reqIdRef = useRef(0);
   const [computeProgress, setComputeProgress] = useState(0);
   const [isWorkerComputing, setIsWorkerComputing] = useState(false);
@@ -910,6 +910,7 @@ export default function PivotWorkbench() {
     }
     try {
       if (!/\.(csv|tsv|txt|xlsx|xls)$/i.test(file.name)) throw new Error('不支持此文件格式，请另存为 CSV、TSV 或 Excel 后重试');
+      importSourceRef.current = { file };
       const sheets = await runImport({ file }, file.name);
       setUploadPreviewModal({ fileName: file.name, activeSheetIdx: 0, sheets });
     } catch (error) {
@@ -917,6 +918,14 @@ export default function PivotWorkbench() {
     }
     if (e?.target && 'value' in e.target) e.target.value = '';
   }, [showToast, runImport]);
+
+  const reparseImport = useCallback(async (options) => {
+    if (!importSourceRef.current || importTaskRef.current) return;
+    try {
+      const sheets = await runImport({ ...importSourceRef.current, options }, uploadPreviewModal.fileName);
+      setUploadPreviewModal((prev) => ({ ...prev, sheets, options }));
+    } catch (error) { if (error.name !== 'AbortError') showToast(error.message, 'error'); }
+  }, [runImport, showToast, uploadPreviewModal]);
 
   const confirmUploadDataset = useCallback(async (autoInitPivot = true) => {
     if (!uploadPreviewModal) return;
@@ -1044,6 +1053,7 @@ export default function PivotWorkbench() {
   const handlePasteText = useCallback(async (text) => {
     if (!text?.trim()) return;
     try {
+      importSourceRef.current = { text };
       const sheets = await runImport({ text }, 'Clipboard_Data.csv');
       setUploadPreviewModal({ fileName: 'Clipboard_Data.csv', activeSheetIdx: 0, sheets });
     } catch (error) { if (error.name !== 'AbortError') showToast(`解析失败：${error.message}`, 'error'); }
@@ -1526,6 +1536,8 @@ export default function PivotWorkbench() {
         />
 
         <UploadModal
+          onReparse={reparseImport}
+          isImporting={Boolean(uploadProgress)}
           uploadPreviewModal={uploadPreviewModal}
           setUploadPreviewModal={setUploadPreviewModal}
           confirmUploadDataset={confirmUploadDataset}

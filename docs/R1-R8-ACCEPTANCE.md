@@ -25,3 +25,7 @@ Results are added per requirement; untested browsers are not claimed as verified
 - Actual Chromium 153: 500,000-row CSV preview → confirmed import → pivot; 10,624ms wall time, 267 UI timer ticks, theme toggle and table verified; import cancellation passed.
 - Actual Worker module in Node bridge: 500k totals correct, 103 progress events, termination tested. No main-thread fallback on worker failure.
 - Fixed pre-existing calendar-date UTC parsing error exposed by baseline tests outside UTC+8.
+
+### R2
+
+27 Node tests passed. Chromium end-to-end verified GBK Chinese, semicolon detection, header override with row-count changes, field override, TSV and exactly 20 preview rows. Numeric/date/boolean inference and leading-zero identifier preservation tested. Ambiguous all-text headers default to present; users can correct explicitly. Excel header handling remains explicit. Added `@playwright/test` as development-only dependency for reproducible browser acceptance (zero new production dependencies).
