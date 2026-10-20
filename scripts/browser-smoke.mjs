@@ -220,6 +220,18 @@ try{
     if(csvRows.length !== exported.length)errors.push('CSV/XLSX pivot row counts disagree: '+csvRows.length+'/'+exported.length);
     console.log('REAL_CSV_EXPORT',JSON.stringify({bytes:csvContent.length,rows:csvRows.length}));
   }
+
+  // Browser performance evidence: actual 100k synthetic records and responsiveness.
+  await evaluate('(() => { window.__psLongTasks = []; if(typeof PerformanceObserver === "function"){try{const obs=new PerformanceObserver(list=>window.__psLongTasks.push(...list.getEntries().map(e=>e.duration)));obs.observe({entryTypes:["longtask"]});window.__psLongTaskObserver=obs;}catch{}}return true;})()');
+  const largeStart=Date.now();
+  assert.equal(await clickText('100K压测'),true,'open synthetic data benchmark');
+  await sleep(120);
+  assert.equal(await clickText('生成 100,000 行合成数据'),true,'generate 100k local rows');
+  await waitFor(async()=>await evaluate('document.body.textContent.includes("100,000 / 100,000 行") && document.body.textContent.includes("本地合成压测数据")'),'100k-row real browser analysis',45000);
+  const largeWallMs=Date.now()-largeStart;
+  const perf=await evaluate('({rows:document.body.textContent.includes("100,000 / 100,000 行"), chartVisible:!!document.getElementById("pivot-chart-container") && document.getElementById("pivot-chart-container").getBoundingClientRect().height>0, longTasks:window.__psLongTasks?.length||0,maxLongTaskMs:Math.round(Math.max(0,...(window.__psLongTasks||[]))),totalLongTaskMs:Math.round((window.__psLongTasks||[]).reduce((a,b)=>a+b,0))})');
+  if(!perf.rows || !perf.chartVisible)errors.push('100k browser workbench not ready');
+  console.log('BROWSER_100K_MEASUREMENT',JSON.stringify({wallTimeMs:largeWallMs,...perf,note:'Synthetic records, CI Chromium only; no performance SLA'}));
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){
