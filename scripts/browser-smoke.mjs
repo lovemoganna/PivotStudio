@@ -201,7 +201,7 @@ try{
     await waitFor(async()=>await evaluate('!!document.querySelector("[role=dialog][aria-label=\\\"文件数据预览与类型校准\\\"]")'),'import file preview',12000);
     const preview=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
     if(!preview.includes('33 行')||!preview.includes('12 个字段'))errors.push('import preview did not show 33 records and 12 fields');
-    assert.equal(await clickText('确认导入并自动初始化透视'),true,'confirm real CSV import');
+    assert.equal(await clickText('确认导入'),true,'confirm real CSV import');
     await waitFor(async()=>await evaluate('document.body.textContent.includes("test_retail_sales.csv (33行)") && document.body.textContent.includes("数据来源：本地导入文件")'),'imported dataset state',12000);
     const imported=await evaluate('({name:document.querySelector("select")?.selectedOptions?.[0]?.textContent,table:document.querySelectorAll("#pivot-main-html-table tbody tr").length})');
     console.log('REAL_CSV_IMPORT',JSON.stringify(imported));
