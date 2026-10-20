@@ -78,6 +78,9 @@ try{
       const chartAfter=await evaluate('(() => { const r=document.getElementById("pivot-chart-container").getBoundingClientRect();return {top:r.top,bottom:r.bottom,viewport:innerHeight}; })()');
       console.log('MOBILE_CHART_REACHABILITY',JSON.stringify({scrollInfo,chartAfter}));
       if(chartAfter.top>=chartAfter.viewport || chartAfter.bottom<=0)errors.push('mobile chart cannot be reached by normal scrolling');
+      const tickCount=await evaluate('document.querySelectorAll("#pivot-chart-container .recharts-xAxis .recharts-cartesian-axis-tick").length');
+      console.log('MOBILE_AXIS_TICK_COUNT',tickCount);
+      if(tickCount<1 || tickCount>5)errors.push('mobile category labels exceed density budget: '+tickCount);
       const chartShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
       await writeFile('artifacts/browser/mobile-chart.png',Buffer.from(chartShot.data,'base64'));
     }

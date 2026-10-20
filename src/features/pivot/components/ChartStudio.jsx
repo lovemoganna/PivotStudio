@@ -33,6 +33,15 @@ export function ChartStudio({
   keynoteShotIdx,
   soundEngine,
 }) {
+  const [compactAxis, setCompactAxis] = React.useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  React.useEffect(() => {
+    const measure = () => setCompactAxis(window.innerWidth < 640);
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  // Display a representative subset of categorical axis ticks without dropping data points.
+  const axisMaxLabels = compactAxis ? 4 : 8;
+  const categoryTickInterval = Math.max(0, Math.ceil((unifiedChartSpec.items?.length || 0) / axisMaxLabels) - 1);
   return (
     <div className="flex-1 flex flex-col h-full min-h-0">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
@@ -303,12 +312,12 @@ export function ChartStudio({
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
                 <XAxis
                   dataKey="name"
-                  interval={0}
+                  interval={categoryTickInterval}
                   angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                   textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                   height={unifiedChartSpec.items.length > 5 ? 56 : 28}
                   tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }}
-                  tickFormatter={(v) => formatAxisTickLabel(v, 14)}
+                  tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                 />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                 {(unifiedChartSpec.hasDualAxis || unifiedChartSpec.derivedSeriesKey) && (
@@ -372,12 +381,12 @@ export function ChartStudio({
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
                 <XAxis
                   dataKey="name"
-                  interval={0}
+                  interval={categoryTickInterval}
                   angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                   textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                   height={unifiedChartSpec.items.length > 5 ? 56 : 28}
                   tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }}
-                  tickFormatter={(v) => formatAxisTickLabel(v, 14)}
+                  tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                 />
                 <YAxis
                   domain={chartType === 'pct_area' ? [0, 100] : ['auto', 'auto']}
@@ -404,12 +413,12 @@ export function ChartStudio({
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
                 <XAxis
                   dataKey="name"
-                  interval={0}
+                  interval={categoryTickInterval}
                   angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                   textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                   height={unifiedChartSpec.items.length > 5 ? 56 : 28}
                   tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }}
-                  tickFormatter={(v) => formatAxisTickLabel(v, 14)}
+                  tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                 />
                 <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#F92672' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#A6E22E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true })} />
@@ -611,19 +620,19 @@ export function ChartStudio({
                       reversed={true}
                       width={110}
                       tick={{ fontSize: 9.5, fill: darkMode ? '#F8F8F2' : '#272822' }}
-                      tickFormatter={(v) => formatAxisTickLabel(v, 14)}
+                      tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                     />
                   </>
                 ) : (
                   <>
                     <XAxis
                       dataKey="name"
-                      interval={0}
+                      interval={categoryTickInterval}
                       angle={unifiedChartSpec.items.length > 5 ? -25 : 0}
                       textAnchor={unifiedChartSpec.items.length > 5 ? 'end' : 'middle'}
                       height={unifiedChartSpec.items.length > 5 ? 56 : 28}
                       tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }}
-                      tickFormatter={(v) => formatAxisTickLabel(v, 14)}
+                      tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                     />
                     <YAxis
                       domain={chartType === 'pct_stacked_bar' ? [0, 100] : ['auto', 'auto']}
