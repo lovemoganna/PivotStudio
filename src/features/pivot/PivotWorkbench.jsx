@@ -1276,7 +1276,7 @@ export default function PivotWorkbench() {
           ref={splitContainerRef}
           
           aria-busy={isPivotCalculating}
-          className={`flex-1 flex flex-col lg:flex-row min-h-[680px] md:min-h-[720px] lg:min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col h-auto' : 'overflow-hidden'}`}
+          className={`relative flex-1 flex flex-col lg:flex-row min-h-[680px] md:min-h-[720px] lg:min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col h-auto' : 'overflow-hidden'}`}
         >
           {isPivotCalculating && (
             <div className="absolute inset-x-4 top-4 z-20 rounded-lg border border-[#0088A3]/35 bg-[#FFFDF7]/95 dark:bg-[#272822]/95 px-4 py-3 shadow-md flex items-center gap-3" role="status">
