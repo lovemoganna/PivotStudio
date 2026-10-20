@@ -1,5 +1,7 @@
 import React from 'react';
 import { FolderOpen, X } from 'lucide-react';
+import { validateWorkspaceSnapshot } from '../../../../utils/viewValidation';
+import { useDialogFocus } from '../../../../utils/useDialogFocus';
 
 export function WorkspaceModal({
   isOpen,
@@ -32,6 +34,7 @@ export function WorkspaceModal({
   copyTextToClipboard,
   showToast,
 }) {
+  const dialogRef = useDialogFocus(isOpen,onClose);
   if (!isOpen) return null;
 
   return (
@@ -40,6 +43,7 @@ export function WorkspaceModal({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4"
     >
       <div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label="工作区和视图分享" tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden flex flex-col max-h-[86vh] animate-apple-modal"
       >
@@ -48,7 +52,7 @@ export function WorkspaceModal({
             <FolderOpen className="w-4 h-4 text-[#F92672]" />
             <span>WORKSPACE_HUB // 本机快照与配置分享</span>
           </h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label="关闭工作区" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -117,13 +121,17 @@ export function WorkspaceModal({
                   <div className="min-w-0">
                     <div className="font-bold truncate">{ws.name}</div>
                     <div className="text-[9px] text-[#75715E]">{ws.updatedAt} · {ws.author}</div>
+                    {validateWorkspaceSnapshot(ws,datasets) && <div className="text-[10px] text-[#C86400] dark:text-[#FD971F] mt-1">原始数据缺失或字段不匹配，请重新导入</div>}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => {
-                        if (ws.datasetId && datasets.some((d) => d.id === ws.datasetId)) {
-                          setActiveDatasetId(ws.datasetId);
+                        const error = validateWorkspaceSnapshot(ws,datasets);
+                        if (error) {
+                          showToast?.(error, 'error');
+                          return;
                         }
+                        setActiveDatasetId(ws.datasetId);
                         setViewMode(ws.viewMode || 'split');
                         setChartType(ws.chartType || 'bar');
                         if (ws.condFormat) setCondFormat(ws.condFormat);
@@ -133,7 +141,9 @@ export function WorkspaceModal({
                         onClose();
                         showToast?.(`已加载工作区「${ws.name}」`);
                       }}
-                      className="px-2.5 py-1 rounded bg-[#66D9EF]/20 text-[#0088A3] dark:text-[#66D9EF] text-[10px] font-bold"
+                      disabled={Boolean(validateWorkspaceSnapshot(ws,datasets))}
+                      title={validateWorkspaceSnapshot(ws,datasets) || '恢复分析配置'}
+                      className="px-2.5 py-1 rounded bg-[#66D9EF]/20 text-[#0088A3] dark:text-[#66D9EF] text-[10px] font-bold disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       载入
                     </button>
@@ -153,12 +163,13 @@ export function WorkspaceModal({
 
           <div className="space-y-2 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
             <div className="font-bold text-[#66D9EF]">分享视图配置（不包含数据）</div>
-            <p className="text-[10px] leading-relaxed text-[#75715E] dark:text-[#908E80]">配置链接使用 Base64，不是加密或鉴权。同一数据集才可正确还原。工作区快照保存在本机浏览器，不同步到服务器。</p>
+            <p className="text-[10px] leading-relaxed text-[#75715E] dark:text-[#908E80]">配置链接使用 Base64，不是加密或鉴权。只有原始数据集和字段均匹配才可还原；配置链接不包含数据。工作区快照仅保存在本机浏览器。</p>
             {(() => {
               const tokenPayload = btoa(
                 unescape(
                   encodeURIComponent(
                     JSON.stringify({
+                      datasetId: activeDatasetId,
                       vm: viewMode,
                       ct: chartType,
                       cf: condFormat,

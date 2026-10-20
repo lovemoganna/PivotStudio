@@ -39,6 +39,7 @@ export function HeaderBar({
   setToastMessage,
 }) {
   const activeKeynoteShot = KEYNOTE_STORYBOARD_SHOTS[keynoteShotIdx] || KEYNOTE_STORYBOARD_SHOTS[0];
+  const [showDemoTools, setShowDemoTools] = React.useState(false);
 
   return (
     <>
@@ -68,7 +69,7 @@ export function HeaderBar({
               </h1>
               <button
                 onClick={() => { soundEngine?.playClick(620); setShowAwardBadgeModal(true); }}
-                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition"
+                className="hidden sm:inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition"
                 title="查看当前项目内部设计规范（不代表获奖）"
               >
                 <Layers3 className="w-3 h-3 text-[#FD971F]" />
@@ -98,6 +99,17 @@ export function HeaderBar({
             <kbd className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#272822] text-[9px] font-semibold text-[#F92672] border border-[#D6D4C8] dark:border-[#49483E] apple-font-mono">⌘K</kbd>
           </button>
 
+          <button
+            aria-expanded={showDemoTools}
+            aria-controls="pivot-demo-actions"
+            onClick={() => setShowDemoTools((visible) => !visible)}
+            title="显示或隐藏演示模式与内置校验工具"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[11px] font-medium text-[#75715E] dark:text-[#B8B5A8] hover:border-[#66D9EF] apple-transition"
+          >
+            <span>演示与检查</span><span aria-hidden="true">{showDemoTools ? '−' : '+'}</span>
+          </button>
+          {showDemoTools && (
+            <div id="pivot-demo-actions" className="flex items-center gap-2">
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5">
             <button
               onClick={() => {
@@ -142,13 +154,17 @@ export function HeaderBar({
             <span>内置校验({liveEngineTestResults.filter((r) => r.passed).length}/5)</span>
           </button>
 
+
+            </div>
+          )}
+
           <button onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] hover:border-[#FD971F] text-[#272822] dark:text-[#F8F8F2] border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] font-medium apple-transition">
             <Palette className="w-3.5 h-3.5 text-[#FD971F]" />
             <span>格式与数值</span>
           </button>
 
           <div className="flex items-center bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-0.5 apple-font-mono">
-            <button onClick={exportToExcelMerged} title="导出真正的 Excel 工作簿 (.xlsx)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLSX</span></button>
+            <button onClick={exportToExcelMerged} title="导出完整可计算的 Excel 工作簿（数值单元格，平铺表头）" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#A6E22E] font-semibold transition"><span>.XLSX</span></button>
             <button onClick={exportToCSV} title="导出 CSV 数据表 (.csv)" className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-[#3E3D32]/20 dark:hover:bg-[#3E3D32] text-[10px] text-[#272822] dark:text-[#66D9EF] font-semibold transition"><span>.CSV</span></button>
             <button
               disabled={viewMode === 'table'}

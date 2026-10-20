@@ -69,6 +69,7 @@ export function FieldShelf({
               </div>
 
               <select
+                aria-label="选择当前分析数据集"
                 value={activeDatasetId}
                 onChange={(e) => {
                   soundEngine?.playClick(540);
@@ -118,7 +119,7 @@ export function FieldShelf({
                   className="px-2.5 py-2 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
                   title="无需本地文件，一键体验步骤5文件解析与字段类型推断预览弹窗"
                 >
-                  模拟预览
+                  样例预览
                 </button>
               </div>
 
@@ -139,9 +140,9 @@ export function FieldShelf({
                   <Globe className="w-3 h-3 text-[#66D9EF]" />
                   <span>GSheet</span>
                 </button>
-                <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[10px] font-medium flex items-center justify-center gap-1 transition">
+                <button title="SQL 数据库连接尚未实现" onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[10px] font-medium flex items-center justify-center gap-1 transition">
                   <Server className="w-3 h-3 text-[#FD971F]" />
-                  <span>SQL代理</span>
+                  <span className="whitespace-nowrap">SQL未接入</span>
                 </button>
                 <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }} className="px-2 py-1.5 rounded-lg bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 hover:bg-[#AE81FF]/25 text-[10px] font-semibold flex items-center justify-center gap-1 transition">
                   <Zap className="w-3 h-3 text-[#AE81FF]" />
@@ -187,10 +188,10 @@ export function FieldShelf({
                         <span className="font-medium text-xs truncate">{field.name}</span>
                       </div>
                       <div className="flex items-center gap-0.5 opacity-85 group-hover:opacity-100 shrink-0 apple-font-mono">
-                        <button onClick={() => addFieldToZone('rows', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] text-[9px] font-semibold transition">+行</button>
-                        <button onClick={() => addFieldToZone('columns', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+列</button>
-                        <button onClick={() => addFieldToZone('values', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+值</button>
-                        <button onClick={() => addFieldToZone('filters', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+筛</button>
+                        <button disabled={isReadOnly} aria-label={`将${field.name}添加到行维度`} title={isReadOnly ? '只读预览模式不可修改分析配置' : `添加到行维度`} onClick={() => addFieldToZone('rows', field.name)} className="ps-field-action disabled:opacity-35 disabled:cursor-not-allowed px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] text-[9px] font-semibold transition">+行</button>
+                        <button disabled={isReadOnly} aria-label={`将${field.name}添加到列维度`} title={isReadOnly ? '只读预览模式不可修改分析配置' : `添加到列维度`} onClick={() => addFieldToZone('columns', field.name)} className="ps-field-action disabled:opacity-35 disabled:cursor-not-allowed px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+列</button>
+                        <button disabled={isReadOnly} aria-label={`将${field.name}添加到值指标`} title={isReadOnly ? '只读预览模式不可修改分析配置' : `添加到值指标`} onClick={() => addFieldToZone('values', field.name)} className="ps-field-action disabled:opacity-35 disabled:cursor-not-allowed px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+值</button>
+                        <button disabled={isReadOnly} aria-label={`将${field.name}添加到筛选器`} title={isReadOnly ? '只读预览模式不可修改分析配置' : `添加到筛选器`} onClick={() => addFieldToZone('filters', field.name)} className="ps-field-action disabled:opacity-35 disabled:cursor-not-allowed px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+筛</button>
                       </div>
                     </div>
                   );

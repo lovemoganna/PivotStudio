@@ -9,6 +9,8 @@ import * as XLSX from 'xlsx';
 import { soundEngine } from '../../services/soundEngine';
 import { formatDimensionValue } from '../../utils/formatters';
 import { parseCSVTextToSheet } from '../../utils/csvParser';
+import { validateViewConfig } from '../../utils/viewValidation';
+import { readTextBlob } from '../../utils/readTextBlob';
 import {
   exportToCSV as doExportCSV,
   exportToExcelMerged as doExportExcel,
@@ -40,7 +42,7 @@ import { CommandPaletteModal } from './components/modals/CommandPaletteModal';
 
 export default function PivotWorkbench() {
   const [darkMode, setDarkMode] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const [keynotePlaying, setKeynotePlaying] = useState(false);
   const [keynoteShotIdx, setKeynoteShotIdx] = useState(0);
   const [cinemaTheaterMode, setCinemaTheaterMode] = useState(false);
@@ -817,21 +819,10 @@ export default function PivotWorkbench() {
         return;
       }
 
-      // 2. CSV / TSV / 文本表格文件
-      const chunkSize = 64 * 1024;
-      const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
-      let accumulatedText = '';
-      for (let idx = 0; idx < totalChunks; idx++) {
-        setUploadProgress({
-          fileName: file.name,
-          currentChunk: idx + 1,
-          totalChunks,
-          pct: Math.round(((idx + 1) / totalChunks) * 100),
-        });
-        const slice = file.slice(idx * chunkSize, (idx + 1) * chunkSize);
-        const chunkText = await slice.text();
-        accumulatedText += chunkText;
-      }
+      // Decode multi-byte UTF-8 characters safely across chunk boundaries.
+      const accumulatedText = await readTextBlob(file, 64*1024, (progress) => {
+        setUploadProgress({fileName:file.name,...progress});
+      });
       setUploadProgress(null);
       const sheet = parseCSVTextToSheet(accumulatedText, file.name);
       if (!sheet || sheet.rows.length === 0) {
@@ -843,9 +834,9 @@ export default function PivotWorkbench() {
         activeSheetIdx: 0,
         sheets: [sheet],
       });
-    } catch {
+    } catch (error) {
       setUploadProgress(null);
-      showToast('文件读取失败，请上传标准 CSV 或 Excel 表格文件', 'error');
+      showToast(`文件导入失败：${error.message}。请检查 UTF-8 CSV 或 Excel 文件格式`, 'error');
     }
     e.target.value = '';
   }, [showToast]);
@@ -861,7 +852,8 @@ export default function PivotWorkbench() {
           const n = raw ? Number(raw.replace(/,/g, '')) : null;
           next[f.name] = n === null || Number.isFinite(n) ? n : null;
         } else if (f.type === 'boolean') {
-          next[f.name] = /^(true|1|是|yes)$/i.test(String(r[f.name] ?? '').trim());
+          const raw = String(r[f.name] ?? '').trim();
+          next[f.name] = raw ? /^(true|1|是|yes)$/i.test(raw) : null;
         }
       });
       return next;
@@ -966,7 +958,12 @@ export default function PivotWorkbench() {
     try {
       const tokenPart = rawInput.includes('share_token=') ? rawInput.split('share_token=')[1].split('&')[0] : rawInput.trim();
       const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(tokenPart)))));
-      if (decoded.fullConfig) setPivotConfig(decoded.fullConfig);
+      const error = validateViewConfig(decoded, currentDataset);
+      if (error) {
+        showToast(error, 'error');
+        return false;
+      }
+      setPivotConfig(decoded.fullConfig);
       if (decoded.cf) setCondFormat(decoded.cf);
       if (decoded.csc) setChartSpecConfig((p) => ({ ...p, ...decoded.csc }));
       if (decoded.vm) setViewMode(decoded.vm);
@@ -977,9 +974,13 @@ export default function PivotWorkbench() {
       showToast('Share Token 格式无效，无法解析还原', 'error');
       return false;
     }
-  }, [showToast]);
+  }, [showToast, currentDataset]);
 
+  const initialShareCheckedRef = useRef(false);
   useEffect(() => {
+    // URL share configuration is an initial-load import, not a persistent state override.
+    if (initialShareCheckedRef.current) return;
+    initialShareCheckedRef.current = true;
     const token = new URLSearchParams(window.location.search).get('share_token');
     if (token) applyShareTokenPayload(token);
   }, [applyShareTokenPayload]);
@@ -1289,6 +1290,7 @@ export default function PivotWorkbench() {
                 setDrillPage={setDrillPage}
                 applyKeynoteShot={applyKeynoteShot}
                 keynoteShotIdx={keynoteShotIdx}
+                showPresentationPresets={keynotePlaying || cinemaTheaterMode}
                 soundEngine={soundEngine}
               />
             </div>

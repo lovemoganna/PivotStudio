@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import { CHART_COLORS, VISUAL_CHART_TYPES, KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
 import { UnifiedFormatter, formatAxisTickLabel } from '../../../utils/formatters';
+import { ZERO_ANCHORED_DOMAIN } from '../../../utils/axisDomain';
 import { UnifiedChartTooltip } from './UnifiedChartTooltip';
 import { renderSmartPieLabel, renderSmartBarLabel } from './SmartChartLabels';
 
@@ -31,6 +32,7 @@ export function ChartStudio({
   setDrillPage,
   applyKeynoteShot,
   keynoteShotIdx,
+  showPresentationPresets = false,
   soundEngine,
 }) {
   const [compactAxis, setCompactAxis] = React.useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
@@ -39,6 +41,23 @@ export function ChartStudio({
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, []);
+  const chartCanvasRef = React.useRef(null);
+  const [chartCanvasWidth, setChartCanvasWidth] = React.useState(0);
+  React.useEffect(() => {
+    const el = chartCanvasRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const update = () => setChartCanvasWidth(Math.max(0, el.clientWidth));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // Show numeric bar labels only where each group has enough horizontal space.
+  // Values remain accessible through tooltips regardless of available label space.
+  const barColumns = Math.max(1, unifiedChartSpec.items?.length || 0);
+  const barSeries = Math.max(1, unifiedChartSpec.seriesMetaList?.length || 0);
+  const labelsFit = chartType === 'horizontal_bar' || chartCanvasWidth / (barColumns * barSeries) >= 80;
+  const showBarDataLabels = chartSpecConfig.showDataLabels && labelsFit;
   // Display a representative subset of categorical axis ticks without dropping data points.
   const axisMaxLabels = compactAxis ? 4 : 8;
   const categoryTickInterval = Math.max(0, Math.ceil((unifiedChartSpec.items?.length || 0) / axisMaxLabels) - 1);
@@ -46,7 +65,7 @@ export function ChartStudio({
     <div className="flex-1 flex flex-col h-full min-h-0">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
         <div>
-          <h3 className="text-xs font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2 apple-font-mono">
+          <h3 className="text-sm font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2 apple-font-mono">
             <BarChart3 className="w-4 h-4 text-[#F92672]" />
             <span>{VISUAL_CHART_TYPES.find((t) => t.value === chartType)?.label || chartType}</span>
             {unifiedChartSpec.derivedSeriesKey && (
@@ -55,7 +74,7 @@ export function ChartStudio({
               </span>
             )}
           </h3>
-          <p className="text-[10px] text-[#75715E] dark:text-[#908E80] mt-0.5 apple-font-mono flex items-center gap-2">
+          <p className="text-[11px] text-[#75715E] dark:text-[#B8B5A8] mt-0.5 apple-font-mono flex items-center gap-2">
             <span>dim: {unifiedChartSpec.xDimensionLabel} · series: {unifiedChartSpec.primarySeriesKey}</span>
             {!unifiedChartSpec.canStack && (chartType === 'stacked_bar' || chartType === 'stacked_area') && (
               <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-[#FD971F] border border-[#FD971F]/30 text-[9px]">
@@ -227,24 +246,8 @@ export function ChartStudio({
         </div>
       </div>
 
-      {/* Quick Tactile Chart Switcher Pill Strip */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-2 mb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 apple-font-mono shrink-0">
-        {VISUAL_CHART_TYPES.map((ct) => (
-          <button
-            key={ct.value}
-            onClick={() => {
-              soundEngine?.playClick(540);
-              setChartType(ct.value);
-            }}
-            className={`px-2 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap transition ${chartType === ct.value ? 'bg-[#F92672] text-[#F8F8F2]' : 'bg-[#EFECE1]/70 dark:bg-[#1E1F1C] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
-          >
-            {ct.short}
-          </button>
-        ))}
-      </div>
-
       {/* Main Chart Canvas */}
-      <div className="flex-1 w-full h-full min-h-[260px] flex items-center justify-center overflow-hidden">
+      <div ref={chartCanvasRef} title={!labelsFit && chartSpecConfig.showDataLabels ? '当前空间不足，已隐藏数据标签；悬停柱体可查看完整数值' : undefined} className="flex-1 w-full h-full min-h-[260px] flex items-center justify-center overflow-hidden">
         {!unifiedChartSpec.hasValues ? (
           <div className="flex flex-col items-center justify-center p-8 text-center apple-font-mono animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-[#FD971F]/10 border border-[#FD971F]/30 flex items-center justify-center mb-3 text-[#FD971F] shadow-sm">
@@ -566,7 +569,7 @@ export function ChartStudio({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
                 <XAxis dataKey="name" tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} />
+                <YAxis allowDecimals={false} domain={[0,'dataMax']} tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} />
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                 <Bar
@@ -613,7 +616,7 @@ export function ChartStudio({
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
                 {chartType === 'horizontal_bar' ? (
                   <>
-                    <XAxis type="number" tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
+                    <XAxis type="number" domain={ZERO_ANCHORED_DOMAIN} tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                     <YAxis
                       type="category"
                       dataKey="name"
@@ -635,7 +638,7 @@ export function ChartStudio({
                       tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                     />
                     <YAxis
-                      domain={chartType === 'pct_stacked_bar' ? [0, 100] : ['auto', 'auto']}
+                      domain={chartType === 'pct_stacked_bar' ? [0, 100] : ZERO_ANCHORED_DOMAIN}
                       tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }}
                       tickFormatter={(v) => (chartType === 'pct_stacked_bar' ? `${v}%` : UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true }))}
                     />
@@ -664,7 +667,7 @@ export function ChartStudio({
                       cursor="pointer"
                       onClick={(d) => handleChartPointClick(d)}
                     >
-                      {chartSpecConfig.showDataLabels && (idx === 0 || !isStacked) && unifiedChartSpec.seriesMetaList.length <= 3 && (
+                      {showBarDataLabels && (idx === 0 || !isStacked) && unifiedChartSpec.seriesMetaList.length <= 3 && (
                         <LabelList
                           dataKey={idx === 0 && !isStacked ? '_compactPrimaryLabel' : sm.key}
                           content={(p) => renderSmartBarLabel(p, darkMode, chartType === 'horizontal_bar')}
@@ -679,7 +682,8 @@ export function ChartStudio({
         )}
       </div>
 
-      {/* Quick Analytical Lens Strip inside Chart Footer */}
+      {/* Presentation presets are optional, never part of the primary analysis canvas. */}
+      {showPresentationPresets && (
       <div className="mt-2 pt-2 border-t border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 flex flex-wrap items-center justify-between gap-2 text-[10px] apple-font-mono shrink-0">
         <div className="flex items-center gap-1.5 overflow-x-auto">
           <span className="text-[#75715E] dark:text-[#908E80] shrink-0">LENS_PRESETS:</span>
@@ -697,6 +701,7 @@ export function ChartStudio({
           双击任意单元格或柱体可下钻原始明细
         </span>
       </div>
+      )}
     </div>
   );
 }

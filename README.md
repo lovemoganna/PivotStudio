@@ -16,7 +16,7 @@ npm run build
 - Browser-side CSV/XLSX import, pivot calculations, filtering, grouping, multiple chart types and exports.
 - Internal retail sample and 100k synthetic dataset are **clearly labelled demos**.
 - Public Google Sheets import requests the actual selected sheet CSV. It works only when the browser is allowed to fetch the publicly accessible CSV; permission and CORS errors are shown, never silently replaced with mock rows.
-- Workbook export writes a genuine XLSX file; general charts export SVG, funnel charts PNG; PDF is available using the browser print dialog.
+- Workbook export writes a genuine XLSX with **numeric cells and complete rows** (flat headers); general charts export SVG, funnel charts PNG; PDF is available using the browser print dialog.
 - Workspace view snapshots persist locally in the same browser. Share links only carry unencrypted Base64 **configuration** and do not include dataset content, access control, or cloud storage.
 
 ## Not implemented

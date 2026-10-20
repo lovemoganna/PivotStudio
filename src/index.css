@@ -93,3 +93,6 @@
 @media (prefers-reduced-motion: reduce) {
   .apple-transition { transition-duration: 0.01ms !important; }
 }
+
+/* Touch-friendly field actions without forcing wider desktop data columns. */
+@media (pointer: coarse) { .ps-field-action { min-height: 30px; min-width: 32px; } }
