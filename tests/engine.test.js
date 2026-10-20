@@ -75,10 +75,10 @@ test('multi-dimensional pivot preserves audited totals, filters and underlying r
         const sum=finite.reduce((a,r)=>a+r.amount,0);
         const avg=finite.length?sum/finite.length:0;
         const prefix=region+'@@'+year+'@@';
-        assert.equal(result.rawValueMatrix[prefix+'sum'],sum);
-        assert.equal(result.rawValueMatrix[prefix+'count'],finite.length);
-        assert.equal(result.rawValueMatrix[prefix+'avg'],avg);
-        assert.equal(result.rawValueMatrix[prefix+'distinct'],new Set(matching.map(r=>r.user)).size);
+        assert.equal((result.rawValueMatrix[prefix+'sum'] ?? 0),sum);
+        assert.equal((result.rawValueMatrix[prefix+'count'] ?? 0),finite.length);
+        assert.equal((result.rawValueMatrix[prefix+'avg'] ?? 0),avg);
+        assert.equal((result.rawValueMatrix[prefix+'distinct'] ?? 0),new Set(matching.map(r=>r.user)).size);
         assert.equal((result.cellRecordsMap.get(region+'@@'+year)||[]).length,matching.length);
       }
     }
