@@ -1,6 +1,7 @@
 // Chromium integration smoke: DOM interactions and responsive geometry.
 import {spawn} from 'node:child_process';
-import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,writeFile,readdir,readFile} from 'node:fs/promises';
+import * as XLSX from 'xlsx';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import assert from 'node:assert/strict';
@@ -144,6 +145,46 @@ try{
   if(themeBefore===themeAfter)errors.push('theme toggle not responding');
   const light=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   await writeFile('artifacts/browser/desktop-light.png',Buffer.from(light.data,'base64'));
+  // Real file import -> type preview -> pivot initialization -> XLSX/CSV download.
+  await send('DOM.enable');
+  const doc=await send('DOM.getDocument');
+  const fileNode=await send('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'input[type="file"]'});
+  if(!fileNode.nodeId)errors.push('file input not available');
+  else {
+    await send('DOM.setFileInputFiles',{nodeId:fileNode.nodeId,files:[join(process.cwd(),'public/test_retail_sales.csv')]});
+    await waitFor(async()=>await evaluate('!!document.querySelector("[role=dialog][aria-label=\\\"文件数据预览与类型校准\\\"]")'),'import file preview',12000);
+    const preview=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
+    if(!preview.includes('33 行')||!preview.includes('12 个字段'))errors.push('import preview did not show 33 records and 12 fields');
+    assert.equal(await clickText('确认导入并自动初始化透视'),true,'confirm real CSV import');
+    await waitFor(async()=>await evaluate('document.body.textContent.includes("test_retail_sales.csv (33行)") && document.body.textContent.includes("数据来源：本地导入文件")'),'imported dataset state',12000);
+    const imported=await evaluate('({name:document.querySelector("select")?.selectedOptions?.[0]?.textContent,table:document.querySelectorAll("#pivot-main-html-table tbody tr").length})');
+    console.log('REAL_CSV_IMPORT',JSON.stringify(imported));
+    if(imported.table<1)errors.push('imported pivot produced no table rows');
+
+    const downloads=join(process.cwd(),'artifacts/browser/downloads');
+    await mkdir(downloads,{recursive:true});
+    await send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:downloads,eventsEnabled:true});
+    assert.equal(await clickText('.XLSX'),true,'Excel export after real CSV import');
+    const excelFile=await waitFor(async()=>{
+      const names=await readdir(downloads);
+      const name=names.find(n=>n.endsWith('.xlsx'));
+      return name?join(downloads,name):null;
+    },'Excel export download',12000);
+    const book=XLSX.read(await readFile(excelFile),{type:'buffer'});
+    const sheet=book.Sheets[book.SheetNames[0]];
+    const exported=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+    console.log('REAL_XLSX_EXPORT',JSON.stringify({sheets:book.SheetNames,rows:exported.length,columns:exported[0]?.length}));
+    if(exported.length<4)errors.push('Excel workbook missing pivot rows');
+    assert.equal(await clickText('.CSV'),true,'CSV export after import');
+    const csvFile=await waitFor(async()=>{
+      const names=await readdir(downloads);
+      const name=names.find(n=>n.endsWith('.csv'));
+      return name?join(downloads,name):null;
+    },'CSV export download',12000);
+    const csvContent=await readFile(csvFile,'utf-8');
+    if(!csvContent.includes('销售额'))errors.push('CSV export missing value metric');
+    console.log('REAL_CSV_EXPORT',JSON.stringify({bytes:csvContent.length,lines:csvContent.split(/\\r?\\n/).length}));
+  }
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){
