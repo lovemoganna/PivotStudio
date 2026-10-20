@@ -191,6 +191,11 @@ try{
   const stress=await evaluate('({label:document.body.textContent.includes("本地合成压测数据"),rows:document.querySelector("aside")?.textContent.includes("100,000 records"),table:!!document.getElementById("pivot-main-html-table"),chart:!!document.getElementById("pivot-chart-container")})');
   if(!stress.label||!stress.rows||!stress.table||!stress.chart)errors.push('100K UI failed to show actual dataset: '+JSON.stringify(stress));
   console.log('BROWSER_100K_SYNTHETIC',JSON.stringify({...stress,readyElapsedMs:elapsed,notice:'includes browser scheduling, React render and UI; CI hardware-specific'}));
+  await sleep(900); // Wait for Recharts bar animation before judging painted chart.
+  const drawn=await evaluate('({bars:document.querySelectorAll("#pivot-chart-container .recharts-bar-rectangle").length,axisText:[...document.querySelectorAll("#pivot-chart-container .recharts-yAxis .recharts-cartesian-axis-tick text")].map(n=>n.textContent)})');
+  if(drawn.bars<1)errors.push('synthetic 100K chart has no rendered bars');
+  if(!drawn.axisText.some(value=>/^(¥|\\$)?0(?:\\.0+)?$/.test(value)))errors.push('absolute positive bar chart vertical axis is not zero anchored: '+JSON.stringify(drawn.axisText));
+  console.log('BROWSER_100K_BAR_AXIS',JSON.stringify(drawn));
   const stressShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
   await writeFile('artifacts/browser/100k-synthetic.png',Buffer.from(stressShot.data,'base64'));
 

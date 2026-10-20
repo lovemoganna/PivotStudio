@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import { CHART_COLORS, VISUAL_CHART_TYPES, KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
 import { UnifiedFormatter, formatAxisTickLabel } from '../../../utils/formatters';
+import { ZERO_ANCHORED_DOMAIN } from '../../../utils/axisDomain';
 import { UnifiedChartTooltip } from './UnifiedChartTooltip';
 import { renderSmartPieLabel, renderSmartBarLabel } from './SmartChartLabels';
 
@@ -598,7 +599,7 @@ export function ChartStudio({
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
                 {chartType === 'horizontal_bar' ? (
                   <>
-                    <XAxis type="number" tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
+                    <XAxis type="number" domain={ZERO_ANCHORED_DOMAIN} tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                     <YAxis
                       type="category"
                       dataKey="name"
@@ -620,7 +621,7 @@ export function ChartStudio({
                       tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 8 : 14)}
                     />
                     <YAxis
-                      domain={chartType === 'pct_stacked_bar' ? [0, 100] : ['auto', 'auto']}
+                      domain={chartType === 'pct_stacked_bar' ? [0, 100] : ZERO_ANCHORED_DOMAIN}
                       tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }}
                       tickFormatter={(v) => (chartType === 'pct_stacked_bar' ? `${v}%` : UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true }))}
                     />
