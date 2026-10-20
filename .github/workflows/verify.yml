@@ -18,6 +18,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: 100K synthetic calculation profile
+        run: npm run perf:smoke
       - run: npm run build
       - id: browser-chrome
         uses: browser-actions/setup-chrome@v1
