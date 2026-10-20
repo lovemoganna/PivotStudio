@@ -63,7 +63,7 @@ try{
   await sleep(80);
   if(!(await evaluate('document.body.textContent.includes("Keynote 演示")'))) errors.push('secondary demo actions cannot expand');
   assert.equal(await clickText('演示与检查'),true);
-  for(const [name,width,height] of [['mobile',390,844],['tablet',768,900],['desktop',1440,900]]){
+  for(const [name,width,height] of [['narrow',320,740],['mobile',390,844],['tablet',768,900],['desktop',1440,900],['wide',1920,1080]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
     await sleep(400);
     const result=await evaluate('(() => { const ch=document.getElementById("pivot-chart-container"); const tb=document.getElementById("pivot-main-html-table"); const sidebar=document.querySelector("aside"); return {pageWidth:document.documentElement.scrollWidth, viewportWidth:innerWidth, chartVisible:!!ch&&ch.getBoundingClientRect().height>0, tableVisible:!!tb&&tb.getBoundingClientRect().height>0, sidebarHeight:sidebar?.getBoundingClientRect().height || 0, datasetLabel:document.body.textContent.includes("数据来源："), appTitle:Array.from(document.querySelectorAll("h1")).find(h=>h.offsetParent!==null)?.textContent||""}; })()');
@@ -175,6 +175,25 @@ try{
   const readonly=await evaluate('({uploadDisabled:!!document.querySelector("aside input[type=file]")?.disabled,quickFields:[...document.querySelectorAll(".ps-field-action")].every(b=>b.disabled),count:document.querySelectorAll(".ps-field-action").length})');
   if(!readonly.uploadDisabled || !readonly.quickFields || readonly.count===0)errors.push('read-only control affordances are not disabled: '+JSON.stringify(readonly));
   console.log('READONLY_AFFORDANCE',JSON.stringify(readonly));
+
+  // Browser-level synthetic stress run; record user-visible readiness rather than extrapolating Node speed.
+  assert.equal(await clickText('工作区 ·'),true);
+  await sleep(120);
+  assert.equal(await clickText('张工 (BI架构师)'),true);
+  await evaluate('document.querySelector("button[aria-label=\\\"关闭工作区\\\"]")?.click()');
+  await sleep(140);
+  assert.equal(await clickText('100K压测'),true,'synthetic perf entry');
+  await sleep(120);
+  const perfStarted=Date.now();
+  assert.equal(await clickText('生成 100,000 行合成数据'),true,'generate synthetic data');
+  await waitFor(async()=>await evaluate('document.body.textContent.includes("100,000 / 100,000 行")'),'100K interface ready',60000);
+  const elapsed=Date.now()-perfStarted;
+  const stress=await evaluate('({label:document.body.textContent.includes("本地合成压测数据"),rows:document.querySelector("aside")?.textContent.includes("100,000 records"),table:!!document.getElementById("pivot-main-html-table"),chart:!!document.getElementById("pivot-chart-container")})');
+  if(!stress.label||!stress.rows||!stress.table||!stress.chart)errors.push('100K UI failed to show actual dataset: '+JSON.stringify(stress));
+  console.log('BROWSER_100K_SYNTHETIC',JSON.stringify({...stress,readyElapsedMs:elapsed,notice:'includes browser scheduling, React render and UI; CI hardware-specific'}));
+  const stressShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+  await writeFile('artifacts/browser/100k-synthetic.png',Buffer.from(stressShot.data,'base64'));
+
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){
