@@ -37,3 +37,7 @@ Retained existing four zones, all requested aggregations, percentage modes and h
 ### R4
 
 Added actual SVG matrix heatmap (not just table conditional formatting). Chart click drills into retained Worker buckets; table click highlights bar/line/pie/heatmap and double-click requests complete details. Preserved optional global-filter interaction. Chromium passed four type switches and 80-record drilldown with 50-row pagination (full 80 retained). Heatmap explicitly labels its 200-group display limit. Corrected audit: baseline had table heat coloring, not a separate heatmap chart.
+
+### R5
+
+Chromium verified named snapshot persistence, deleting the final snapshot and reload, configuration-only share, fresh-tab empty state and restoring average aggregation after manual import. Share projection excludes dataset/record properties; links use URL fragments so configuration is not included in the initial HTTP request. Legacy query-token input remains supported.

@@ -1,9 +1,11 @@
 import React from 'react';
+import { createShareLink } from '../../../../utils/viewConfig';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { FolderOpen, X } from 'lucide-react';
 
 export function WorkspaceModal({
   isOpen,
+  restorePivotConfig,
   onClose,
   currentUser,
   setCurrentUser,
@@ -135,7 +137,7 @@ export function WorkspaceModal({
                         setChartType(ws.chartType || 'bar');
                         if (ws.condFormat) setCondFormat(ws.condFormat);
                         if (ws.chartSpecConfig) setChartSpecConfig((p) => ({ ...p, ...ws.chartSpecConfig }));
-                        if (ws.pivotConfig) setPivotConfig(ws.pivotConfig);
+                        if (ws.pivotConfig) restorePivotConfig(ws.pivotConfig, Boolean(ws.datasetId && datasets.some((d) => d.id === ws.datasetId)));
                         if (ws.tableSettings && setTableSettings) setTableSettings(ws.tableSettings);
                         setActiveWorkspaceId(ws.id);
                         onClose();
@@ -145,7 +147,7 @@ export function WorkspaceModal({
                     >
                       载入
                     </button>
-                    {!isReadOnly && savedWorkspaces.length > 1 && (
+                    {!isReadOnly && (
                       <button
                         onClick={() => setSavedWorkspaces((prev) => prev.filter((x) => x.id !== ws.id))}
                         className="px-2 py-1 rounded bg-[#F92672]/15 text-[#F92672] text-[10px]"
@@ -161,28 +163,16 @@ export function WorkspaceModal({
 
           <div className="space-y-2 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
             <div className="font-bold text-[#66D9EF]">分享视图配置（不包含数据）</div>
-            <p className="text-[10px] leading-relaxed text-[#75715E] dark:text-[#908E80]">配置链接使用 Base64，不是加密或鉴权。同一数据集才可正确还原。工作区快照保存在本机浏览器，不同步到服务器。</p>
+            <p className="text-[10px] leading-relaxed text-[#75715E] dark:text-[#908E80]">配置链接使用 Base64，不是加密或鉴权。打开链接后请自行加载字段匹配的数据。工作区快照保存在本机浏览器，不同步到服务器。</p>
             {(() => {
-              const tokenPayload = btoa(
-                unescape(
-                  encodeURIComponent(
-                    JSON.stringify({
-                      vm: viewMode,
-                      ct: chartType,
-                      cf: condFormat,
-                      csc: chartSpecConfig,
-                      fullConfig: pivotConfig,
-                      ts: tableSettings,
-                    })
-                  )
-                )
-              );
-              const shareLink = `${window.location.origin}${window.location.pathname}?share_token=${encodeURIComponent(tokenPayload)}`;
+              let shareLink;
+              try { shareLink = createShareLink({ vm:viewMode, ct:chartType, cf:condFormat, csc:chartSpecConfig, fullConfig:pivotConfig, ts:tableSettings }, window.location); }
+              catch (error) { return <p role="alert">{error.message}</p>; }
               const iframeCode = `<iframe src="${shareLink}" width="100%" height="680" frameborder="0" style="border-radius:12px;border:1px solid #3E3D32;"></iframe>`;
               return (
                 <div className="space-y-2">
                   <div className="flex gap-2">
-                    <input readOnly value={shareLink} className="flex-1 px-2.5 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px]" />
+                    <input aria-label="分享配置链接" readOnly value={shareLink} className="flex-1 px-2.5 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px]" />
                     <button onClick={() => copyTextToClipboard(shareLink, '已复制 Base64 配置链接（非加密）')} className="px-3 py-1 rounded bg-[#66D9EF] text-[#1E1F1C] font-bold text-[10px]">
                       复制链接
                     </button>

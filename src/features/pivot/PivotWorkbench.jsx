@@ -8,6 +8,7 @@ import {
 } from '../../constants/pivotConstants';
 import { soundEngine } from '../../services/soundEngine';
 import { formatDimensionValue } from '../../utils/formatters';
+import { decodeView } from '../../utils/viewConfig';
 import { startImportTask } from '../../utils/workerTask';
 import {
   exportToCSV as doExportCSV,
@@ -168,6 +169,7 @@ export default function PivotWorkbench() {
   const [currentUser, setCurrentUser] = useState({ id: 'usr_analyst_01', name: '张工 (BI分析师)', role: 'Admin' });
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [newWorkspaceNameInput, setNewWorkspaceNameInput] = useState('');
+  const pendingViewRef = useRef(null);
   const [shareTokenInput, setShareTokenInput] = useState('');
   const [savedWorkspaces, setSavedWorkspaces] = useState(() => {
     try {
@@ -958,7 +960,10 @@ export default function PivotWorkbench() {
     setHighlightedRowKey(null);
     setHoveredCellTelemetry(null);
 
-    if (autoInitPivot) {
+    if (pendingViewRef.current) {
+      setPivotConfig(pendingViewRef.current);
+      pendingViewRef.current = null;
+    } else if (autoInitPivot) {
       setPivotConfig(buildDefaultPivotConfig(newDs));
     } else {
       setPivotConfig((prev) => ({ ...prev, filters: [], rows: [], columns: [], values: [], collapsedRowKeys: {}, collapsedColKeys: {} }));
@@ -1022,7 +1027,8 @@ export default function PivotWorkbench() {
       return [...prev, preset];
     });
     switchDataset(preset.id, preset);
-    setPivotConfig(buildDefaultPivotConfig(preset));
+    setPivotConfig(pendingViewRef.current || buildDefaultPivotConfig(preset));
+    pendingViewRef.current = null;
     soundEngine?.playTransitionChord?.();
     showToast(`已加载测试集「${preset.name}」`);
   }, [switchDataset, showToast]);
@@ -1089,26 +1095,28 @@ export default function PivotWorkbench() {
   const applyShareTokenPayload = useCallback((rawInput) => {
     if (!rawInput || !rawInput.trim()) return false;
     try {
-      const tokenPart = rawInput.includes('share_token=') ? rawInput.split('share_token=')[1].split('&')[0] : rawInput.trim();
-      const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(tokenPart)))));
-      if (decoded.fullConfig) setPivotConfig(decoded.fullConfig);
+      const decoded = decodeView(rawInput);
+      pendingViewRef.current = currentDataset ? null : decoded.fullConfig;
+      setPivotConfig(decoded.fullConfig);
       if (decoded.cf) setCondFormat(decoded.cf);
       if (decoded.csc) setChartSpecConfig((p) => ({ ...p, ...decoded.csc }));
       if (decoded.vm) setViewMode(decoded.vm);
       if (decoded.ct) setChartType(decoded.ct);
       if (decoded.ts) setTableSettings((p) => ({ ...p, ...decoded.ts }));
-      showToast('已从 Share Token 成功还原透视工作台视图！');
+      showToast(currentDataset ? '已恢复视图配置，请核对字段是否匹配' : '已载入视图配置，请自行加载相同字段的数据');
       return true;
     } catch {
       showToast('Share Token 格式无效，无法解析还原', 'error');
       return false;
     }
-  }, [showToast]);
+  }, [showToast, currentDataset, setPivotConfig]);
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('share_token');
+    const token = new URLSearchParams(window.location.hash.slice(1)).get('share_token') || new URLSearchParams(window.location.search).get('share_token');
     if (token) applyShareTokenPayload(token);
-  }, [applyShareTokenPayload]);
+    // Read once: data import must not reapply an old URL over subsequent user edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Spotlight Command Palette Actions
   const commandActions = useMemo(() => {
@@ -1617,6 +1625,7 @@ export default function PivotWorkbench() {
         />
 
         <WorkspaceModal
+          restorePivotConfig={(config, datasetAvailable) => { pendingViewRef.current = datasetAvailable ? null : config; setPivotConfig(config); }}
           isOpen={showWorkspaceModal}
           onClose={() => setShowWorkspaceModal(false)}
           currentUser={currentUser}
