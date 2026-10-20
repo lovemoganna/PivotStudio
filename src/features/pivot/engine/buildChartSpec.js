@@ -435,8 +435,8 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   // 7. Histogram Items (Sturges Binning)
   const histField = primaryValCfg.field || '销售额';
   const rawNums = grandTotalRecords
-    .map((r) => ({ val: Number(r[histField]), rec: r }))
-    .filter((x) => !Number.isNaN(x.val));
+    .map((r) => ({ val: (r[histField] === null || r[histField] === undefined || String(r[histField]).trim() === '') ? NaN : Number(r[histField]), rec: r }))
+    .filter((x) => Number.isFinite(x.val));
   const histogramItems = [];
   if (rawNums.length > 0) {
     const minV = Math.min(...rawNums.map((x) => x.val));
