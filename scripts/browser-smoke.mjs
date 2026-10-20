@@ -126,6 +126,37 @@ try{
     const after=await evaluate('document.querySelector("[role=separator]")?.getAttribute("aria-valuenow")');
     if(Number(after)!==Math.min(75,Number(before)+5))errors.push('keyboard splitter did not update');
   }
+  // The secondary chart palettes must be discoverable but not obscure the data by default.
+  if(await evaluate('!!document.getElementById("pivot-chart-types")'))errors.push('chart shortcut palette open by default');
+  if(await evaluate('!!document.getElementById("pivot-lens-presets")'))errors.push('analysis preset palette open by default');
+  assert.equal(await clickText('图表类型'),true,'expand chart type palette');
+  await sleep(100);
+  if(!await evaluate('!!document.getElementById("pivot-chart-types")'))errors.push('chart palette did not expand');
+  assert.equal(await clickText('图表类型'),true);
+  assert.equal(await clickText('分析视角'),true,'expand analytical presets');
+  await sleep(100);
+  if(!await evaluate('!!document.getElementById("pivot-lens-presets")'))errors.push('analysis presets did not expand');
+  assert.equal(await clickText('分析视角'),true);
+
+  // Every advertised chart type must remain switchable and preserve the workbench.
+  const kinds=await evaluate('Array.from(document.querySelector('select[aria-label="选择图表类型"]').options).map(x=>x.value)');
+  for(const kind of kinds) {
+    const selected=await evaluate('(() => {const el=document.querySelector(\'select[aria-label="选择图表类型"]\'); el.value='+JSON.stringify(kind)+';el.dispatchEvent(new Event("change",{bubbles:true}));return el.value;})()');
+    await sleep(140);
+    if(selected!==kind || !await evaluate('!!document.getElementById("pivot-chart-container")'))errors.push('chart type failed: '+kind);
+  }
+  console.log('CHART_TYPES_VERIFIED',JSON.stringify(kinds));
+  await evaluate('(() => { const el=document.querySelector(\'select[aria-label="选择图表类型"]\');el.value="bar";el.dispatchEvent(new Event("change",{bubbles:true}));return true; })()');
+  await sleep(130);
+  for(const [label,description] of [['格式与数值','数值与条件格式设置'],['内置校验','内置校验结果'],['工作区','本机工作区与配置分享']]){
+    assert.equal(await clickText(label),true,'open '+description);
+    await sleep(130);
+    const focused=await evaluate('(() => {const d=document.querySelector("[role=dialog]"); return d?{label:d.getAttribute("aria-label"),focused:d.contains(document.activeElement)}:null;})()');
+    if(!focused||focused.label!==description||!focused.focused)errors.push('dialog inaccessible: '+description+' '+JSON.stringify(focused));
+    await evaluate('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
+    await sleep(130);
+    if(await evaluate('!!document.querySelector("[role=dialog]")'))errors.push('Escape did not close '+description);
+  }
   assert.equal(await clickText('SQL代理'),true);
   await sleep(160);
   const sql=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
