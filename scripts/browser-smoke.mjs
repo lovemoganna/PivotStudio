@@ -56,6 +56,12 @@ try{
   console.log('BROWSER_BOOT',JSON.stringify(await evaluate('({url:location.href,ready:document.readyState,title:document.title,body:document.body?.innerText.slice(0,500),html:document.documentElement?.outerHTML.slice(0,800)})')));
   await waitFor(async()=>await evaluate("Array.from(document.querySelectorAll('h1')).some(h => h.textContent.includes('PivotStudio'))"),'React app',12000);
   const errors=[];
+  const demoClosed=await evaluate('!document.body.textContent.includes("Keynote 演示")');
+  if(!demoClosed)errors.push('demo actions displace primary navigation on initial load');
+  assert.equal(await clickText('演示与检查'),true);
+  await sleep(80);
+  if(!(await evaluate('document.body.textContent.includes("Keynote 演示")'))) errors.push('secondary demo actions cannot expand');
+  assert.equal(await clickText('演示与检查'),true);
   for(const [name,width,height] of [['mobile',390,844],['tablet',768,900],['desktop',1440,900]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
     await sleep(400);
@@ -113,7 +119,7 @@ try{
     const after=await evaluate('document.querySelector("[role=separator]")?.getAttribute("aria-valuenow")');
     if(Number(after)!==Math.min(75,Number(before)+5))errors.push('keyboard splitter did not update');
   }
-  assert.equal(await clickText('SQL代理'),true);
+  assert.equal(await clickText('SQL（未接入）'),true);
   await sleep(160);
   const sql=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
   if(!sql.includes('尚未实现'))errors.push('SQL integration misrepresented');

@@ -42,7 +42,7 @@ import { CommandPaletteModal } from './components/modals/CommandPaletteModal';
 
 export default function PivotWorkbench() {
   const [darkMode, setDarkMode] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const [keynotePlaying, setKeynotePlaying] = useState(false);
   const [keynoteShotIdx, setKeynoteShotIdx] = useState(0);
   const [cinemaTheaterMode, setCinemaTheaterMode] = useState(false);

@@ -118,7 +118,7 @@ export function FieldShelf({
                   className="px-2.5 py-2 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
                   title="无需本地文件，一键体验步骤5文件解析与字段类型推断预览弹窗"
                 >
-                  模拟预览
+                  样例预览
                 </button>
               </div>
 
@@ -141,7 +141,7 @@ export function FieldShelf({
                 </button>
                 <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[10px] font-medium flex items-center justify-center gap-1 transition">
                   <Server className="w-3 h-3 text-[#FD971F]" />
-                  <span>SQL代理</span>
+                  <span>SQL（未接入）</span>
                 </button>
                 <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }} className="px-2 py-1.5 rounded-lg bg-[#AE81FF]/15 text-[#6B38FB] dark:text-[#AE81FF] border border-[#AE81FF]/35 hover:bg-[#AE81FF]/25 text-[10px] font-semibold flex items-center justify-center gap-1 transition">
                   <Zap className="w-3 h-3 text-[#AE81FF]" />
