@@ -28,8 +28,28 @@ export function PivotTable({
   setDrillDownModal,
   soundEngine,
 }) {
+  const openAllFilteredRecords = () => {
+    const records = pivotResult.cellRecordsMap?.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || [];
+    setDrillSearch?.('');
+    setDrillPage?.(1);
+    setDrillDownModal?.({
+      rowLabel: '当前筛选结果',
+      colLabel: '所有维度',
+      valLabel: '全部原始记录',
+      valueFormatted: '原始明细',
+      records,
+    });
+  };
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
+      {pivotResult.filteredCount > 0 && !isPrintingReport && (
+        <div className="px-3 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between gap-3 text-[11px] text-[#75715E] dark:text-[#B8B5A8]">
+          <span className="truncate">当前结果：{pivotResult.filteredCount.toLocaleString()} 条原始记录</span>
+          <button type="button" onClick={openAllFilteredRecords} aria-label="查看当前筛选后的全部原始记录" className="shrink-0 min-h-8 px-3 py-1 rounded-md border border-[#0088A3]/45 dark:border-[#66D9EF]/45 text-[#0088A3] dark:text-[#66D9EF] font-semibold hover:bg-[#0088A3]/10 focus-visible:ring-2 focus-visible:ring-[#66D9EF]">
+            查看原始记录
+          </button>
+        </div>
+      )}
       {pivotResult.filteredCount === 0 && (
         <div className="bg-[#FD971F]/15 border-b border-[#FD971F]/30 px-4 py-2 flex items-center justify-between text-xs">
           <span className="text-[#C86400] dark:text-[#FD971F] apple-font-mono">当前筛选条件下匹配 0 条记录</span>
@@ -47,7 +67,7 @@ export function PivotTable({
         </div>
       )}
       <div ref={tableContainerRef} onScroll={(e) => setScrollTop?.(e.currentTarget.scrollTop)} className="flex-1 h-full min-h-0 overflow-auto relative">
-        <table id="pivot-main-html-table" className="w-full border-separate border-spacing-0 text-[11px] text-left select-text tabular-nums">
+        <table id="pivot-main-html-table" className="w-full border-separate border-spacing-0 text-[12px] text-left select-text tabular-nums">
           <thead className="sticky top-0 z-20 bg-[#EFECE1]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-md text-[#272822] dark:text-[#F8F8F2] shadow-sm">
             {pivotResult.colConfigs.length > 0 && pivotResult.colHeaderRows.length > 0 && (
               pivotResult.colHeaderRows.map((headerRow, levelIdx) => (

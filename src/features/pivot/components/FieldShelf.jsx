@@ -187,10 +187,10 @@ export function FieldShelf({
                         <span className="font-medium text-xs truncate">{field.name}</span>
                       </div>
                       <div className="flex items-center gap-0.5 opacity-85 group-hover:opacity-100 shrink-0 apple-font-mono">
-                        <button onClick={() => addFieldToZone('rows', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] text-[9px] font-semibold transition">+行</button>
-                        <button onClick={() => addFieldToZone('columns', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+列</button>
-                        <button onClick={() => addFieldToZone('values', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+值</button>
-                        <button onClick={() => addFieldToZone('filters', field.name)} className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] text-[9px] font-semibold transition">+筛</button>
+                        <button onClick={() => addFieldToZone('rows', field.name)} aria-label={`将 ${field.name} 添加到行维度`} disabled={isReadOnly} className="min-w-7 min-h-7 inline-flex items-center justify-center px-1 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#F92672] hover:text-[#F8F8F2] text-[10px] font-semibold transition">+行</button>
+                        <button onClick={() => addFieldToZone('columns', field.name)} aria-label={`将 ${field.name} 添加到列维度`} disabled={isReadOnly} className="min-w-7 min-h-7 inline-flex items-center justify-center px-1 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] text-[10px] font-semibold transition">+列</button>
+                        <button onClick={() => addFieldToZone('values', field.name)} aria-label={`将 ${field.name} 添加到数值指标`} disabled={isReadOnly} className="min-w-7 min-h-7 inline-flex items-center justify-center px-1 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] text-[10px] font-semibold transition">+值</button>
+                        <button onClick={() => addFieldToZone('filters', field.name)} aria-label={`将 ${field.name} 添加到筛选条件`} disabled={isReadOnly} className="min-w-7 min-h-7 inline-flex items-center justify-center px-1 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] text-[10px] font-semibold transition">+筛</button>
                       </div>
                     </div>
                   );

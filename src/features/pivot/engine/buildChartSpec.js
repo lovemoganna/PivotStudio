@@ -37,7 +37,13 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       : '汇总维度';
 
   const dataRows = (pivotResult?.tableRows || []).filter((r) => !r.isTotal && !r.isSubtotal);
-  const grandTotalRecords = pivotResult?.cellRecordsMap?.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || [];
+  // Most chart types use aggregated cells; only reconstruct every original
+  // record for histogram or explicit grand-total drill-through.
+  const needsGrandTotalRecords = chartType === 'histogram' || chartType === 'waterfall' ||
+    (pivotResult?.tableRows || []).every((r) => r.isTotal || r.isSubtotal);
+  const grandTotalRecords = needsGrandTotalRecords
+    ? (pivotResult?.cellRecordsMap?.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || [])
+    : [];
 
   // If no value metrics are configured, return graceful empty spec immediately
   if (!hasValues) {
@@ -434,13 +440,20 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
 
   // 7. Histogram Items (Sturges Binning)
   const histField = primaryValCfg.field || '销售额';
-  const rawNums = grandTotalRecords
-    .map((r) => ({ val: Number(r[histField]), rec: r }))
-    .filter((x) => !Number.isNaN(x.val));
+  const rawNums = chartType === 'histogram'
+    ? grandTotalRecords
+        .filter((r) => r[histField] !== null && r[histField] !== undefined && String(r[histField]).trim() !== '')
+        .map((r) => ({ val: Number(r[histField]), rec: r }))
+        .filter((x) => Number.isFinite(x.val))
+    : [];
   const histogramItems = [];
   if (rawNums.length > 0) {
-    const minV = Math.min(...rawNums.map((x) => x.val));
-    const maxV = Math.max(...rawNums.map((x) => x.val));
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (const row of rawNums) {
+      if (row.val < minV) minV = row.val;
+      if (row.val > maxV) maxV = row.val;
+    }
     const binCount = chartSpecConfig?.histogramBins > 0
       ? chartSpecConfig.histogramBins
       : Math.max(4, Math.min(10, Math.ceil(1 + 3.322 * Math.log10(rawNums.length))));

@@ -133,6 +133,14 @@ try{
     const after=await evaluate('document.querySelector("[role=separator]")?.getAttribute("aria-valuenow")');
     if(Number(after)!==Math.min(75,Number(before)+5))errors.push('keyboard splitter did not update');
   }
+  // The raw-record affordance must show actual underlying rows, not just a count or a toast.
+  assert.equal(await clickText('查看原始记录'),true,'open all filtered source rows');
+  await sleep(150);
+  const sourceRecords=await evaluate(`(() => { const dialog=document.querySelector('[role="dialog"][aria-label="原始交易明细下钻"]'); return {exists:!!dialog, text:dialog?.textContent.slice(0,360) || ""}; })()`);
+  if(!sourceRecords.exists || !sourceRecords.text.includes('33 条记录'))errors.push('source record dialog did not show 33 real rows');
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
+  await sleep(150);
+  if(await evaluate('!!document.querySelector("[role=dialog]")'))errors.push('source record dialog did not close');
   // The secondary chart palettes must be discoverable but not obscure the data by default.
   if(await evaluate('!!document.getElementById("pivot-chart-types")'))errors.push('chart shortcut palette open by default');
   if(await evaluate('!!document.getElementById("pivot-lens-presets")'))errors.push('analysis preset palette open by default');
@@ -238,7 +246,22 @@ try{
   const largeWallMs=Date.now()-largeStart;
   const perf=await evaluate('({rows:document.body.textContent.includes("100,000 / 100,000 行"), chartVisible:!!document.getElementById("pivot-chart-container") && document.getElementById("pivot-chart-container").getBoundingClientRect().height>0, longTasks:window.__psLongTasks?.length||0,maxLongTaskMs:Math.round(Math.max(0,...(window.__psLongTasks||[]))),totalLongTaskMs:Math.round((window.__psLongTasks||[]).reduce((a,b)=>a+b,0))})');
   if(!perf.rows || !perf.chartVisible)errors.push('100k browser workbench not ready');
+  if(!await evaluate('document.body.textContent.includes("Web Worker 本地计算")'))errors.push('100k pivot worker did not finish on dedicated thread');
   console.log('BROWSER_100K_MEASUREMENT',JSON.stringify({wallTimeMs:largeWallMs,...perf,note:'Synthetic records, CI Chromium only; no performance SLA'}));
+
+  // Switching away from a large dataset must never expose stale worker results.
+  const options=await evaluate('Array.from(document.querySelector("aside select").options).map(o=>o.value)');
+  if(options.length<2)errors.push('Cannot test worker dataset switch: missing datasets');
+  else{
+    const switchResult=await evaluate('(() => { const s=document.querySelector("aside select");s.value='+JSON.stringify(options[0])+';s.dispatchEvent(new Event("input",{bubbles:true}));s.dispatchEvent(new Event("change",{bubbles:true}));return {value:s.value,options:s.options.length};})()');
+    console.log('WORKER_SWITCH_REQUEST',JSON.stringify({first:options[0],last:options.at(-1),...switchResult}));
+    await waitFor(async()=>await evaluate('document.body.textContent.includes("数据来源：内置演示数据（非真实业务记录）")'),'switch back to retail demo source',12000);
+    console.log('WORKER_SWITCH_RETAIL',JSON.stringify(await evaluate('({selected:document.querySelector("aside select").value,status:Array.from(document.querySelectorAll("[role=status]")).map(x=>x.textContent).slice(0,3)})')));
+    const returnId=options.at(-1);
+    await evaluate('(() => { const s=document.querySelector("aside select");s.value='+JSON.stringify(returnId)+';s.dispatchEvent(new Event("change",{bubbles:true}));return true;})()');
+    await waitFor(async()=>await evaluate('document.body.textContent.includes("100,000 / 100,000 行") && document.body.textContent.includes("Web Worker 本地计算")'),'worker re-evaluates after dataset switch',45000);
+    console.log('WORKER_DATASET_SWITCH','PASS',JSON.stringify({original:options[0],target:returnId}));
+  }
   console.log('CHROMIUM_SMOKE',errors.length?'FAIL':'PASS',errors);
   assert.equal(errors.length,0,errors.join('; '));
 }catch(error){

@@ -58,6 +58,8 @@ export default function PivotWorkbench() {
   const [showAwardBadgeModal, setShowAwardBadgeModal] = useState(false);
 
   const [datasets, setDatasets] = useState([RETAIL_TEST_DATASET]);
+  const [syntheticProgress, setSyntheticProgress] = useState(null);
+  const syntheticGenerationRef = useRef(false);
   const [activeDatasetId, setActiveDatasetId] = useState(RETAIL_TEST_DATASET.id);
 
   const currentDataset = useMemo(
@@ -421,10 +423,73 @@ export default function PivotWorkbench() {
     };
   }, [keynotePlaying, applyKeynoteShot]);
 
-  const pivotResult = useMemo(
-    () => calculatePivot(currentDataset, pivotConfig),
-    [currentDataset, pivotConfig]
+  // Keep small datasets synchronous, but run expensive pivots off the UI thread.
+  // Never display a result computed from another dataset or another configuration.
+  const usesWorker = currentDataset.rows.length >= duckdbThreshold;
+  const [workerPivot, setWorkerPivot] = useState(null);
+  const [workerFallback, setWorkerFallback] = useState(null);
+  const directPivot = useMemo(
+    () => usesWorker ? null : calculatePivot(currentDataset, pivotConfig),
+    [currentDataset, pivotConfig, usesWorker]
   );
+  const pendingPivot = useMemo(
+    () => usesWorker ? calculatePivot({ ...currentDataset, rows: [] }, pivotConfig) : null,
+    [currentDataset, pivotConfig, usesWorker]
+  );
+  const matchingWorkerPivot = usesWorker &&
+    workerPivot?.dataset === currentDataset && workerPivot?.config === pivotConfig;
+  const isPivotCalculating = usesWorker && !matchingWorkerPivot;
+  const pivotResult = matchingWorkerPivot ? workerPivot.result : (usesWorker ? pendingPivot : directPivot);
+
+  useEffect(() => {
+    if (!usesWorker) return undefined;
+    let stopped = false;
+    let worker;
+    let fallbackUsed = false;
+    setWorkerFallback(null);
+    const useFallback = (message) => {
+      if (stopped || fallbackUsed) return;
+      fallbackUsed = true;
+      worker?.terminate();
+      setWorkerFallback({ dataset: currentDataset, config: pivotConfig, message });
+      // Preserve functionality when Web Workers are disabled; report the downgrade.
+      const result = calculatePivot(currentDataset, pivotConfig);
+      if (!stopped) setWorkerPivot({ dataset: currentDataset, config: pivotConfig, result });
+    };
+    try {
+      worker = new Worker(new URL('./engine/pivotWorker.js', import.meta.url), { type: 'module' });
+      worker.onmessage = (event) => {
+        if (stopped || fallbackUsed) return;
+        if (event.data?.ok && event.data?.result) {
+          const result = event.data.result;
+          if (event.data.encoding === 'row_indices_v1') {
+            const buckets = result.cellRecordsMap;
+            result.cellRecordsMap = {
+              get(key) {
+                const ids = buckets.get(key);
+                if (!ids) return undefined;
+                return Array.from(ids, (index) => currentDataset.rows[index]);
+              },
+            };
+          }
+          setWorkerPivot({ dataset: currentDataset, config: pivotConfig, result });
+        } else {
+          useFallback(event.data?.error || 'Worker 计算失败');
+        }
+      };
+      worker.onerror = (event) => {
+        event.preventDefault();
+        useFallback(event.message || 'Worker 启动失败');
+      };
+      worker.postMessage({ dataset: currentDataset, config: pivotConfig });
+    } catch (error) {
+      useFallback(error?.message || 'Worker 不可用');
+    }
+    return () => {
+      stopped = true;
+      worker?.terminate();
+    };
+  }, [currentDataset, pivotConfig, usesWorker]);
 
   const unifiedChartSpec = useMemo(
     () => buildUnifiedChartSpec(currentDataset, pivotResult, chartType, chartSpecConfig),
@@ -901,59 +966,75 @@ export default function PivotWorkbench() {
     showToast(`成功导入数据集「${newDs.name}」`);
   }, [uploadPreviewModal, showToast]);
 
-  const generate100kDataset = useCallback((count = 100000) => {
+  const generate100kDataset = useCallback(async (count = 100000) => {
+    if (syntheticGenerationRef.current) return;
+    syntheticGenerationRef.current = true;
     const regions = ['华东', '华南', '华北', '西南', '华中', '西北'];
     const cities = ['上海', '深圳', '北京', '成都', '杭州', '广州', '武汉', '西安'];
     const channels = ['线上旗舰店', '企业集采', '线下自营店', '抖音电商'];
     const categories = ['智能数码', '办公外设', '智能家居', '潮流服饰', '休闲食品'];
     const products = ['降噪耳机 Pro', '4K高清显示器', '智能扫地机 X9', '机械键盘 RGB', '纯棉连帽卫衣', '意式咖啡机', '冻干咖啡礼盒', '极光便携投影'];
     const memberTypes = ['普通会员', 'VIP黄金会员', '企业客户'];
-
     const bigRows = new Array(count);
-    for (let i = 0; i < count; i++) {
-      const m = (i % 12) + 1;
-      const d = (i % 28) + 1;
-      const yr = 2023 + (i % 3);
-      const sales = ((i * 173) % 95000) + 5000;
-      const qty = ((i * 7) % 45) + 1;
-      const cost = Math.round(sales * 0.6);
-      const profit = sales - cost;
-
-      bigRows[i] = {
-        订单日期: `${yr}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-        销售大区: regions[i % regions.length],
-        城市: cities[i % cities.length],
-        销售渠道: channels[i % channels.length],
-        商品类别: categories[i % categories.length],
-        商品名称: products[i % products.length],
-        客户类型: memberTypes[i % memberTypes.length],
-        销售额: sales,
-        销量: qty,
-        成本: cost,
-        毛利润: profit,
-        是否促销: i % 2 === 0,
+    const batchSize = 10000;
+    try {
+      setSyntheticProgress({ done: 0, total: count });
+      for (let start = 0; start < count; start += batchSize) {
+        const end = Math.min(count, start + batchSize);
+        for (let i = start; i < end; i++) {
+          const m = (i % 12) + 1;
+          const d = (i % 28) + 1;
+          const yr = 2023 + (i % 3);
+          const sales = ((i * 173) % 95000) + 5000;
+          const qty = ((i * 7) % 45) + 1;
+          const cost = Math.round(sales * 0.6);
+          bigRows[i] = {
+            订单日期: `${yr}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
+            销售大区: regions[i % regions.length],
+            城市: cities[i % cities.length],
+            销售渠道: channels[i % channels.length],
+            商品类别: categories[i % categories.length],
+            商品名称: products[i % products.length],
+            客户类型: memberTypes[i % memberTypes.length],
+            销售额: sales,
+            销量: qty,
+            成本: cost,
+            毛利润: sales - cost,
+            是否促销: i % 2 === 0,
+          };
+        }
+        setSyntheticProgress({ done: end, total: count });
+        // Yield after each bounded batch so input and paint are not held hostage.
+        if (end < count) await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      const bigDs = {
+        id: `ds_100k_${Date.now()}`,
+        name: `10万行级全渠道零售压测数据集 (${count.toLocaleString()}行)`,
+        fields: RETAIL_TEST_DATASET.fields,
+        rows: bigRows,
       };
+      setDatasets((prev) => [...prev, bigDs]);
+      switchDataset(bigDs.id, bigDs);
+      setActiveDataSourceModal(null);
+      soundEngine.playTransitionChord();
+      showToast(`已生成 ${count.toLocaleString()} 行合成数据，透视计算由本地 Worker 执行；实际完成状态以数据栏为准。`);
+    } catch {
+      showToast('合成数据生成失败，未切换数据集', 'error');
+    } finally {
+      syntheticGenerationRef.current = false;
+      setSyntheticProgress(null);
     }
-    const bigDs = {
-      id: `ds_100k_${Date.now()}`,
-      name: `10万行级全渠道零售压测数据集 (${count.toLocaleString()}行)`,
-      fields: RETAIL_TEST_DATASET.fields,
-      rows: bigRows,
-    };
-    setDatasets((prev) => [...prev, bigDs]);
-    switchDataset(bigDs.id, bigDs);
-    setActiveDataSourceModal(null);
-    soundEngine.playTransitionChord();
-    showToast(`已生成并载入 ${count.toLocaleString()} 行全渠道零售数据集，虚拟滚动已就绪，聚合仍由本地 JavaScript 执行。`);
   }, [showToast, switchDataset]);
 
   const exportToCSV = useCallback(() => {
+    if (isPivotCalculating) { showToast('透视计算尚未完成，暂不能导出', 'error'); return; }
     doExportCSV(currentDataset, pivotResult, showToast);
-  }, [currentDataset, pivotResult, showToast]);
+  }, [currentDataset, pivotResult, isPivotCalculating, showToast]);
 
   const exportToExcelMerged = useCallback(() => {
+    if (isPivotCalculating) { showToast('透视计算尚未完成，暂不能导出', 'error'); return; }
     doExportExcel(currentDataset, pivotResult, showToast);
-  }, [currentDataset, pivotResult, showToast]);
+  }, [currentDataset, pivotResult, isPivotCalculating, showToast]);
 
   const exportChartAsPNG = useCallback(() => {
     doExportPNG(currentDataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast);
@@ -1105,6 +1186,7 @@ export default function PivotWorkbench() {
           liveEngineTestResults={liveEngineTestResults}
           exportToExcelMerged={exportToExcelMerged}
           exportToCSV={exportToCSV}
+          isPivotCalculating={isPivotCalculating}
           exportChartAsPNG={exportChartAsPNG}
           exportPDFReport={exportPDFReport}
           showToast={showToast}
@@ -1112,14 +1194,15 @@ export default function PivotWorkbench() {
           setToastMessage={setToastMessage}
         />
 
-        <div role="status" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
+        <div role="status" aria-live="polite" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
           <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#66D9EF]" />
-          <span className="truncate">数据来源：{currentDataset.id === RETAIL_TEST_DATASET.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()} 行 · 本地 JavaScript 计算</span>
+          {syntheticProgress && <span className="shrink-0 font-semibold text-[#0088A3] dark:text-[#66D9EF]">正在生成合成数据 {syntheticProgress.done.toLocaleString()} / {syntheticProgress.total.toLocaleString()} 行</span>}
+          <span className="truncate">数据来源：{currentDataset.id === RETAIL_TEST_DATASET.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {isPivotCalculating ? `正在计算 ${currentDataset.rows.length.toLocaleString()} 行` : `${pivotResult.filteredCount.toLocaleString()} / ${pivotResult.totalCount.toLocaleString()} 行`} · {usesWorker ? (workerFallback?.dataset === currentDataset && workerFallback?.config === pivotConfig ? 'Worker 失败，已回退主线程计算' : 'Web Worker 本地计算') : '本地 JavaScript 计算'}</span>
         </div>
 
         {/* Bento KPI Cards Strip with Mini Sparklines */}
-        {unifiedChartSpec.kpiCards.length > 0 && (
-          <div className="bg-[#F7F6F0] dark:bg-[#1E1F1C] px-4 pt-3 pb-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 shrink-0">
+        {!isPivotCalculating && unifiedChartSpec.kpiCards.length > 0 && (
+          <div style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 18rem), 1fr))' }} className="bg-[#F7F6F0] dark:bg-[#1E1F1C] px-4 pt-3 pb-1 grid gap-3 shrink-0">
             {unifiedChartSpec.kpiCards.map((kpi) => (
               <div key={kpi.id} className="px-4 py-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822] apple-specular-card flex items-center justify-between gap-3 apple-transition hover:border-[#66D9EF]/60">
                 <div className="min-w-0">
@@ -1192,8 +1275,15 @@ export default function PivotWorkbench() {
         <div
           ref={splitContainerRef}
           
-          className={`flex-1 flex flex-col lg:flex-row min-h-[680px] md:min-h-[720px] lg:min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col h-auto' : 'overflow-hidden'}`}
+          aria-busy={isPivotCalculating}
+          className={`relative flex-1 flex flex-col lg:flex-row min-h-[680px] md:min-h-[720px] lg:min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible flex-col h-auto' : 'overflow-hidden'}`}
         >
+          {isPivotCalculating && (
+            <div className="absolute inset-x-4 top-4 z-20 rounded-lg border border-[#0088A3]/35 bg-[#FFFDF7]/95 dark:bg-[#272822]/95 px-4 py-3 shadow-md flex items-center gap-3" role="status">
+              <span className="h-3 w-3 border-2 border-[#0088A3] border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <span className="text-xs font-semibold">正在后台计算 {currentDataset.rows.length.toLocaleString()} 行，完成后更新所有分析结果</span>
+            </div>
+          )}
           {(viewMode !== 'chart' || isPrintingReport) && (
             <div
               style={{

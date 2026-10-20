@@ -31,8 +31,16 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.browser-chrome.outputs.chrome-path }}
         run: node scripts/browser-smoke.mjs
+      - name: Assert required visual evidence was captured
+        if: success()
+        run: |
+          test -s artifacts/browser/desktop.png
+          test -s artifacts/browser/mobile.png
+          test -s artifacts/browser/tablet.png
+          test -s artifacts/browser/mobile-chart.png
       - name: Upload responsive screenshots
         if: always()
+        continue-on-error: true  # External artifact service outage must remain visible but not hide passed app checks.
         uses: actions/upload-artifact@v4
         with:
           name: pivotstudio-browser-evidence
