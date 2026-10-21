@@ -1,5 +1,12 @@
 import { AGG_METHODS, CHART_COLORS } from '../../../constants/pivotConstants.js';
 import { UnifiedFormatter, getDimDisplayLabel } from '../../../utils/formatters.js';
+import { buildHistogramBins } from './histogram.js';
+
+function summarizeValues(values) {
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return { total, mean: values.length ? total / values.length : 0,
+    max: values.length ? Math.max(...values) : 0, min: values.length ? Math.min(...values) : 0 };
+}
 
 export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpecConfig) {
   const valConfigs = pivotResult?.valConfigs || [];
@@ -37,36 +44,36 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       : '汇总维度';
 
   const dataRows = (pivotResult?.tableRows || []).filter((r) => !r.isTotal && !r.isSubtotal);
-  const grandTotalRecords = (pivotResult?.cellRecordsMap?.get?.('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || []).slice(0, 50);
+  const allGrandTotalRecords = pivotResult?.cellRecordsMap?.get?.('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || [];
+  const grandTotalRecords = allGrandTotalRecords.slice(0, 50);
 
   // If no value metrics are configured, return graceful empty spec immediately
-  if (!hasValues) {
-    return {
-      chartType,
-      hasValues: false,
-      isPercentMode: false,
-      xDimensionLabel: '未配置度量指标',
-      primaryValCfg,
-      secondaryValCfg,
-      primarySeriesKey: '无指标',
-      secondarySeriesKey: '无指标',
-      derivedSeriesKey: null,
-      derivedMode: 'none',
-      seriesMetaList: [],
-      kpiCards: [],
-      items: [],
-      pieItems: [],
-      waterfallItems: [],
-      funnelItems: [],
-      scatterPoints: [],
-      scatterRegressionSegment: null,
-      scatterMeanX: 0,
-      scatterMeanY: 0,
-      histogramItems: [],
-      primaryStats: { total: 0, mean: 0, max: 0, min: 0 },
-      executiveInsight: null,
-    };
-  }
+  const emptySpec = {
+    chartType,
+    hasValues: false,
+    isPercentMode: false,
+    xDimensionLabel: '未配置度量指标',
+    primaryValCfg,
+    secondaryValCfg,
+    primarySeriesKey: '无指标',
+    secondarySeriesKey: '无指标',
+    derivedSeriesKey: null,
+    derivedMode: 'none',
+    seriesMetaList: [],
+    kpiCards: [],
+    items: [],
+    pieItems: [],
+    waterfallItems: [],
+    funnelItems: [],
+    scatterPoints: [],
+    scatterRegressionSegment: null,
+    scatterMeanX: 0,
+    scatterMeanY: 0,
+    histogramItems: [],
+    primaryStats: { total: 0, mean: 0, max: 0, min: 0 },
+    executiveInsight: null,
+  };
+  if (!hasValues) return emptySpec;
 
   // 1. Build KPI Cards + Mini Sparkline Points
   const kpiCards = valConfigs.slice(0, 4).map((vc, kIdx) => {
@@ -101,7 +108,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   });
 
   // 2. Build Series Metadata & Items
-  const hasColGroups = pivotResult.leafColGroups && pivotResult.leafColGroups.length > 0;
+  const hasColGroups = chartType !== 'histogram' && pivotResult.leafColGroups && pivotResult.leafColGroups.length > 0;
   const seriesMetaList = [];
   if (hasColGroups && chartType !== 'combo' && dataRows.length > 0) {
     pivotResult.leafColGroups.forEach((cg, idx) => {
@@ -146,10 +153,25 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   const isPercentMode = chartType === 'pct_stacked_bar' || chartType === 'pct_area';
   const missingMode = chartSpecConfig?.missingValueMode || 'zero';
 
+  const groupCount = dataRows.length || pivotResult.leafColGroups?.length || 1;
+  const requestedCount = chartSpecConfig?.topN > 0 ? Math.min(groupCount, chartSpecConfig.topN) : groupCount;
+  const maximumGroups = chartType === 'heatmap' || chartType === 'funnel' ? 200 : 2000;
+  // Unbounded SVG marks can block input for tens of seconds. Require an explicit scope.
+  if (chartType !== 'histogram' && requestedCount > maximumGroups) {
+    const series = seriesMetaList[0];
+    const values = dataRows.length
+      ? dataRows.map((row) => Number(pivotResult.displayMatrix[`${row.rowKey}@@${series.colKey}@@${series.valCfg.id}`]?.display ?? 0))
+      : pivotResult.leafColGroups.map((group) => Number(pivotResult.displayMatrix[`__GRAND_TOTAL_ROW__@@${group.key}@@${series.valCfg.id}`]?.display ?? 0));
+    return { ...emptySpec, hasValues: true, kpiCards, seriesMetaList, xDimensionLabel,
+      primarySeriesKey, secondarySeriesKey, primaryStats: summarizeValues(values),
+      canStack: hasColGroups || (valConfigs.length > 1 && valConfigs.every((value) => UnifiedFormatter.inferUnit(value) === UnifiedFormatter.inferUnit(valConfigs[0]))),
+      renderLimit: { groupCount, maximum: maximumGroups } };
+  }
+
   const lastSeenBySeries = {};
   let processedItems = [];
 
-  if (dataRows.length > 0) {
+  if (dataRows.length > 0 && chartType !== 'histogram') {
     processedItems = dataRows.map((r) => {
       const item = {
         name: r.label,
@@ -190,7 +212,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       item._stackSum = stackSum;
       return item;
     });
-  } else if (hasColGroups) {
+  } else if (hasColGroups && chartType !== 'histogram') {
     // If no row dimension is configured but column dimension exists, chart column leaves
     processedItems = pivotResult.leafColGroups.map((cg) => {
       const item = {
@@ -436,42 +458,16 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   const histField = (primaryValCfg.field && primaryValCfg.field !== '__COUNT__')
     ? primaryValCfg.field
     : (dataset?.fields?.find((f) => f.type === 'number')?.name || '');
-  const rawNums = grandTotalRecords
-    .map((r) => ({ val: Number(r[histField]), rec: r }))
-    .filter((x) => !Number.isNaN(x.val));
-  const histogramItems = [];
-  if (rawNums.length > 0) {
-    const minV = Math.min(...rawNums.map((x) => x.val));
-    const maxV = Math.max(...rawNums.map((x) => x.val));
-    const binCount = chartSpecConfig?.histogramBins > 0
-      ? chartSpecConfig.histogramBins
-      : Math.max(4, Math.min(10, Math.ceil(1 + 3.322 * Math.log10(rawNums.length))));
-    const step = Math.max(1, Math.ceil((maxV - minV + 1) / binCount));
-    for (let b = 0; b < binCount; b++) {
-      const low = minV + b * step;
-      const high = low + step;
-      const matched = rawNums
-        .filter((x) => (b === binCount - 1 ? x.val >= low && x.val <= high : x.val >= low && x.val < high))
-        .map((x) => x.rec);
-      histogramItems.push({
-        name: `${UnifiedFormatter.formatValue(low, primaryValCfg, { compact: true })}~${UnifiedFormatter.formatValue(high, primaryValCfg, { compact: true })}`,
-        rangeFull: `[${low.toLocaleString()}, ${high.toLocaleString()})`,
-        count: matched.length,
-        pct: ((matched.length / rawNums.length) * 100).toFixed(1),
-        matchedRows: matched.slice(0, 50),
-      });
-    }
-  }
+  const histogramItems = chartType === 'histogram'
+    ? buildHistogramBins(allGrandTotalRecords, histField, chartSpecConfig?.histogramBins).map((bin) => ({
+      ...bin,
+      name: `${UnifiedFormatter.formatValue(bin.low, primaryValCfg, { compact: true })}~${UnifiedFormatter.formatValue(bin.high, primaryValCfg, { compact: true })}`,
+      rangeFull: `[${bin.low.toLocaleString()}, ${bin.high.toLocaleString()}${bin.includeMax ? ']' : ')'}`,
+    })) : [];
 
   // 8. Primary Series Telemetry Stats
   const primaryValues = processedItems.map((it) => Number(it._rawSeriesValues[primarySeriesKey] ?? 0));
-  const primaryTotal = primaryValues.reduce((a, b) => a + b, 0);
-  const primaryStats = {
-    total: primaryTotal,
-    mean: primaryValues.length > 0 ? primaryTotal / primaryValues.length : 0,
-    max: primaryValues.length > 0 ? Math.max(...primaryValues) : 0,
-    min: primaryValues.length > 0 ? Math.min(...primaryValues) : 0,
-  };
+  const primaryStats = summarizeValues(primaryValues);
 
   const canStack = hasColGroups || (valConfigs.length > 1 && valConfigs.every((v) => UnifiedFormatter.inferUnit(v) === UnifiedFormatter.inferUnit(valConfigs[0])));
   const hasDualAxis = !hasColGroups && valConfigs.length > 1;
@@ -482,7 +478,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     isPercentMode,
     canStack,
     hasDualAxis,
-    xDimensionLabel,
+    xDimensionLabel: chartType === 'histogram' ? histField : xDimensionLabel,
     primaryValCfg,
     secondaryValCfg,
     primarySeriesKey,
@@ -492,6 +488,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     seriesMetaList,
     kpiCards,
     items: processedItems,
+    scope: chartType !== 'histogram' && processedItems.length < groupCount ? { shown: processedItems.length, total: groupCount } : null,
     pieItems,
     waterfallItems,
     funnelItems,
@@ -500,6 +497,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     scatterMeanX,
     scatterMeanY,
     histogramItems,
+    histogramStats: chartType === 'histogram' ? { valid: histogramItems.reduce((sum, bin) => sum + bin.count, 0), records: allGrandTotalRecords.length } : null,
     primaryStats,
     executiveInsight,
   };

@@ -57,6 +57,7 @@ export async function exportChartImage(dataset, chartSpec, chartType, darkMode, 
   try {
     if (viewMode === 'table') throw new Error('请先切换到表图上下或仅图表视图');
     const container = document.getElementById('pivot-chart-container');
+    if (chartSpec?.renderLimit) throw new Error('图表分组过多，请先筛选、减少维度或设置 TopN 后再导出');
     const source = container?.querySelector('svg[data-chart-svg], .recharts-wrapper > svg');
     if (!source || !chartSpec?.items?.length) throw new Error('当前图表为空，请调整筛选或配置指标后重试');
     const box = source.getBoundingClientRect();
@@ -75,13 +76,15 @@ export async function exportChartImage(dataset, chartSpec, chartType, darkMode, 
     const ns='http://www.w3.org/2000/svg';
     const svg=document.createElementNS(ns,'svg');
     const legend = [...container.querySelectorAll('.recharts-legend-item-text')].map((node) => node.textContent).join(' · ');
-    svg.setAttribute('xmlns',ns); svg.setAttribute('width',width); svg.setAttribute('height',height+62);
-    svg.setAttribute('viewBox',`0 0 ${width} ${height+62}`);
+    const totalHeight = height + (chartSpec.scope ? 86 : 62);
+    svg.setAttribute('xmlns',ns); svg.setAttribute('width',width); svg.setAttribute('height',totalHeight);
+    svg.setAttribute('viewBox',`0 0 ${width} ${totalHeight}`);
     const background=document.createElementNS(ns,'rect'); background.setAttribute('width','100%'); background.setAttribute('height','100%'); background.setAttribute('fill',darkMode?'#272822':'#FFFDF7'); svg.appendChild(background);
     const addText=(value,y)=>{const text=document.createElementNS(ns,'text');text.setAttribute('x','12');text.setAttribute('y',y);text.setAttribute('fill',darkMode?'#F8F8F2':'#272822');text.setAttribute('font-size','12');text.textContent=value;svg.appendChild(text);};
     addText(`${dataset?.name || '数据'} · ${chartSpec.primarySeriesKey}`,20);
     clone.setAttribute('y','30'); clone.setAttribute('width',width); clone.setAttribute('height',height); svg.appendChild(clone);
     if(legend) addText(legend,height+52);
+    if(chartSpec.scope) addText(`Top ${chartSpec.scope.shown} / ${chartSpec.scope.total}; full table & KPIs`,height+76);
     const blob=new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});
     if(format==='svg') { downloadBlob(blob,`${dataset?.name || '数据'}_透视图表.svg`); }
     else {
@@ -91,8 +94,8 @@ export async function exportChartImage(dataset, chartSpec, chartType, darkMode, 
         await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error('图表光栅化失败，请改用 SVG 导出'));image.src=url;});
         const canvas=document.createElement('canvas');
         // Bound the export canvas for mobile browsers with stricter texture limits.
-        const scale=Math.min(2,8192/width,8192/(height+62));
-        canvas.width=Math.ceil(width*scale);canvas.height=Math.ceil((height+62)*scale);
+        const scale=Math.min(2,8192/width,8192/totalHeight);
+        canvas.width=Math.ceil(width*scale);canvas.height=Math.ceil(totalHeight*scale);
         const context=canvas.getContext('2d');
         if(!context) throw new Error('无法创建图像画布，请改用 SVG 导出');
         context.drawImage(image,0,0,canvas.width,canvas.height);

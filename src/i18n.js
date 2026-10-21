@@ -1,5 +1,15 @@
 // UI copy only: never translate dataset field names or record values.
 const english = {
+  "有效数值：": "Valid numeric values: ",
+  "行；空值和非数值不参与频数。": "rows; blanks and non-numeric values are excluded.",
+  "频数分布": "Frequency distribution",
+  "点击柱体下钻明细": "Click a bar for details",
+  "图表分组过多": "Too many chart groups",
+  "个分组超过当前图表上限：": "groups exceed the current chart limit: ",
+  "；表格和 KPI 保持全量。请筛选、减少维度或设置 TopN。": "; the table and KPIs keep all results. Filter, reduce dimensions, or set TopN.",
+  "按主指标显示 Top 10": "Show top 10 by primary metric",
+  "图表范围：": "Chart scope: ",
+  "组；表格和 KPI 保持全量。": "groups; the table and KPIs keep all results.",
   "阈值比较方式": "Threshold comparison",
   "阈值": "Threshold",
   "单位/符号": "Unit or symbol",

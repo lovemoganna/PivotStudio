@@ -36,6 +36,15 @@ export function ChartStudio({
 }) {
   const [showChartTypes, setShowChartTypes] = React.useState(false);
   const [showLensPresets, setShowLensPresets] = React.useState(false);
+  const chartTypeToggleRef = React.useRef(null);
+  const restoreScopeFocusRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!unifiedChartSpec.renderLimit && restoreScopeFocusRef.current) {
+      // A completed scope action removes its button; keep keyboard navigation in the chart.
+      if (document.activeElement === document.body) chartTypeToggleRef.current?.focus({ preventScroll: true });
+      restoreScopeFocusRef.current = false;
+    }
+  }, [unifiedChartSpec]);
   const [compactAxis, setCompactAxis] = React.useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   React.useEffect(() => {
     const measure = () => setCompactAxis(window.innerWidth < 640);
@@ -64,9 +73,16 @@ export function ChartStudio({
               <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-ink-orange border border-[#FD971F]/30 text-[9px]">{' ' + t("量纲不同已自动按分组呈现") + ' '}</span>
             )}
           </p>
+          {unifiedChartSpec.scope && <p role="status" className="text-[10px] text-ink-muted mt-1 break-words">
+            {t("图表范围：")}{unifiedChartSpec.scope.shown} / {unifiedChartSpec.scope.total} {t("组；表格和 KPI 保持全量。")}
+          </p>}
+          {unifiedChartSpec.histogramStats && <p role="status" className="text-[10px] text-ink-muted mt-1 break-words">
+            {t("有效数值：")}{unifiedChartSpec.histogramStats.valid.toLocaleString()} / {unifiedChartSpec.histogramStats.records.toLocaleString()} {t("行；空值和非数值不参与频数。")}
+          </p>}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 relative apple-font-mono">
           <button
+            ref={chartTypeToggleRef}
             type="button"
             aria-controls="pivot-chart-types"
             aria-expanded={showChartTypes}
@@ -262,7 +278,13 @@ export function ChartStudio({
 
       {/* Main Chart Canvas */}
       <div className="flex-1 w-full min-h-[260px] flex items-center justify-center overflow-hidden">
-        {!unifiedChartSpec.hasValues ? (
+        {unifiedChartSpec.renderLimit ? (
+          <div role="status" className="p-6 max-w-lg text-center space-y-3">
+            <h4 className="text-sm font-semibold">{t("图表分组过多")}</h4>
+            <p className="text-xs text-ink-muted">{unifiedChartSpec.renderLimit.groupCount.toLocaleString()} {t("个分组超过当前图表上限：")}{unifiedChartSpec.renderLimit.maximum.toLocaleString()}{t("；表格和 KPI 保持全量。请筛选、减少维度或设置 TopN。")}</p>
+            <button className="px-3 py-2 rounded-lg bg-action text-[#F8F8F2] text-xs" onClick={(event) => { restoreScopeFocusRef.current = document.activeElement === event.currentTarget; setChartSpecConfig((prev) => ({ ...prev, topN: 10, sortMode: 'desc' })); }}>{t("按主指标显示 Top 10")}</button>
+          </div>
+        ) : !unifiedChartSpec.hasValues ? (
           <div className="flex flex-col items-center justify-center p-8 text-center apple-font-mono animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-[#FD971F]/10 border border-[#FD971F]/30 flex items-center justify-center mb-3 text-ink-orange shadow-sm">
               <Sliders className="w-6 h-6" />
@@ -271,19 +293,21 @@ export function ChartStudio({
             <p className="text-xs text-ink-muted max-w-sm leading-relaxed mb-4">{' ' + t("当前透视配置中缺少度量值。请在左侧字段架中点击或拖拽数值字段至【指标 / 值 (Values)】区域以生成图表。") + ' '}</p>
             <div className="px-3 py-1 rounded-full bg-[#3E3D32]/40 text-[10px] text-ink-green border border-[#A6E22E]/30">{' ' + t("提示: 可在左侧点击或拖入数值指标，或将任意维度加入值区域设为计数 (COUNT)") + ' '}</div>
           </div>
-        ) : unifiedChartSpec.items.length === 0 ? (
+        ) : unifiedChartSpec.items.length === 0 || (chartType === 'histogram' && !unifiedChartSpec.histogramItems.length) ? (
           <div className="text-center text-xs text-ink-muted py-12 apple-font-mono">{' ' + t("/* 当前筛选条件下暂无可展示的数据行 */") + ' '}</div>
         ) : chartType === 'heatmap' ? (
           <div className="w-full h-full overflow-auto">
             {(() => {
               const rows = pivotResult.tableRows.filter((row) => !row.isTotal && !row.isSubtotal);
-              const shownRows = rows.length ? rows.slice(0,200) : pivotResult.tableRows;
-              const groups = pivotResult.leafColGroups.length ? pivotResult.leafColGroups : pivotResult.allColGroups;
+              const rowsByKey = new Map(rows.map((row) => [row.rowKey, row]));
+              const shownRows = rows.length ? unifiedChartSpec.items.map((item) => rowsByKey.get(item.rowKey)).filter(Boolean) : pivotResult.tableRows;
+              const allGroups = pivotResult.leafColGroups.length ? pivotResult.leafColGroups : pivotResult.allColGroups;
+              const groupsByKey = new Map(allGroups.map((group) => [group.key, group]));
+              const groups = !rows.length && pivotResult.leafColGroups.length ? unifiedChartSpec.items.map((item) => groupsByKey.get(item.rowKey)).filter(Boolean) : allGroups;
               const metric = unifiedChartSpec.primaryValCfg;
               const magnitude = Math.max(1,...shownRows.flatMap((row) => groups.map((group) => Math.abs(pivotResult.displayMatrix[`${row.rowKey}@@${group.key}@@${metric.id}`]?.display || 0))));
               return <>
-                {rows.length > 200 && <p>{t("热力图展示前 200 个分组，请筛选或减少分组以查看其他数据。")}</p>}
-                <svg data-chart-svg="true" role="img" aria-label={t("矩阵热力图")} width={Math.max(500,160+groups.length*110)} height={Math.max(180,60+shownRows.length*38)}>
+                <svg data-chart-svg="true" role="group" aria-label={t("矩阵热力图")} width={Math.max(500,160+groups.length*110)} height={Math.max(180,60+shownRows.length*38)}>
                   {groups.map((group,index) => <text key={group.key} x={165+index*110} y={22} fill={darkMode?'#F8F8F2':'#272822'} fontSize="11">{group.pathLabels?.join(' / ') || '总计'}</text>)}
                   {shownRows.map((row,r) => <g key={row.rowKey}>
                     <text x="4" y={58+r*38} fill={darkMode?'#F8F8F2':'#272822'} fontSize="11">{row.label.slice(0,18)}</text>
@@ -304,7 +328,7 @@ export function ChartStudio({
           </div>
         ) : chartType === 'funnel' ? (
           <div className="w-full h-full overflow-auto">
-            <svg data-chart-svg="true" role="img" aria-label={t("漏斗图")} width="800" height={Math.max(220,unifiedChartSpec.funnelItems.length*54+24)}>
+            <svg data-chart-svg="true" role="group" aria-label={t("漏斗图")} width="800" height={Math.max(220,unifiedChartSpec.funnelItems.length*54+24)}>
               {unifiedChartSpec.funnelItems.map((item,index) => {
                 const width = item.widthPct*5.5, x=180+(550-width)/2, y=12+index*54;
                 return <g key={item.rowKey} onClick={() => handleChartPointClick(item)} role="button" tabIndex={0} aria-label={`${item.name}: ${item.formattedValue}`}>
@@ -581,24 +605,14 @@ export function ChartStudio({
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                 <Bar isAnimationActive={false}
                   dataKey="count"
-                  name={`频数分布 (${unifiedChartSpec.primaryValCfg.field} · 双击柱体下钻明细)`}
+                  name={`${t('频数分布')} (${unifiedChartSpec.primaryValCfg.field} · ${t('点击柱体下钻明细')})`}
                   fill="url(#monokaiHistGrad)"
                   radius={[5, 5, 0, 0]}
                   cursor="pointer"
                   onClick={(d) => {
                     soundEngine?.playTransitionChord();
                     const payload = d?.payload || d;
-                    if (payload?.matchedRows) {
-                      setDrillSearch?.('');
-                      setDrillPage?.(1);
-                      setDrillDownModal?.({
-                        rowLabel: `区间 ${payload.rangeFull}`,
-                        colLabel: '直方图频数分箱',
-                        valLabel: `${payload.count} 笔 (${payload.pct}%)`,
-                        valueFormatted: `${payload.count} 笔`,
-                        records: payload.matchedRows,
-                      });
-                    }
+                    if (Number.isInteger(payload?.histogramBin)) handleChartPointClick(payload);
                   }}
                 >
                   {chartSpecConfig.showDataLabels && (
