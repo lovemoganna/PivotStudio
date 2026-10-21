@@ -799,7 +799,7 @@ export default function PivotWorkbench() {
               field: fieldName,
               agg: defaultAgg,
               showAs: 'normal',
-              format: { thousands: true, decimals: 0, currency: /销售额|金额/.test(fieldName) ? '¥' : '', isPercent: false },
+              format: { thousands: true, decimals: 0, currency: fMeta?.currency || '', isPercent: false },
             },
           ],
         };

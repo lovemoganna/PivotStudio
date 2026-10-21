@@ -34,3 +34,10 @@ test('invalid quote tails, binary and HTML inputs give explicit actionable failu
   assert.equal(result.rows[0].value,'');
   assert.match(result.importMeta.warnings,/缺少字段/);
 });
+
+test('identifier columns remain text even when the first sample is mostly numeric',()=>{
+  const csv='InvoiceNo,StockCode,CustomerID,Quantity,UnitPrice\n'+Array.from({length:100},(_,i)=>`${536365+i},${i<95?85123+i:'85123A'},17850,6,2.55`).join('\n');
+  const sheet=parseCSVTextToSheet(csv);
+  assert.deepEqual(sheet.fields.map(f=>f.type),['text','text','text','number','number']);
+  assert.equal(sheet.rows[99].StockCode,'85123A');
+});

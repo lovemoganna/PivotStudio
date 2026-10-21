@@ -272,12 +272,15 @@ test('R8 worker crash and storage quota failure stay visible and allow retry',as
 });
 
 test('review: Excel currency percentages dates and text IDs retain underlying values',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});
   await page.setViewportSize({width:1440,height:1000});
   const sheet=XLSX.utils.aoa_to_sheet([
     ['Region','Amount','Rate','Date','ID'],
     ['East',1234.56,.125,new Date('2026-10-20T00:00:00Z'),'00123'],
     ['West',2000,.25,new Date('2026-10-21T00:00:00Z'),'00456'],
   ],{cellDates:true});
+  sheet.D2={t:'n',v:Date.UTC(2026,9,20)/86400000+25569,z:'m/d/yy'};
+  sheet.D3={t:'n',v:Date.UTC(2026,9,21)/86400000+25569,z:'m/d/yy'};
   for(const row of [2,3]) { sheet[`B${row}`].z='$#,##0.00'; sheet[`C${row}`].z='0.0%'; sheet[`D${row}`].z='m/d/yy'; }
   const book=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book,sheet,'Finance');
   await page.goto('/');
@@ -287,6 +290,7 @@ test('review: Excel currency percentages dates and text IDs retain underlying va
   await expect(preview(page).getByLabel('Date · 字段类型',{exact:true})).toHaveValue('date');
   await expect(preview(page).getByLabel('ID · 字段类型',{exact:true})).toHaveValue('text');
   await expect(preview(page)).toContainText('00123');
+  await expect(preview(page)).toContainText('2026-10-20T00:00:00.000');
   await page.getByRole('button',{name:'仅导入数据（清空当前透视）',exact:true}).click(); await ready(page);
   await page.getByTestId('field-Region').dragTo(page.getByTestId('zone-rows')); await ready(page);
   await page.getByTestId('field-Amount').dragTo(page.getByTestId('zone-values')); await ready(page);
@@ -332,4 +336,23 @@ test('review: saving recovers malformed local workspace storage across reload',a
   await page.reload(); await ready(page);
   await page.getByRole('button',{name:/工作区 ·/}).click();
   await expect(page.getByRole('dialog')).toContainText('Recovered');
+});
+
+test('review: non-A Excel used ranges preserve dates and adjacent numbers',async({page})=>{
+  for(const start of [{r:1,c:1},{r:3,c:3}]) {
+    const sheet={};
+    const serial=Date.UTC(2026,9,20,8,26)/86400000+25569;
+    XLSX.utils.sheet_add_aoa(sheet,[['Label','Date','Amount'],['East',serial,12.5]],{origin:start});
+    sheet['!ref']=XLSX.utils.encode_range({s:start,e:{r:start.r+1,c:start.c+2}});
+    sheet[XLSX.utils.encode_cell({r:start.r+1,c:start.c+1})].z='yyyy-mm-dd hh:mm';
+    const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,sheet,'Offset');
+    await page.goto('/');
+    await upload(page,XLSX.write(book,{type:'buffer',bookType:'xlsx'}),'offset.xlsx');
+    await expect(preview(page)).toBeVisible();
+    await expect(preview(page).getByLabel('Date · 字段类型',{exact:true})).toHaveValue('date');
+    await expect(preview(page).getByLabel('Amount · 字段类型',{exact:true})).toHaveValue('number');
+    await expect(preview(page).locator('select[aria-label$=" · 字段类型"]')).toHaveCount(3);
+    await expect(preview(page)).toContainText('2026-10-20T08:26:00.000');
+    await expect(preview(page).getByRole('cell',{name:'12.5',exact:true})).toBeVisible();
+  }
 });

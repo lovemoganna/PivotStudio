@@ -21,20 +21,14 @@ export const UnifiedFormatter = {
     if (/_mb$/i.test(fName)) return 'MB';
     if (/_gb$/i.test(fName)) return 'GB';
     if (/_kb$/i.test(fName)) return 'KB';
-    if (/_(pct|percent|rate|ratio)$/i.test(fName)) return '%';
+    if (valCfg.format?.isPercent !== false && /_(pct|percent|rate|ratio)$/i.test(fName)) return '%';
     if (/_(usd|dollar)$/i.test(fName)) return '$';
     if (/_(cny|rmb)$/i.test(fName)) return '¥';
     if (/_eur$/i.test(fName)) return '€';
 
     // 3. 通用业务语义推断
     if (valCfg.agg === 'count' || valCfg.agg === 'count_distinct' || fName === '__COUNT__') return '笔';
-    if (/率|比|percent|ratio|rate/i.test(fName)) return '%';
-    if (/销售额|金额|成本|利润|毛利润|单价|营收|收入|price|amount|revenue|cost|profit|salary|wage/i.test(fName)) return '¥';
-    if (/数量|件数|销量|volume|qty/i.test(fName)) return '件';
-    if (/延迟|耗时|latency|duration/i.test(fName)) return 'ms';
-    if (/内存|mem|ram|disk/i.test(fName)) return 'MB';
-    if (/温度|temp/i.test(fName)) return '°C';
-    if (/血压|bp/i.test(fName)) return 'mmHg';
+    // Names such as UnitPrice or Duration do not establish currency/time units.
 
     return '';
   },
@@ -55,7 +49,8 @@ export const UnifiedFormatter = {
     const plusSign = options.showPlusSign && num > 0 ? '+' : '';
 
     if (isPercent) {
-      return `${plusSign}${num.toFixed(decimals)}%`;
+      const percentValue = isPctShowAs ? num : num * 100;
+      return `${plusSign}${percentValue.toFixed(decimals)}%`;
     }
 
     if (options.compact) {

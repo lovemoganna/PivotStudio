@@ -258,7 +258,10 @@ test('UnifiedFormatter infers units from suffixes and brackets', () => {
   assert.equal(UnifiedFormatter.inferUnit({ field: 'mem_mb' }), 'MB');
   assert.equal(UnifiedFormatter.inferUnit({ field: 'cpu_pct' }), '%');
   assert.equal(UnifiedFormatter.inferUnit({ field: 'weight(kg)' }), 'kg');
-  assert.equal(UnifiedFormatter.inferUnit({ field: 'base_salary' }), '¥');
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'base_salary' }), '');
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'base_salary',format:{currency:'$'} }), '$');
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'UnitPrice' }), '');
+  assert.equal(UnifiedFormatter.inferUnit({ field: 'Administrative_Duration' }), '');
   assert.equal(UnifiedFormatter.inferUnit({ field: '__COUNT__' }), '笔');
 });
 
@@ -403,4 +406,24 @@ test('large sparse pivot fails with actionable memory guard before allocating de
   const rows=Array.from({length:1000},(_,i)=>({a:'a'+i,b:'b'+i,n:1}));
   const ds={fields:[{name:'a',type:'text'},{name:'b',type:'text'},{name:'n',type:'number'}],rows};
   assert.throws(()=>calculatePivot(ds,{rows:[{field:'a'}],columns:[{field:'b'}],values:[{id:'v',field:'n',agg:'sum'}]}),/内存不足/);
+});
+
+test('recommendations exclude numeric identifiers and never invent currency',()=>{
+  const fields=[{name:'InvoiceNo',type:'number'},{name:'StockCode',type:'number'},{name:'CustomerID',type:'number'},{name:'Country',type:'text'},{name:'Quantity',type:'number'},{name:'UnitPrice',type:'number'}];
+  const cfg=buildDefaultPivotConfig({fields,rows:[]});
+  assert.deepEqual(cfg.values.map(v=>v.field),['Quantity','UnitPrice']);
+  assert.equal(cfg.rows[0].field,'Country');
+  assert.equal(cfg.values[1].format.currency,'');
+  fields[5].currency='£';
+  assert.equal(buildDefaultPivotConfig({fields,rows:[]}).values[1].format.currency,'£');
+});
+
+
+test('duration is not a ratio and source fractions format as percentages once',()=>{
+  const cfg=buildDefaultPivotConfig({fields:[{name:'Administrative_Duration',type:'number'},{name:'BounceRates',type:'number'}],rows:[]});
+  assert.equal(cfg.values[0].agg,'sum');assert.equal(cfg.values[0].format.isPercent,false);
+  assert.equal(cfg.values[1].agg,'avg');assert.equal(cfg.values[1].format.isPercent,true);
+  assert.equal(UnifiedFormatter.formatValue(.0268666074,{field:'BounceRates',format:{isPercent:true,decimals:2}}),'2.69%');
+  assert.equal(UnifiedFormatter.formatValue(2.68666074,{showAs:'pct_grand',format:{isPercent:true}}),'2.7%');
+  assert.equal(UnifiedFormatter.formatValue(.0268666074,{field:'BounceRates',format:{isPercent:false,decimals:4}}),'0.0269');
 });

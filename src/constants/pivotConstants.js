@@ -1,4 +1,5 @@
 import { Type, Hash, Calendar, ToggleLeft } from 'lucide-react';
+import { isIdentifierField, isRateField } from '../utils/fieldSemantics.js';
 
 export const FIELD_TYPES = {
   text: {
@@ -254,17 +255,17 @@ export function buildDefaultPivotConfig(dataset) {
 
   // 1. 分类识别维度与度量（优先尊重用户的 role 标注）
   const dimensionFields = dataset.fields.filter(
-    (f) => f.role === 'dimension' || (!f.role && f.type !== 'number')
+    (f) => f.role === 'dimension' || (!f.role && (f.type !== 'number' || isIdentifierField(f.name)))
   );
   const measureFields = dataset.fields.filter(
-    (f) => f.role === 'measure' || (!f.role && f.type === 'number')
+    (f) => f.role === 'measure' || (!f.role && f.type === 'number' && !isIdentifierField(f.name))
   );
 
   const dateFields = dimensionFields.filter((f) => f.type === 'date');
   const textFields = dimensionFields.filter((f) => f.type !== 'date');
 
   // 2. 避免将纯 ID/唯一键作为默认首选行维度
-  const isKeyName = (name) => /(^id$|_id$|uuid|guid|no$|编号|代码|工号|序号)/i.test(name);
+  const isKeyName = isIdentifierField;
   const sortedTextFields = [...textFields].sort((a, b) => {
     const aIsKey = isKeyName(a.name) ? 1 : 0;
     const bIsKey = isKeyName(b.name) ? 1 : 0;
@@ -305,8 +306,7 @@ export function buildDefaultPivotConfig(dataset) {
   const values = [];
   if (measureFields.length > 0) {
     measureFields.slice(0, 2).forEach((mf, idx) => {
-      const isRateOrAvg = /rate|ratio|pct|percent|score|age|temp|lat|cpu|率|比|分|度|龄|均/i.test(mf.name);
-      const isCurrency = /额|利|成本|价|营收|收入|price|amount|revenue|cost|profit|salary/i.test(mf.name);
+      const isRateOrAvg = isRateField(mf.name) || /^(score|age|temp|temperature|latency|cpu)$|率|比|分|度|龄|均/i.test(mf.name);
       values.push({
         id: `v_init_${idx + 1}`,
         field: mf.name,
@@ -315,8 +315,9 @@ export function buildDefaultPivotConfig(dataset) {
         format: {
           thousands: true,
           decimals: isRateOrAvg ? 1 : 0,
-          currency: isCurrency ? '¥' : '',
-          isPercent: /rate|ratio|pct|percent|率|比/i.test(mf.name),
+          // A measure name cannot establish its currency; only use explicit metadata.
+          currency: mf.currency || '',
+          isPercent: isRateField(mf.name),
         },
       });
     });
