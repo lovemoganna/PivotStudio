@@ -221,7 +221,12 @@ export default function PivotWorkbench() {
   }, []);
 
   useEffect(() => {
-    if (workspaceLoadErrorRef.current) { showToast(workspaceLoadErrorRef.current,'error'); return; }
+    if (workspaceLoadErrorRef.current) {
+      showToast(workspaceLoadErrorRef.current,'error');
+      // Preserve the invalid value until a subsequent save, then allow recovery.
+      workspaceLoadErrorRef.current = null;
+      return;
+    }
     try { localStorage.setItem('pivotstudio_workspaces_v1',JSON.stringify(savedWorkspaces)); }
     catch { showToast('本机存储不足或不可用，视图仅在当前标签页有效；请释放存储空间后重新保存','error'); }
   }, [savedWorkspaces,showToast]);

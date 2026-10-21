@@ -26,10 +26,16 @@ self.onmessage = async ({ data: { file, text, sheets, normalize, options = {} } 
     if (file && /\.(xlsx|xls)$/i.test(file.name)) {
       const buffer = await file.arrayBuffer();
       progress(30);
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
       result = workbook.SheetNames.map((name, index) => {
         progress(35 + Math.round(index / workbook.SheetNames.length * 50));
-        const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[name]);
+        // Import underlying numbers (including currency/percent), not display strings.
+        // ISO dates keep date inference independent of workbook display formats.
+        const records = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, raw: true, defval: '' });
+        const csv = records.map((row) => row.map((value) => {
+          const raw = value instanceof Date ? value.toISOString() : String(value ?? '');
+          return `"${raw.replace(/"/g, '""')}"`;
+        }).join(',')).join('\n');
         return parseCSVTextToSheet(csv, name, { delimiter: ',', header: 'yes' });
       }).filter(Boolean);
     } else {

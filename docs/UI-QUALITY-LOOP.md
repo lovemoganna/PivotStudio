@@ -128,3 +128,11 @@ The loop stops after the identified P1/P2 repairs have runnable regressions, con
 - `tests/browser/quality.spec.js`
 - `docs/UI-QUALITY-LOOP.md`
 - `docs/quality-evidence/ (paired screenshots and JSON evidence)`
+
+## Authorized release follow-up (2026-10-21)
+
+The user subsequently authorized review, merge/deployment and production checks in that order. Pre-merge review found two remaining defects: formatted Excel currency/percent cells became text (P1), and malformed workspace storage permanently blocked later saves (P2). Excel now reads raw typed cells, serializes dates as ISO and preserves text IDs; workspace load errors are reported once so later explicit saves can recover. The rejected cross-zone move already returned the original configuration; a browser regression now proves source preservation and unchanged history. Deployment uses Node 22, matching verification and the development dependency engine requirement. No production dependency was added.
+
+Executed locally: 32/32 Node tests, production build and 25/25 Chromium browser tests. The new Excel test checks inferred types, text `00123`, summed amounts and a numeric XLSX average of `0.1875`. The storage regression saves after malformed JSON and reloads the saved view. The drag regression checks both zones and Undo after rejection. Initial new test attempts used a viewport too short for reliable native drag; their failures remain in local test results; corrected tests assert the intended state.
+
+`scripts/delivery-smoke.mjs` runs the same import → row filter → chart drilldown → CSV export flow at 360px touch emulation and 1440px desktop, locally or at `DELIVERY_URL`. Both candidate checks passed with two of three fixture rows selected, correct total 30, no page exceptions, no non-GET requests and no document horizontal overflow. Inputs are explicitly synthetic fixtures, not user business data. JSON and screenshots are written to ignored `artifacts/delivery/`. Physical devices and private user files remain unverified.

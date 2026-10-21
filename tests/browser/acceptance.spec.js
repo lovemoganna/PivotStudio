@@ -270,3 +270,66 @@ test('R8 worker crash and storage quota failure stay visible and allow retry',as
   await page.getByRole('button',{name:'重新计算',exact:true}).click(); await ready(page);
   await expect(page.locator('#pivot-main-html-table')).toBeVisible();
 });
+
+test('review: Excel currency percentages dates and text IDs retain underlying values',async({page})=>{
+  await page.setViewportSize({width:1440,height:1000});
+  const sheet=XLSX.utils.aoa_to_sheet([
+    ['Region','Amount','Rate','Date','ID'],
+    ['East',1234.56,.125,new Date('2026-10-20T00:00:00Z'),'00123'],
+    ['West',2000,.25,new Date('2026-10-21T00:00:00Z'),'00456'],
+  ],{cellDates:true});
+  for(const row of [2,3]) { sheet[`B${row}`].z='$#,##0.00'; sheet[`C${row}`].z='0.0%'; sheet[`D${row}`].z='m/d/yy'; }
+  const book=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book,sheet,'Finance');
+  await page.goto('/');
+  await upload(page,XLSX.write(book,{type:'buffer',bookType:'xlsx'}),'formatted.xlsx');
+  await expect(preview(page).getByLabel('Amount · 字段类型',{exact:true})).toHaveValue('number');
+  await expect(preview(page).getByLabel('Rate · 字段类型',{exact:true})).toHaveValue('number');
+  await expect(preview(page).getByLabel('Date · 字段类型',{exact:true})).toHaveValue('date');
+  await expect(preview(page).getByLabel('ID · 字段类型',{exact:true})).toHaveValue('text');
+  await expect(preview(page)).toContainText('00123');
+  await page.getByRole('button',{name:'仅导入数据（清空当前透视）',exact:true}).click(); await ready(page);
+  await page.getByTestId('field-Region').dragTo(page.getByTestId('zone-rows')); await ready(page);
+  await page.getByTestId('field-Amount').dragTo(page.getByTestId('zone-values')); await ready(page);
+  const csvPromise=page.waitForEvent('download'); await page.getByRole('button',{name:'.CSV',exact:true}).click();
+  const csv=parseCSVRecords(await readFile(await (await csvPromise).path(),'utf8'));
+  expect(csv.flat().map(value=>value.replace(/^[¥$]/,''))).toEqual(expect.arrayContaining(['1,235','2,000','3,235']));
+  await page.getByTestId('field-Rate').dragTo(page.getByTestId('zone-values')); await ready(page);
+  await page.getByLabel('切换聚合口径',{exact:true}).last().selectOption('avg'); await ready(page);
+  await page.getByTestId('zone-values').getByRole('button',{name:'移除字段',exact:true}).first().click(); await ready(page);
+  await page.getByRole('button',{name:'格式与数值',exact:true}).click();
+  await page.getByLabel('Rate · 小数位数',{exact:true}).selectOption('2');
+  await page.keyboard.press('Escape'); await ready(page);
+  const rateDownload=page.waitForEvent('download'); await page.getByRole('button',{name:'.XLSX',exact:true}).click();
+  const rateBook=XLSX.read(await readFile(await (await rateDownload).path()));
+  const rateRows=XLSX.utils.sheet_to_json(rateBook.Sheets[rateBook.SheetNames[0]],{header:1});
+  expect(rateRows.at(-1).at(-1)).toBe(.1875);
+});
+
+test('review: rejected cross-zone move preserves source and configuration history',async({page})=>{
+  await page.setViewportSize({width:1440,height:1000});
+  await page.goto('/'); await upload(page,'Date,Amount\n2026-10-20,10\n2026-10-21,20');
+  await expect(preview(page)).toBeVisible();
+  await page.getByRole('button',{name:'仅导入数据（清空当前透视）',exact:true}).click(); await ready(page);
+  for(const zone of ['rows','filters']) { await page.getByTestId('field-Date').dragTo(page.getByTestId(`zone-${zone}`)); await ready(page); await expect(page.getByTestId(`zone-${zone}`)).toContainText('Date'); }
+  await page.getByTestId('zone-rows').locator('[draggable=true]').first().dragTo(page.getByTestId('zone-filters'),{sourcePosition:{x:8,y:10},targetPosition:{x:8,y:8}});
+  await expect(page.locator('[role=status]').filter({hasText:'已存在于该区域'})).toBeVisible();
+  await expect(page.getByTestId('zone-rows')).toContainText('Date');
+  await expect(page.getByTestId('zone-filters').locator('[draggable=true]')).toHaveCount(1);
+  await page.getByRole('button',{name:'撤销',exact:true}).click(); await ready(page);
+  await expect(page.getByTestId('zone-rows')).toContainText('Date');
+  await expect(page.getByTestId('zone-filters')).not.toContainText('Date');
+});
+
+test('review: saving recovers malformed local workspace storage across reload',async({page})=>{
+  await page.goto('/');
+  await page.evaluate(()=>localStorage.setItem('pivotstudio_workspaces_v1','{broken'));
+  await page.goto('/?demo=retail'); await ready(page);
+  await expect(page.locator('[role=status]').filter({hasText:'本机视图无法读取'})).toBeVisible();
+  await page.getByRole('button',{name:/工作区 ·/}).click();
+  await page.getByPlaceholder('输入新工作区快照名称...').fill('Recovered');
+  await page.getByRole('button',{name:'保存快照',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('pivotstudio_workspaces_v1'))[0]?.name)).toBe('Recovered');
+  await page.reload(); await ready(page);
+  await page.getByRole('button',{name:/工作区 ·/}).click();
+  await expect(page.getByRole('dialog')).toContainText('Recovered');
+});
