@@ -272,12 +272,15 @@ test('R8 worker crash and storage quota failure stay visible and allow retry',as
 });
 
 test('review: Excel currency percentages dates and text IDs retain underlying values',async({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});
   await page.setViewportSize({width:1440,height:1000});
   const sheet=XLSX.utils.aoa_to_sheet([
     ['Region','Amount','Rate','Date','ID'],
     ['East',1234.56,.125,new Date('2026-10-20T00:00:00Z'),'00123'],
     ['West',2000,.25,new Date('2026-10-21T00:00:00Z'),'00456'],
   ],{cellDates:true});
+  sheet.D2={t:'n',v:Date.UTC(2026,9,20)/86400000+25569,z:'m/d/yy'};
+  sheet.D3={t:'n',v:Date.UTC(2026,9,21)/86400000+25569,z:'m/d/yy'};
   for(const row of [2,3]) { sheet[`B${row}`].z='$#,##0.00'; sheet[`C${row}`].z='0.0%'; sheet[`D${row}`].z='m/d/yy'; }
   const book=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book,sheet,'Finance');
   await page.goto('/');
@@ -287,6 +290,7 @@ test('review: Excel currency percentages dates and text IDs retain underlying va
   await expect(preview(page).getByLabel('Date · 字段类型',{exact:true})).toHaveValue('date');
   await expect(preview(page).getByLabel('ID · 字段类型',{exact:true})).toHaveValue('text');
   await expect(preview(page)).toContainText('00123');
+  await expect(preview(page)).toContainText('2026-10-20T00:00:00.000');
   await page.getByRole('button',{name:'仅导入数据（清空当前透视）',exact:true}).click(); await ready(page);
   await page.getByTestId('field-Region').dragTo(page.getByTestId('zone-rows')); await ready(page);
   await page.getByTestId('field-Amount').dragTo(page.getByTestId('zone-values')); await ready(page);

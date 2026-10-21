@@ -49,8 +49,10 @@ export function excelNumberFormat(metric) {
   const currency = !percent && /^[\$¥€£元]/.test(unit) ? unit : '';
   const suffix = percent ? '%' : currency ? '' : unit ? ` ${unit}` : '';
   const literal = (text) => text ? '"' + text.replace(/"/g,'""') + '"' : '';
+  // Source ratios remain fractions; show-as percentages are already multiplied by 100.
+  const suffixFormat = percent && !metric.showAs?.startsWith('pct_') ? '%' : literal(suffix);
   const digits = (percent || metric.format?.thousands === false ? '0' : '#,##0') + (decimals ? '.'+'0'.repeat(decimals) : '');
-  const positive = (metric.showAs === 'prev_diff' || metric.showAs === 'pct_prev_diff' ? '+' : '') + literal(currency) + digits + literal(suffix);
-  const normal = literal(currency) + digits + literal(suffix);
+  const positive = (metric.showAs === 'prev_diff' || metric.showAs === 'pct_prev_diff' ? '+' : '') + literal(currency) + digits + suffixFormat;
+  const normal = literal(currency) + digits + suffixFormat;
   return `${positive};-${normal};${normal}`;
 }

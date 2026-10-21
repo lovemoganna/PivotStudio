@@ -33,6 +33,7 @@ test('formatted export matches table decimals currency percentages and baseline'
   for(const metric of [
     {id:'v',field:'amount',agg:'sum',format:{decimals:2,currency:'¥',thousands:true}},
     {id:'v',field:'amount',agg:'sum',showAs:'pct_grand',format:{}},
+    {id:'v',field:'BounceRates',agg:'avg',format:{isPercent:true,decimals:2}},
     {id:'v',field:'latency_ms',agg:'avg',format:{decimals:1}},
   ]) {
     for(const value of [1234.56,-1234.56,0]) {

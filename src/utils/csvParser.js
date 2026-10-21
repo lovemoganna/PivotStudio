@@ -1,3 +1,5 @@
+import { isIdentifierField } from './fieldSemantics.js';
+
 // Quoted commas, embedded newlines and escaped quotes are handled as one CSV record.
 export function parseCSVRecords(text, delimiter = ',', limit = Infinity) {
   const records = [];
@@ -96,7 +98,7 @@ export function parseCSVTextToSheet(csvText, sheetName = 'Sheet1', options = {})
       const type = scalarType(row[name]);
       if (type !== 'empty') { nonempty++; counts[type]++; }
     }
-    const type = ['boolean','date','number'].find((key) => nonempty && counts[key] / nonempty >= 0.7) || 'text';
+    const type = isIdentifierField(name) ? 'text' : ['boolean','date','number'].find((key) => nonempty && counts[key] / nonempty >= 0.7) || 'text';
     return { name, type };
   });
   return { name: sheetName, fields, rows, importMeta: { delimiter, hasHeader, encoding: options.encoding || 'utf-8', warnings: shortRowCount ? `${shortRowCount} 行缺少字段，已按原有规则补为空值；请核对分隔符设置，并确认原文件是否遗漏列` : '' } };

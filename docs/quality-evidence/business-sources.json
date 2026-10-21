@@ -1,0 +1,51 @@
+[
+  {
+    "name": "retail",
+    "url": "https://archive.ics.uci.edu/static/public/352/online+retail.zip",
+    "sourcePage": "https://archive.ics.uci.edu/dataset/352/online+retail",
+    "sourceSHA256": "f5385cbb54bbebf7196389109c6b0621faab0c304e3702548165e71c84aede8b",
+    "file": "artifacts/business-data/retail-first-2000.xlsx",
+    "fileSHA256": "05ea2f5cabae9696d0d4d5aee216fdbcb86b1f6d6148e39e2541f58b7cb3a8b5",
+    "rows": 2000,
+    "group": "Country",
+    "measure": "Quantity",
+    "agg": "sum",
+    "selected": "United Kingdom",
+    "filteredRows": 1841,
+    "expected": "15535",
+    "subset": "First 2000 records in source worksheet order, unchanged cell values",
+    "priceCurrency": "GBP"
+  },
+  {
+    "name": "bank",
+    "url": "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip",
+    "sourcePage": "https://archive.ics.uci.edu/dataset/222/bank+marketing",
+    "sourceSHA256": "e0bf5f5de5b846e2f18e9d90606637267d46dfa260e0f17bb12e605db5efbeb4",
+    "file": "artifacts/business-data/bank-full.csv",
+    "fileSHA256": "d1513ec63b385506f7cfce9f2c5caa9fe99e7ba4e8c3fa264b3aaf0f849ed32d",
+    "rows": 45211,
+    "group": "job",
+    "measure": "balance",
+    "agg": "sum",
+    "selected": "management",
+    "filteredRows": 9458,
+    "expected": "16680288",
+    "subset": "Complete published CSV"
+  },
+  {
+    "name": "shoppers",
+    "url": "https://archive.ics.uci.edu/static/public/468/online+shoppers+purchasing+intention+dataset.zip",
+    "sourcePage": "https://archive.ics.uci.edu/dataset/468/online+shoppers+purchasing+intention+dataset",
+    "sourceSHA256": "2972e6184d3ad7beaaa831d9fc2b059dc3ee29df69d1ec593c466a5cd8485d14",
+    "file": "artifacts/business-data/online-shoppers.csv",
+    "fileSHA256": "b3055ee355f59134d851d32641183cb4a8b45def7124d2f50442a042f358e0d9",
+    "rows": 12330,
+    "group": "Month",
+    "measure": "BounceRates",
+    "agg": "avg",
+    "selected": "May",
+    "filteredRows": 3364,
+    "expected": "0.02686660742627824019024970273",
+    "subset": "Complete published CSV"
+  }
+]

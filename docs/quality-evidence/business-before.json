@@ -1,0 +1,266 @@
+[
+  {
+    "name": "retail",
+    "url": "https://lovemoganna.github.io/PivotStudio/",
+    "rows": 2000,
+    "types": {
+      "InvoiceNo": "number",
+      "StockCode": "number",
+      "Description": "text",
+      "Quantity": "number",
+      "InvoiceDate": "date",
+      "UnitPrice": "number",
+      "CustomerID": "number",
+      "Country": "text"
+    },
+    "defaultConfig": {
+      "filters": [],
+      "rows": [
+        {
+          "id": "r_init_1",
+          "field": "Description",
+          "sort": "none",
+          "dateGranularity": "raw",
+          "excludedValues": []
+        },
+        {
+          "id": "r_init_2",
+          "field": "Country",
+          "sort": "none",
+          "dateGranularity": "raw",
+          "excludedValues": []
+        }
+      ],
+      "columns": [
+        {
+          "id": "c_init_1",
+          "field": "InvoiceDate",
+          "sort": "asc",
+          "dateGranularity": "year",
+          "excludedValues": []
+        }
+      ],
+      "values": [
+        {
+          "id": "v_init_1",
+          "field": "InvoiceNo",
+          "agg": "sum",
+          "showAs": "normal",
+          "format": {
+            "thousands": true,
+            "decimals": 0,
+            "currency": "",
+            "isPercent": false
+          }
+        },
+        {
+          "id": "v_init_2",
+          "field": "StockCode",
+          "agg": "sum",
+          "showAs": "normal",
+          "format": {
+            "thousands": true,
+            "decimals": 0,
+            "currency": "",
+            "isPercent": false
+          }
+        }
+      ],
+      "valueSort": {
+        "colKey": "__GRAND_TOTAL_COL__",
+        "valueId": "v_init_1",
+        "direction": "none"
+      },
+      "collapsedRowKeys": {},
+      "collapsedColKeys": {},
+      "showSubtotals": false
+    },
+    "defaultImportAndSaveMs": 2746,
+    "issues": [
+      "Identifier InvoiceNo incorrectly defaults to SUM",
+      "Identifier StockCode incorrectly defaults to SUM"
+    ],
+    "filteredRows": 1841,
+    "expected": "15535",
+    "actual": 15535,
+    "csvTotal": "15,535.00",
+    "errors": [],
+    "uploads": [],
+    "calculationResult": "passed"
+  },
+  {
+    "name": "bank",
+    "url": "https://lovemoganna.github.io/PivotStudio/",
+    "rows": 45211,
+    "types": {
+      "age": "number",
+      "job": "text",
+      "marital": "text",
+      "education": "text",
+      "default": "text",
+      "balance": "number",
+      "housing": "text",
+      "loan": "text",
+      "contact": "text",
+      "day": "number",
+      "month": "text",
+      "duration": "number",
+      "campaign": "number",
+      "pdays": "number",
+      "previous": "number",
+      "poutcome": "text",
+      "y": "text"
+    },
+    "defaultConfig": {
+      "filters": [],
+      "rows": [
+        {
+          "id": "r_init_1",
+          "field": "job",
+          "sort": "none",
+          "dateGranularity": "raw",
+          "excludedValues": []
+        },
+        {
+          "id": "r_init_2",
+          "field": "marital",
+          "sort": "none",
+          "dateGranularity": "raw",
+          "excludedValues": []
+        }
+      ],
+      "columns": [],
+      "values": [
+        {
+          "id": "v_init_1",
+          "field": "age",
+          "agg": "avg",
+          "showAs": "normal",
+          "format": {
+            "thousands": true,
+            "decimals": 1,
+            "currency": "",
+            "isPercent": false
+          }
+        },
+        {
+          "id": "v_init_2",
+          "field": "balance",
+          "agg": "sum",
+          "showAs": "normal",
+          "format": {
+            "thousands": true,
+            "decimals": 0,
+            "currency": "",
+            "isPercent": false
+          }
+        }
+      ],
+      "valueSort": {
+        "colKey": "__GRAND_TOTAL_COL__",
+        "valueId": "v_init_1",
+        "direction": "none"
+      },
+      "collapsedRowKeys": {},
+      "collapsedColKeys": {},
+      "showSubtotals": false
+    },
+    "defaultImportAndSaveMs": 2108,
+    "issues": [],
+    "filteredRows": 9458,
+    "expected": "16680288",
+    "actual": 16680288,
+    "csvTotal": "16,680,288.00",
+    "errors": [],
+    "uploads": [],
+    "calculationResult": "passed"
+  },
+  {
+    "name": "shoppers",
+    "url": "https://lovemoganna.github.io/PivotStudio/",
+    "rows": 12330,
+    "types": {
+      "Administrative": "number",
+      "Administrative_Duration": "number",
+      "Informational": "number",
+      "Informational_Duration": "number",
+      "ProductRelated": "number",
+      "ProductRelated_Duration": "number",
+      "BounceRates": "number",
+      "ExitRates": "number",
+      "PageValues": "number",
+      "SpecialDay": "number",
+      "Month": "text",
+      "OperatingSystems": "number",
+      "Browser": "number",
+      "Region": "number",
+      "TrafficType": "number",
+      "VisitorType": "text",
+      "Weekend": "boolean",
+      "Revenue": "boolean"
+    },
+    "defaultConfig": {
+      "filters": [],
+      "rows": [
+        {
+          "id": "r_init_1",
+          "field": "Month",
+          "sort": "none",
+          "dateGranularity": "raw",
+          "excludedValues": []
+        },
+        {
+          "id": "r_init_2",
+          "field": "VisitorType",
+          "sort": "none",
+          "dateGranularity": "raw",
+          "excludedValues": []
+        }
+      ],
+      "columns": [],
+      "values": [
+        {
+          "id": "v_init_1",
+          "field": "Administrative",
+          "agg": "sum",
+          "showAs": "normal",
+          "format": {
+            "thousands": true,
+            "decimals": 0,
+            "currency": "",
+            "isPercent": false
+          }
+        },
+        {
+          "id": "v_init_2",
+          "field": "Administrative_Duration",
+          "agg": "avg",
+          "showAs": "normal",
+          "format": {
+            "thousands": true,
+            "decimals": 1,
+            "currency": "",
+            "isPercent": true
+          }
+        }
+      ],
+      "valueSort": {
+        "colKey": "__GRAND_TOTAL_COL__",
+        "valueId": "v_init_1",
+        "direction": "none"
+      },
+      "collapsedRowKeys": {},
+      "collapsedColKeys": {},
+      "showSubtotals": false
+    },
+    "defaultImportAndSaveMs": 1512,
+    "issues": [],
+    "filteredRows": 3364,
+    "expected": "0.02686660742627824019024970273",
+    "actual": 0.026866607426278433,
+    "csvTotal": "0.03 %",
+    "errors": [],
+    "uploads": [],
+    "calculationResult": "passed"
+  }
+]

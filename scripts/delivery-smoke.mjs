@@ -8,11 +8,13 @@ const remote=process.env.DELIVERY_URL;
 const server=remote ? null : await createServer({server:{host:'127.0.0.1',port:5191,strictPort:true}});
 if(server)await server.listen();
 const url=remote || 'http://127.0.0.1:5191/';
-const browser=await chromium.launch({executablePath:process.env.CHROME_BIN,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const proxyURL=remote && process.env.HTTPS_PROXY ? new URL(process.env.HTTPS_PROXY) : null;
+const proxy=proxyURL ? {server:proxyURL.origin,username:decodeURIComponent(proxyURL.username),password:decodeURIComponent(proxyURL.password)} : undefined;
+const browser=await chromium.launch({proxy,executablePath:process.env.CHROME_BIN,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const evidence=[];
 try {
   for(const width of [360,1440]) {
-    const context=await browser.newContext({viewport:{width,height:900},isMobile:width===360,hasTouch:width===360});
+    const context=await browser.newContext({ignoreHTTPSErrors:process.env.DELIVERY_IGNORE_HTTPS_ERRORS==='1',viewport:{width,height:900},isMobile:width===360,hasTouch:width===360});
     const page=await context.newPage();const errors=[];const uploads=[];
     page.on('pageerror',error=>errors.push(error.message));
     page.on('request',request=>{if(!['GET','HEAD'].includes(request.method()))uploads.push({method:request.method(),url:request.url()});});
