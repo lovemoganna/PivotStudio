@@ -1,9 +1,12 @@
+import { t } from '../../../../i18n.js';
 import React from 'react';
+import { createShareLink } from '../../../../utils/viewConfig';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { FolderOpen, X } from 'lucide-react';
 
 export function WorkspaceModal({
   isOpen,
+  restorePivotConfig,
   onClose,
   currentUser,
   setCurrentUser,
@@ -45,22 +48,22 @@ export function WorkspaceModal({
     >
       <div
         ref={dialogRef}
-        role="dialog" aria-modal="true" aria-label="本机工作区与配置分享" tabIndex={-1}
+        role="dialog" aria-modal="true" aria-label={t("本机工作区与配置分享")} tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-2xl rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden flex flex-col max-h-[86vh] animate-apple-modal"
       >
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
-            <FolderOpen className="w-4 h-4 text-[#F92672]" />
-            <span>WORKSPACE_HUB // 本机快照与配置分享</span>
+            <FolderOpen className="w-4 h-4 text-ink-pink" />
+            <span>{t("WORKSPACE_HUB // 本机快照与配置分享")}</span>
           </h3>
-          <button onClick={onClose} aria-label="关闭本机工作区与配置分享" className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label={t("关闭本机工作区与配置分享")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-ink-muted hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-5 space-y-4 overflow-y-auto text-xs apple-font-mono">
           <div className="p-3 rounded-xl bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] flex flex-wrap items-center justify-between gap-2">
-            <span>本机角色演示（不是身份认证）:</span>
+            <span>{t("本机角色演示（不是身份认证）:")}</span>
             <div className="flex gap-1.5">
               {[
                 { id: 'usr_admin', name: '张工 (BI架构师)', role: 'Admin' },
@@ -72,7 +75,7 @@ export function WorkspaceModal({
                     setCurrentUser(u);
                     showToast?.(`已切换身份为：${u.name}`);
                   }}
-                  className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold ${currentUser.role === u.role ? 'bg-[#F92672] text-[#F8F8F2] border-[#F92672]' : 'border-[#D6D4C8] dark:border-[#3E3D32]'}`}
+                  className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold ${currentUser.role === u.role ? 'bg-action text-[#F8F8F2] border-[#F92672]' : 'border-[#D6D4C8] dark:border-[#3E3D32]'}`}
                 >
                   {u.name}
                 </button>
@@ -81,14 +84,15 @@ export function WorkspaceModal({
           </div>
 
           <div className="space-y-2">
-            <div className="font-bold text-[#A6E22E]">保存或切换本机工作区快照 ({savedWorkspaces.length})</div>
+            <div className="font-bold text-ink-green">{t("保存或切换本机工作区快照 (")}{savedWorkspaces.length})</div>
             <div className="flex gap-2">
               <input
                 type="text"
                 disabled={isReadOnly}
+                maxLength={128}
                 value={newWorkspaceNameInput}
                 onChange={(e) => setNewWorkspaceNameInput(e.target.value)}
-                placeholder="输入新工作区快照名称..."
+                placeholder={t("输入新工作区快照名称...")}
                 className="flex-1 px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32]"
               />
               <button
@@ -114,16 +118,14 @@ export function WorkspaceModal({
                   showToast?.(`已保存工作区快照「${name}」`);
                 }}
                 className="px-3.5 py-1.5 rounded-lg bg-[#A6E22E] text-[#1E1F1C] font-bold disabled:opacity-40"
-              >
-                保存快照
-              </button>
+              >{' ' + t("保存快照") + ' '}</button>
             </div>
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {savedWorkspaces.map((ws) => (
                 <div key={ws.id} className="p-2.5 rounded-lg bg-[#EFECE1]/40 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-bold truncate">{ws.name}</div>
-                    <div className="text-[9px] text-[#75715E]">{ws.updatedAt} · {ws.author}</div>
+                    <div className="text-[9px] text-ink-muted">{ws.updatedAt} · {ws.author}</div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
@@ -135,23 +137,19 @@ export function WorkspaceModal({
                         setChartType(ws.chartType || 'bar');
                         if (ws.condFormat) setCondFormat(ws.condFormat);
                         if (ws.chartSpecConfig) setChartSpecConfig((p) => ({ ...p, ...ws.chartSpecConfig }));
-                        if (ws.pivotConfig) setPivotConfig(ws.pivotConfig);
+                        if (ws.pivotConfig) restorePivotConfig(ws.pivotConfig, Boolean(ws.datasetId && datasets.some((d) => d.id === ws.datasetId)));
                         if (ws.tableSettings && setTableSettings) setTableSettings(ws.tableSettings);
                         setActiveWorkspaceId(ws.id);
                         onClose();
                         showToast?.(`已加载工作区「${ws.name}」`);
                       }}
-                      className="px-2.5 py-1 rounded bg-[#66D9EF]/20 text-[#0088A3] dark:text-[#66D9EF] text-[10px] font-bold"
-                    >
-                      载入
-                    </button>
-                    {!isReadOnly && savedWorkspaces.length > 1 && (
+                      className="px-2.5 py-1 rounded bg-[#66D9EF]/20 text-ink-cyan text-[10px] font-bold"
+                    >{' ' + t("载入") + ' '}</button>
+                    {!isReadOnly && (
                       <button
                         onClick={() => setSavedWorkspaces((prev) => prev.filter((x) => x.id !== ws.id))}
-                        className="px-2 py-1 rounded bg-[#F92672]/15 text-[#F92672] text-[10px]"
-                      >
-                        删除
-                      </button>
+                        className="px-2 py-1 rounded bg-[#F92672]/15 text-ink-pink text-[10px]"
+                      >{' ' + t("删除") + ' '}</button>
                     )}
                   </div>
                 </div>
@@ -160,42 +158,27 @@ export function WorkspaceModal({
           </div>
 
           <div className="space-y-2 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
-            <div className="font-bold text-[#66D9EF]">分享视图配置（不包含数据）</div>
-            <p className="text-[10px] leading-relaxed text-[#75715E] dark:text-[#908E80]">配置链接使用 Base64，不是加密或鉴权。同一数据集才可正确还原。工作区快照保存在本机浏览器，不同步到服务器。</p>
+            <div className="font-bold text-ink-cyan">{t("分享视图配置（不包含数据）")}</div>
+            <p className="text-[10px] leading-relaxed text-ink-muted">{t("配置链接使用 Base64，不是加密或鉴权。打开链接后请自行加载字段匹配的数据。工作区快照保存在本机浏览器，不同步到服务器。")}</p>
             {(() => {
-              const tokenPayload = btoa(
-                unescape(
-                  encodeURIComponent(
-                    JSON.stringify({
-                      vm: viewMode,
-                      ct: chartType,
-                      cf: condFormat,
-                      csc: chartSpecConfig,
-                      fullConfig: pivotConfig,
-                      ts: tableSettings,
-                    })
-                  )
-                )
-              );
-              const shareLink = `${window.location.origin}${window.location.pathname}?share_token=${encodeURIComponent(tokenPayload)}`;
+              let shareLink;
+              try { shareLink = createShareLink({ vm:viewMode, ct:chartType, cf:condFormat, csc:chartSpecConfig, fullConfig:pivotConfig, ts:tableSettings }, window.location); }
+              catch (error) { return <p role="alert">{error.message}</p>; }
               const iframeCode = `<iframe src="${shareLink}" width="100%" height="680" frameborder="0" style="border-radius:12px;border:1px solid #3E3D32;"></iframe>`;
               return (
                 <div className="space-y-2">
                   <div className="flex gap-2">
-                    <input readOnly value={shareLink} className="flex-1 px-2.5 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px]" />
-                    <button onClick={() => copyTextToClipboard(shareLink, '已复制 Base64 配置链接（非加密）')} className="px-3 py-1 rounded bg-[#66D9EF] text-[#1E1F1C] font-bold text-[10px]">
-                      复制链接
-                    </button>
-                    <button onClick={() => copyTextToClipboard(iframeCode, '已复制 Iframe 嵌入代码')} className="px-3 py-1 rounded bg-[#AE81FF] text-[#1E1F1C] font-bold text-[10px]">
-                      复制 Iframe
-                    </button>
+                    <input aria-label={t("分享配置链接")} readOnly value={shareLink} className="flex-1 px-2.5 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px]" />
+                    <button onClick={() => copyTextToClipboard(shareLink, '已复制 Base64 配置链接（非加密）')} className="px-3 py-1 rounded bg-[#66D9EF] text-[#1E1F1C] font-bold text-[10px]">{' ' + t("复制链接") + ' '}</button>
+                    <button onClick={() => copyTextToClipboard(iframeCode, '已复制 Iframe 嵌入代码')} className="px-3 py-1 rounded bg-[#AE81FF] text-[#1E1F1C] font-bold text-[10px]">{' ' + t("复制 Iframe") + ' '}</button>
                   </div>
                   <div className="flex gap-2">
                     <input
                       type="text"
+                      maxLength={180000}
                       value={shareTokenInput}
                       onChange={(e) => setShareTokenInput(e.target.value)}
-                      placeholder="在此粘贴分享链接或 Share Token 一键还原视图..."
+                      placeholder={t("在此粘贴分享链接或 Share Token 一键还原视图...")}
                       className="flex-1 px-2.5 py-1 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px]"
                     />
                     <button
@@ -205,10 +188,8 @@ export function WorkspaceModal({
                           onClose();
                         }
                       }}
-                      className="px-3 py-1 rounded bg-[#F92672] text-[#F8F8F2] font-bold text-[10px]"
-                    >
-                      还原视图
-                    </button>
+                      className="px-3 py-1 rounded bg-action text-[#F8F8F2] font-bold text-[10px]"
+                    >{' ' + t("还原视图") + ' '}</button>
                   </div>
                 </div>
               );

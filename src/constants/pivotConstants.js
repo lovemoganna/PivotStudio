@@ -4,22 +4,22 @@ export const FIELD_TYPES = {
   text: {
     label: '文本',
     icon: Type,
-    color: 'text-[#948400] bg-[#E6DB74]/20 border-[#E6DB74]/45 dark:text-[#E6DB74] dark:bg-[#E6DB74]/15 dark:border-[#E6DB74]/35',
+    color: 'text-[#948400] bg-[#E6DB74]/20 border-[#E6DB74]/45 dark:text-ink-yellow dark:bg-[#E6DB74]/15 dark:border-[#E6DB74]/35',
   },
   number: {
     label: '数字',
     icon: Hash,
-    color: 'text-[#6B38FB] bg-[#AE81FF]/15 border-[#AE81FF]/40 dark:text-[#AE81FF] dark:bg-[#AE81FF]/15 dark:border-[#AE81FF]/35',
+    color: 'text-ink-purple bg-[#AE81FF]/15 border-[#AE81FF]/40 dark:text-ink-purple dark:bg-[#AE81FF]/15 dark:border-[#AE81FF]/35',
   },
   date: {
     label: '日期',
     icon: Calendar,
-    color: 'text-[#0088A3] bg-[#66D9EF]/15 border-[#66D9EF]/40 dark:text-[#66D9EF] dark:bg-[#66D9EF]/15 dark:border-[#66D9EF]/35',
+    color: 'text-ink-cyan bg-[#66D9EF]/15 border-[#66D9EF]/40 dark:text-ink-cyan dark:bg-[#66D9EF]/15 dark:border-[#66D9EF]/35',
   },
   boolean: {
     label: '布尔值',
     icon: ToggleLeft,
-    color: 'text-[#C86400] bg-[#FD971F]/15 border-[#FD971F]/40 dark:text-[#FD971F] dark:bg-[#FD971F]/15 dark:border-[#FD971F]/35',
+    color: 'text-ink-orange bg-[#FD971F]/15 border-[#FD971F]/40 dark:text-ink-orange dark:bg-[#FD971F]/15 dark:border-[#FD971F]/35',
   },
 };
 
@@ -59,6 +59,7 @@ export const DATE_GRANULARITIES = [
 export const CHART_COLORS = ['#F92672', '#A6E22E', '#66D9EF', '#FD971F', '#AE81FF', '#E6DB74', '#FF6188', '#78DCE8'];
 
 export const VISUAL_CHART_TYPES = [
+  { value: 'heatmap', label: '矩阵热力图 (Heatmap)', short: '热力图', category: 'heatmap' },
   { value: 'bar', label: '分组柱状图 (Bar)', short: '柱状', category: 'bar' },
   { value: 'horizontal_bar', label: '横向条形图 (Horizontal)', short: '条形', category: 'bar' },
   { value: 'stacked_bar', label: '堆叠柱状图 (Stacked)', short: '堆叠柱', category: 'bar' },

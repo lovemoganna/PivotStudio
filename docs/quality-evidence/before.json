@@ -1,0 +1,554 @@
+[
+  {
+    "width": 360,
+    "state": "intro",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "count": 24
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "count": 32,
+        "targets": [
+          [
+            ".tracking-\\[0\\.08em\\]"
+          ],
+          [
+            "button[title=\"View internal design notes\"] > span"
+          ],
+          [
+            "button[aria-label=\"Open command palette\"] > kbd"
+          ]
+        ]
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "count": 3,
+        "targets": [
+          [
+            "button[title=\"Reset column widths\"]"
+          ],
+          [
+            "button[title=\"Align left\"]"
+          ],
+          [
+            "button[title=\"Align right\"]"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 32,
+    "geometry": {
+      "displayControlsHeight": 181,
+      "chartHeight": 160,
+      "tableViewport": 538,
+      "bodyHeight": 430.5
+    },
+    "controls": 66
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "count": 11,
+        "targets": [
+          [
+            "button[title=\"View internal design notes\"] > span"
+          ],
+          [
+            "button[aria-label=\"Open command palette\"] > kbd"
+          ],
+          [
+            ".hover\\:bg-\\[\\#FF3B85\\] > span"
+          ]
+        ]
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "count": 3,
+        "targets": [
+          [
+            "button[title=\"Reset column widths\"]"
+          ],
+          [
+            "button[title=\"Align left\"]"
+          ],
+          [
+            "button[title=\"Align right\"]"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 32,
+    "geometry": {
+      "displayControlsHeight": 181,
+      "chartHeight": 160,
+      "tableViewport": 538,
+      "bodyHeight": 430.5
+    },
+    "controls": 66
+  },
+  {
+    "width": 360,
+    "state": "import",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "count": 14
+      },
+      {
+        "id": "select-name",
+        "count": 2
+      },
+      {
+        "id": "target-size",
+        "count": 3
+      }
+    ],
+    "unnamed": [
+      "<select class=\"px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] apple-font-mono text-[#F",
+      "<select class=\"px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] apple-font-mono text-[#F"
+    ]
+  },
+  {
+    "width": 768,
+    "state": "intro",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "count": 13
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "count": 39,
+        "targets": [
+          [
+            ".tracking-\\[0\\.08em\\]"
+          ],
+          [
+            "button[title=\"View internal design notes\"] > span"
+          ],
+          [
+            ".sm\\:block"
+          ]
+        ]
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "count": 7,
+        "targets": [
+          [
+            ".hover\\:underline"
+          ],
+          [
+            "button[title=\"维度排序: 升序\"]"
+          ],
+          [
+            ".border-l-\\[\\#66D9EF\\] > .pr-0\\.5.overflow-y-auto.space-y-1 > .cursor-grab.active\\:cursor-grabbing.shadow-2xs > .gap-0\\.5.shrink-0.flex > .hover\\:text-\\[\\#A6E22E\\][title=\"Select filter values\"][aria-label=\"Filter values\"]"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 118,
+    "geometry": {
+      "displayControlsHeight": 181.25,
+      "chartHeight": 160,
+      "tableViewport": 0,
+      "bodyHeight": 430.5
+    },
+    "controls": 151
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "count": 12,
+        "targets": [
+          [
+            "button[title=\"View internal design notes\"] > span"
+          ],
+          [
+            "button[aria-label=\"Open command palette\"] > kbd"
+          ],
+          [
+            ".bg-\\[\\#F92672\\]\\/15"
+          ]
+        ]
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "count": 7,
+        "targets": [
+          [
+            ".hover\\:underline"
+          ],
+          [
+            "button[title=\"维度排序: 升序\"]"
+          ],
+          [
+            ".border-l-\\[\\#66D9EF\\] > .pr-0\\.5.overflow-y-auto.space-y-1 > .cursor-grab.active\\:cursor-grabbing.shadow-2xs > .gap-0\\.5.shrink-0.flex > .hover\\:text-\\[\\#A6E22E\\][title=\"Select filter values\"][aria-label=\"Filter values\"]"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 118,
+    "geometry": {
+      "displayControlsHeight": 181.25,
+      "chartHeight": 160,
+      "tableViewport": 0,
+      "bodyHeight": 430.5
+    },
+    "controls": 151
+  },
+  {
+    "width": 768,
+    "state": "import",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "count": 17
+      },
+      {
+        "id": "select-name",
+        "count": 2
+      },
+      {
+        "id": "target-size",
+        "count": 7
+      }
+    ],
+    "unnamed": [
+      "<select class=\"px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] apple-font-mono text-[#F",
+      "<select class=\"px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] apple-font-mono text-[#F"
+    ]
+  },
+  {
+    "width": 1280,
+    "state": "intro",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "count": 16
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "count": 60,
+        "targets": [
+          [
+            ".tracking-\\[0\\.08em\\]"
+          ],
+          [
+            "button[title=\"View internal design notes\"] > span"
+          ],
+          [
+            ".sm\\:block"
+          ]
+        ]
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "count": 7,
+        "targets": [
+          [
+            ".hover\\:underline"
+          ],
+          [
+            "button[title=\"维度排序: 升序\"]"
+          ],
+          [
+            ".border-l-\\[\\#66D9EF\\] > .pr-0\\.5.overflow-y-auto.space-y-1 > .cursor-grab.active\\:cursor-grabbing.shadow-2xs > .gap-0\\.5.shrink-0.flex > .hover\\:text-\\[\\#A6E22E\\][title=\"Select filter values\"][aria-label=\"Filter values\"]"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 117,
+    "geometry": {
+      "displayControlsHeight": 82.5,
+      "chartHeight": 160,
+      "tableViewport": 111,
+      "bodyHeight": 430.5
+    },
+    "controls": 150
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "count": 16,
+        "targets": [
+          [
+            "button[title=\"View internal design notes\"] > span"
+          ],
+          [
+            "button[aria-label=\"Open command palette\"] > kbd"
+          ],
+          [
+            ".hover\\:bg-\\[\\#FF3B85\\] > span"
+          ]
+        ]
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "count": 7,
+        "targets": [
+          [
+            ".hover\\:underline"
+          ],
+          [
+            "button[title=\"维度排序: 升序\"]"
+          ],
+          [
+            ".border-l-\\[\\#66D9EF\\] > .pr-0\\.5.overflow-y-auto.space-y-1 > .cursor-grab.active\\:cursor-grabbing.shadow-2xs > .gap-0\\.5.shrink-0.flex > .hover\\:text-\\[\\#A6E22E\\][title=\"Select filter values\"][aria-label=\"Filter values\"]"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 117,
+    "geometry": {
+      "displayControlsHeight": 82.5,
+      "chartHeight": 160,
+      "tableViewport": 111,
+      "bodyHeight": 430.5
+    },
+    "controls": 150
+  },
+  {
+    "width": 1280,
+    "state": "import",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "count": 21
+      },
+      {
+        "id": "select-name",
+        "count": 2
+      },
+      {
+        "id": "target-size",
+        "count": 7
+      }
+    ],
+    "unnamed": [
+      "<select class=\"px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] apple-font-mono text-[#F",
+      "<select class=\"px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] apple-font-mono text-[#F"
+    ]
+  },
+  {
+    "width": 1440,
+    "state": "intro",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "count": 16
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "theme": "light",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "count": 64,
+        "targets": [
+          [
+            ".tracking-\\[0\\.08em\\]"
+          ],
+          [
+            "button[title=\"View internal design notes\"] > span"
+          ],
+          [
+            ".sm\\:block"
+          ]
+        ]
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "count": 7,
+        "targets": [
+          [
+            ".hover\\:underline"
+          ],
+          [
+            "button[title=\"维度排序: 升序\"]"
+          ],
+          [
+            ".border-l-\\[\\#66D9EF\\] > .pr-0\\.5.overflow-y-auto.space-y-1 > .cursor-grab.active\\:cursor-grabbing.shadow-2xs > .gap-0\\.5.shrink-0.flex > .hover\\:text-\\[\\#A6E22E\\][title=\"Select filter values\"][aria-label=\"Filter values\"]"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "theme": "light",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 117,
+    "geometry": {
+      "displayControlsHeight": 82.5,
+      "chartHeight": 160,
+      "tableViewport": 141,
+      "bodyHeight": 430.5
+    },
+    "controls": 150
+  },
+  {
+    "width": 1440,
+    "theme": "dark",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "count": 16,
+        "targets": [
+          [
+            "button[title=\"View internal design notes\"] > span"
+          ],
+          [
+            "button[aria-label=\"Open command palette\"] > kbd"
+          ],
+          [
+            ".hover\\:bg-\\[\\#FF3B85\\] > span"
+          ]
+        ]
+      },
+      {
+        "id": "target-size",
+        "impact": "serious",
+        "count": 7,
+        "targets": [
+          [
+            ".hover\\:underline"
+          ],
+          [
+            "button[title=\"维度排序: 升序\"]"
+          ],
+          [
+            ".border-l-\\[\\#66D9EF\\] > .pr-0\\.5.overflow-y-auto.space-y-1 > .cursor-grab.active\\:cursor-grabbing.shadow-2xs > .gap-0\\.5.shrink-0.flex > .hover\\:text-\\[\\#A6E22E\\][title=\"Select filter values\"][aria-label=\"Filter values\"]"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "theme": "dark",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 117,
+    "geometry": {
+      "displayControlsHeight": 82.5,
+      "chartHeight": 160,
+      "tableViewport": 141,
+      "bodyHeight": 430.5
+    },
+    "controls": 150
+  },
+  {
+    "width": 1440,
+    "state": "import",
+    "axe": [
+      {
+        "id": "color-contrast",
+        "count": 21
+      },
+      {
+        "id": "select-name",
+        "count": 2
+      },
+      {
+        "id": "target-size",
+        "count": 7
+      }
+    ],
+    "unnamed": [
+      "<select class=\"px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] apple-font-mono text-[#F",
+      "<select class=\"px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px] apple-font-mono text-[#F"
+    ]
+  }
+]

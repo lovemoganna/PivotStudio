@@ -1,0 +1,214 @@
+[
+  {
+    "width": 360,
+    "state": "intro",
+    "axe": []
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "axe": []
+  },
+  {
+    "width": 360,
+    "theme": "light",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 2,
+    "geometry": {
+      "displayControlsHeight": 0,
+      "displayToggleHeight": 34.875,
+      "chartHeight": 260,
+      "tableViewport": 538,
+      "bodyHeight": 430.5
+    },
+    "controls": 52
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "axe": []
+  },
+  {
+    "width": 360,
+    "theme": "dark",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 2,
+    "geometry": {
+      "displayControlsHeight": 0,
+      "displayToggleHeight": 34.875,
+      "chartHeight": 260,
+      "tableViewport": 538,
+      "bodyHeight": 430.5
+    },
+    "controls": 52
+  },
+  {
+    "width": 360,
+    "state": "import",
+    "axe": [],
+    "unnamed": []
+  },
+  {
+    "width": 768,
+    "state": "intro",
+    "axe": []
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "axe": []
+  },
+  {
+    "width": 768,
+    "theme": "light",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 5,
+    "geometry": {
+      "displayControlsHeight": 194.25,
+      "displayToggleHeight": 0,
+      "chartHeight": 286,
+      "tableViewport": 247,
+      "bodyHeight": 430.5
+    },
+    "controls": 151
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "axe": []
+  },
+  {
+    "width": 768,
+    "theme": "dark",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 5,
+    "geometry": {
+      "displayControlsHeight": 194.25,
+      "displayToggleHeight": 0,
+      "chartHeight": 286,
+      "tableViewport": 247,
+      "bodyHeight": 430.5
+    },
+    "controls": 151
+  },
+  {
+    "width": 768,
+    "state": "import",
+    "axe": [],
+    "unnamed": []
+  },
+  {
+    "width": 1280,
+    "state": "intro",
+    "axe": []
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "axe": []
+  },
+  {
+    "width": 1280,
+    "theme": "light",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 5,
+    "geometry": {
+      "displayControlsHeight": 86.25,
+      "displayToggleHeight": 0,
+      "chartHeight": 338.5,
+      "tableViewport": 355,
+      "bodyHeight": 430.5
+    },
+    "controls": 151
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "axe": []
+  },
+  {
+    "width": 1280,
+    "theme": "dark",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 5,
+    "geometry": {
+      "displayControlsHeight": 86.25,
+      "displayToggleHeight": 0,
+      "chartHeight": 338.5,
+      "tableViewport": 355,
+      "bodyHeight": 430.5
+    },
+    "controls": 151
+  },
+  {
+    "width": 1280,
+    "state": "import",
+    "axe": [],
+    "unnamed": []
+  },
+  {
+    "width": 1440,
+    "state": "intro",
+    "axe": []
+  },
+  {
+    "width": 1440,
+    "theme": "light",
+    "axe": []
+  },
+  {
+    "width": 1440,
+    "theme": "light",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 5,
+    "geometry": {
+      "displayControlsHeight": 86.25,
+      "displayToggleHeight": 0,
+      "chartHeight": 338.5,
+      "tableViewport": 355,
+      "bodyHeight": 430.5
+    },
+    "controls": 151
+  },
+  {
+    "width": 1440,
+    "theme": "dark",
+    "axe": []
+  },
+  {
+    "width": 1440,
+    "theme": "dark",
+    "errors": [],
+    "overflow": 0,
+    "unnamed": [],
+    "tiny": 5,
+    "geometry": {
+      "displayControlsHeight": 86.25,
+      "displayToggleHeight": 0,
+      "chartHeight": 338.5,
+      "tableViewport": 355,
+      "bodyHeight": 430.5
+    },
+    "controls": 151
+  },
+  {
+    "width": 1440,
+    "state": "import",
+    "axe": [],
+    "unnamed": []
+  }
+]

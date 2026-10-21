@@ -1,3 +1,4 @@
+import { t } from '../../../i18n.js';
 import React from 'react';
 import { UnifiedFormatter } from '../../../utils/formatters';
 
@@ -11,66 +12,64 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
   return (
     <div className={`p-3.5 rounded-xl shadow-2xl border text-xs max-w-xs transition-all ${darkMode ? 'bg-[#1E1F1C]/95 text-[#F8F8F2] border-[#49483E] shadow-[0_12px_32px_rgba(0,0,0,0.65)]' : 'bg-[#FFFDF7]/95 text-[#272822] border-[#D6D4C8] shadow-xl'} backdrop-blur-xl`}>
       <div className="font-semibold tracking-tight border-b border-[#49483E]/40 pb-1.5 mb-2 truncate flex items-center justify-between gap-3">
-        <span className="truncate text-[#948400] dark:text-[#E6DB74] apple-font-mono">{rawPoint?.name || label}</span>
-        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F92672]/15 text-[#F92672] border border-[#F92672]/30 apple-font-mono">CLICK_LINK</span>
+        <span className="truncate text-[#948400] dark:text-ink-yellow apple-font-mono">{rawPoint?.name || label}</span>
+        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30 apple-font-mono">CLICK_LINK</span>
       </div>
 
       {chartType === 'scatter' && rawPoint ? (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[#908E80] truncate">{chartSpec?.primarySeriesKey} [X]:</span>
-            <span className="apple-font-mono font-semibold text-[#66D9EF]">
+            <span className="text-ink-muted truncate">{chartSpec?.primarySeriesKey} [X]:</span>
+            <span className="apple-font-mono font-semibold text-ink-cyan">
               {UnifiedFormatter.formatValue(rawPoint.x, primaryValCfg, { compact: false })}
             </span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[#908E80] truncate">{chartSpec?.secondarySeriesKey} [Y]:</span>
-            <span className="apple-font-mono font-semibold text-[#A6E22E]">
+            <span className="text-ink-muted truncate">{chartSpec?.secondarySeriesKey} [Y]:</span>
+            <span className="apple-font-mono font-semibold text-ink-green">
               {UnifiedFormatter.formatValue(rawPoint.y, secondaryValCfg, { compact: false })}
             </span>
           </div>
           {rawPoint.expectedY && (
             <div className="flex items-center justify-between gap-4 text-[11px] border-t border-[#49483E]/30 pt-1">
-              <span className="text-[#908E80]">OLS 回归预期:</span>
-              <span className="apple-font-mono text-[#AE81FF]">
+              <span className="text-ink-muted">{t("OLS 回归预期:")}</span>
+              <span className="apple-font-mono text-ink-purple">
                 {UnifiedFormatter.formatValue(Number(rawPoint.expectedY), secondaryValCfg, { compact: false })}
               </span>
             </div>
           )}
           {rawPoint.isOutlier && (
-            <div className="mt-1 px-2 py-1 rounded bg-[#F92672]/15 text-[#F92672] border border-[#F92672]/30 text-[10px] font-semibold apple-font-mono">
-              [异常点] Z-Score = {rawPoint.zScore} (偏离拟合线)
-            </div>
+            <div className="mt-1 px-2 py-1 rounded bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30 text-[10px] font-semibold apple-font-mono">{' ' + t("[异常点] Z-Score =") + ' '}{rawPoint.zScore}{' ' + t("(偏离拟合线)") + ' '}</div>
           )}
         </div>
       ) : chartType === 'waterfall' && rawPoint?.semanticType ? (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[#908E80]">节点类型:</span>
-            <span className="font-medium text-[#66D9EF]">{rawPoint.semanticType}</span>
+            <span className="text-ink-muted">{t("节点类型:")}</span>
+            <span className="font-medium text-ink-cyan">{rawPoint.semanticType}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[#908E80]">当期变化量:</span>
-            <span className="apple-font-mono font-semibold text-[#A6E22E]">{rawPoint.formattedDelta}</span>
+            <span className="text-ink-muted">{t("当期变化量:")}</span>
+            <span className="apple-font-mono font-semibold text-ink-green">{rawPoint.formattedDelta}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[#908E80]">累计总额:</span>
-            <span className="apple-font-mono font-bold text-[#AE81FF]">{rawPoint.formattedCumulative}</span>
+            <span className="text-ink-muted">{t("累计总额:")}</span>
+            <span className="apple-font-mono font-bold text-ink-purple">{rawPoint.formattedCumulative}</span>
           </div>
         </div>
       ) : chartType === 'histogram' && rawPoint?.rangeFull ? (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[#908E80]">数值分箱区间:</span>
-            <span className="apple-font-mono font-medium text-[#66D9EF]">{rawPoint.rangeFull}</span>
+            <span className="text-ink-muted">{t("数值分箱区间:")}</span>
+            <span className="apple-font-mono font-medium text-ink-cyan">{rawPoint.rangeFull}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[#908E80]">样本频数:</span>
-            <span className="apple-font-mono font-semibold text-[#A6E22E]">{rawPoint.count} 笔</span>
+            <span className="text-ink-muted">{t("样本频数:")}</span>
+            <span className="apple-font-mono font-semibold text-ink-green">{rawPoint.count}{' ' + t("笔")}</span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="text-[#908E80]">占总样本比:</span>
-            <span className="apple-font-mono font-bold text-[#F92672]">{rawPoint.pct}%</span>
+            <span className="text-ink-muted">{t("占总样本比:")}</span>
+            <span className="apple-font-mono font-bold text-ink-pink">{rawPoint.pct}%</span>
           </div>
         </div>
       ) : (chartType === 'pie' || chartType === 'donut') && payload[0] ? (
@@ -78,15 +77,15 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 truncate">
               <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: payload[0].payload?.fill || payload[0].fill || '#F92672' }} />
-              <span className="text-[#908E80] truncate">{payload[0].name}:</span>
+              <span className="text-ink-muted truncate">{payload[0].name}:</span>
             </div>
             <span className="apple-font-mono font-semibold">
               {UnifiedFormatter.formatValue(payload[0].value, primaryValCfg, { compact: false })}
             </span>
           </div>
           <div className="flex items-center justify-between gap-4 border-t border-[#49483E]/30 pt-1">
-            <span className="text-[#908E80]">占总计比例:</span>
-            <span className="apple-font-mono font-bold text-[#A6E22E]">
+            <span className="text-ink-muted">{t("占总计比例:")}</span>
+            <span className="apple-font-mono font-bold text-ink-green">
               {rawPoint?.pct || ((payload[0].value / (chartSpec?.primaryStats?.total || 1)) * 100).toFixed(1)}%
             </span>
           </div>
@@ -117,7 +116,7 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
               <div key={`tip_${idx}`} className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 truncate">
                   <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color || item.fill || '#F92672' }} />
-                  <span className="text-[#908E80] truncate">{seriesKey}:</span>
+                  <span className="text-ink-muted truncate">{seriesKey}:</span>
                 </div>
                 <span className="apple-font-mono font-semibold">{formatted}</span>
               </div>
@@ -125,14 +124,12 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
           })}
           {rawPoint?._stackTotalFormatted && chartSpec?.canStack && chartSpec?.seriesMetaList?.length > 1 && (
             <div className="flex items-center justify-between gap-4 border-t border-[#49483E]/40 pt-1.5 mt-1.5 font-semibold">
-              <span className="text-[#908E80]">合计总额:</span>
-              <span className="apple-font-mono text-[#A6E22E]">{rawPoint._stackTotalFormatted}</span>
+              <span className="text-ink-muted">{t("合计总额:")}</span>
+              <span className="apple-font-mono text-ink-green">{rawPoint._stackTotalFormatted}</span>
             </div>
           )}
           {rawPoint?.isOutlier && (
-            <div className="mt-1 px-2 py-1 rounded bg-[#F92672]/15 text-[#F92672] border border-[#F92672]/30 text-[10px] font-semibold apple-font-mono">
-              [异常点] Z-Score = {rawPoint.zScore} (偏离拟合线)
-            </div>
+            <div className="mt-1 px-2 py-1 rounded bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30 text-[10px] font-semibold apple-font-mono">{' ' + t("[异常点] Z-Score =") + ' '}{rawPoint.zScore}{' ' + t("(偏离拟合线)") + ' '}</div>
           )}
         </div>
       )}

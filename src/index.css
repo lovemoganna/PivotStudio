@@ -136,7 +136,7 @@ svg text {
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 
 /* Design quality pass: typography, adaptive surfaces and precise interaction states. */
-:root { --ps-focus: #0088A3; --ps-control-min: 32px; }
+:root { --ps-focus: #0088A3; --ps-control-min: 24px; }
 .dark { --ps-focus: #66D9EF; }
 .apple-transition { transition-property: background-color, border-color, color, opacity, box-shadow, transform; transition-duration: 180ms; transition-timing-function: var(--apple-ease); }
 :where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ps-focus); outline-offset: 2px; }
@@ -179,4 +179,34 @@ svg text {
     scroll-snap-align: start;
     min-height: 36px;
   }
+}
+/* Semantic text colors: bright chart colors remain decorative, ink adapts to the surface. */
+:root {
+  --ps-ink-cyan: #00677A;
+  --ps-ink-green: #416600;
+  --ps-ink-pink: #BD1450;
+  --ps-ink-orange: #8A4900;
+  --ps-ink-yellow: #746300;
+  --ps-ink-purple: #6531C7;
+  --ps-ink-muted: #655F50;
+}
+.dark, .ps-dark-surface {
+  --ps-ink-cyan: #66D9EF;
+  --ps-ink-green: #A6E22E;
+  --ps-ink-pink: #FF66A0;
+  --ps-ink-orange: #FD971F;
+  --ps-ink-yellow: #E6DB74;
+  --ps-ink-purple: #C5A0FF;
+  --ps-ink-muted: #A5A292;
+}
+/* Minimum targets apply to the shared workbench, including dense field actions. */
+[data-testid="pivot-workbench"] :where(button, select, [role="button"]) {
+  min-width: var(--ps-control-min);
+  min-height: var(--ps-control-min);
+}
+[data-testid="pivot-workbench"] label:has(input[type="checkbox"]) {
+  min-height: var(--ps-control-min);
+}
+@media (pointer: coarse) {
+  :root { --ps-control-min: 32px; }
 }

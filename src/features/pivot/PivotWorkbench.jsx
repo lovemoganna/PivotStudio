@@ -1,3 +1,4 @@
+import { t, getLocale, setLocale } from '../../i18n.js';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   RETAIL_TEST_DATASET,
@@ -6,14 +7,14 @@ import {
   VISUAL_CHART_TYPES,
   buildDefaultPivotConfig
 } from '../../constants/pivotConstants';
-import * as XLSX from 'xlsx';
 import { soundEngine } from '../../services/soundEngine';
-import { formatDimensionValue } from '../../utils/formatters';
-import { parseCSVTextToSheet } from '../../utils/csvParser';
+import { decodeView, projectView } from '../../utils/viewConfig';
+import { startImportTask } from '../../utils/workerTask';
 import {
   exportToCSV as doExportCSV,
   exportToExcelMerged as doExportExcel,
   exportChartAsPNG as doExportPNG,
+  exportChartAsSVG as doExportSVG,
   exportPDFReport as doExportPDF
 } from '../../utils/exportUtils';
 import { calculatePivot } from './engine/calculatePivot';
@@ -44,7 +45,21 @@ import { WorkspaceModal } from './components/modals/WorkspaceModal';
 import { CommandPaletteModal } from './components/modals/CommandPaletteModal';
 
 export default function PivotWorkbench() {
-  const [darkMode, setDarkMode] = useState(true);
+  const [locale, setLocaleState] = useState(getLocale);
+  useEffect(() => { document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN'; }, [locale]);
+  const [theme, setTheme] = useState(() => { try { return ['light','dark','system'].includes(localStorage.getItem('pivotstudio_theme')) ? localStorage.getItem('pivotstudio_theme') : 'system'; } catch { return 'system'; } });
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const darkMode = theme === 'system' ? systemDark : theme === 'dark';
+  const setDarkMode = useCallback((value) => setTheme((previous) => {
+    const current = previous === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : previous === 'dark';
+    return (typeof value === 'function' ? value(current) : value) ? 'dark' : 'light';
+  }), []);
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = (event) => setSystemDark(event.matches);
+    query.addEventListener('change',update);
+    return () => query.removeEventListener('change',update);
+  }, []);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [keynotePlaying, setKeynotePlaying] = useState(false);
   const [keynoteShotIdx, setKeynoteShotIdx] = useState(0);
@@ -169,18 +184,23 @@ export default function PivotWorkbench() {
   const [currentUser, setCurrentUser] = useState({ id: 'usr_analyst_01', name: '张工 (BI分析师)', role: 'Admin' });
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [newWorkspaceNameInput, setNewWorkspaceNameInput] = useState('');
+  const pendingViewRef = useRef(null);
   const [shareTokenInput, setShareTokenInput] = useState('');
+  const workspaceLoadErrorRef = useRef(null);
   const [savedWorkspaces, setSavedWorkspaces] = useState(() => {
     try {
-      const saved = JSON.parse(window.localStorage.getItem('pivotstudio_workspaces_v1'));
-      return Array.isArray(saved) ? saved : [];
+      const raw = window.localStorage.getItem('pivotstudio_workspaces_v1');
+      if (!raw) return [];
+      const saved = JSON.parse(raw);
+      if (!Array.isArray(saved) || !saved.every((view) => view && typeof view.id === 'string' && typeof view.name === 'string' && view.pivotConfig)) throw new Error('配置损坏');
+      saved.forEach((view) => projectView({ fullConfig:view.pivotConfig }));
+      return saved;
     } catch {
+      workspaceLoadErrorRef.current = '本机视图无法读取，可能存储受限或配置损坏；请检查浏览器存储权限，或重新保存视图';
       return [];
     }
   });
-  useEffect(() => {
-    try { window.localStorage.setItem('pivotstudio_workspaces_v1', JSON.stringify(savedWorkspaces)); } catch { /* memory-only fallback */ }
-  }, [savedWorkspaces]);
+
 
   const [toastMessage, setToastMessage] = useState(null);
   const toastTimerRef = useRef(null);
@@ -197,8 +217,28 @@ export default function PivotWorkbench() {
   const showToast = useCallback((text, type = 'success') => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToastMessage({ text, type });
-    toastTimerRef.current = setTimeout(() => { setToastMessage(null); }, 3200);
+    if (type !== 'error') toastTimerRef.current = setTimeout(() => { setToastMessage(null); }, 3200);
   }, []);
+
+  useEffect(() => {
+    if (workspaceLoadErrorRef.current) {
+      showToast(workspaceLoadErrorRef.current,'error');
+      // Preserve the invalid value until a subsequent save, then allow recovery.
+      workspaceLoadErrorRef.current = null;
+      return;
+    }
+    try { localStorage.setItem('pivotstudio_workspaces_v1',JSON.stringify(savedWorkspaces)); }
+    catch { showToast('本机存储不足或不可用，视图仅在当前标签页有效；请释放存储空间后重新保存','error'); }
+  }, [savedWorkspaces,showToast]);
+
+  useEffect(() => {
+    const handleAsyncError = (event) => showToast(`操作失败：${event.reason?.message || event.error?.message || '浏览器执行异常'}；请重试，必要时重新导入文件`, 'error');
+    window.addEventListener('unhandledrejection',handleAsyncError);
+    window.addEventListener('error',handleAsyncError);
+    return () => { window.removeEventListener('unhandledrejection',handleAsyncError); window.removeEventListener('error',handleAsyncError); };
+  }, [showToast]);
+
+  useEffect(() => { try { localStorage.setItem('pivotstudio_theme',theme); } catch { showToast('无法保存主题偏好，当前标签页内仍有效；请检查浏览器存储权限','error'); } }, [theme,showToast]);
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < configHistory.length - 1;
@@ -501,100 +541,97 @@ export default function PivotWorkbench() {
     };
   }, [keynotePlaying, applyKeynoteShot]);
 
-  // Web Worker async computation pipeline for large datasets with main-thread fallback
   const workerRef = useRef(null);
+  const profileRequestsRef = useRef(new Map());
+  const profileIdRef = useRef(0);
+  const importTaskRef = useRef(null);
+  const importSourceRef = useRef(null);
   const reqIdRef = useRef(0);
+  const [computeError, setComputeError] = useState(null);
+  const [computeAttempt, setComputeAttempt] = useState(0);
+  const [computeProgress, setComputeProgress] = useState(0);
   const [isWorkerComputing, setIsWorkerComputing] = useState(false);
   const [activeResults, setActiveResults] = useState(() => {
-    const initP = calculatePivot(null, buildDefaultPivotConfig(null));
-    const initC = buildUnifiedChartSpec(null, initP, 'bar', {
-      primaryValueId: '', secondaryValueId: '', sortMode: 'none', topN: 0,
-      missingValueMode: 'zero', lineDerivedMetric: 'none', showDataLabels: true,
-      showAvgReferenceLine: true, clickLinkMode: 'highlight', histogramBins: 0, stickyRowHeaders: true,
-    });
-    return { pivotResult: initP, unifiedChartSpec: initC };
+    const pivotResult = calculatePivot(null, buildDefaultPivotConfig(null));
+    return { pivotResult, unifiedChartSpec: buildUnifiedChartSpec(null, pivotResult, 'bar', {}) };
   });
+  const cachedDatasetRef = useRef(null);
+  const busyRef = useRef(false);
 
-  const currentDatasetRef = useRef(currentDataset);
-  const pivotConfigRef = useRef(pivotConfig);
-  const chartTypeRef = useRef(chartType);
-  const chartSpecConfigRef = useRef(chartSpecConfig);
-
-  useEffect(() => {
-    currentDatasetRef.current = currentDataset;
-    pivotConfigRef.current = pivotConfig;
-    chartTypeRef.current = chartType;
-    chartSpecConfigRef.current = chartSpecConfig;
-  }, [currentDataset, pivotConfig, chartType, chartSpecConfig]);
-
-  useEffect(() => {
-    let worker = null;
-    try {
-      worker = new Worker(new URL('./engine/pivotWorker.js', import.meta.url), { type: 'module' });
-      worker.onmessage = (e) => {
-        const { id, success, pivotResult: pRes, unifiedChartSpec: cSpec } = e.data || {};
-        if (id === reqIdRef.current) {
-          setIsWorkerComputing(false);
-          if (success && pRes && cSpec) {
-            pRes.cellRecordsMap = new Map();
-            setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
-          } else {
-            const fallbackP = calculatePivot(currentDatasetRef.current, pivotConfigRef.current);
-            const fallbackC = buildUnifiedChartSpec(currentDatasetRef.current, fallbackP, chartTypeRef.current, chartSpecConfigRef.current);
-            setActiveResults({ pivotResult: fallbackP, unifiedChartSpec: fallbackC });
-          }
-        }
-      };
-      worker.onerror = (err) => {
-        console.warn('Pivot WebWorker execution error, falling back to main-thread:', err);
-        setIsWorkerComputing(false);
-        const fallbackP = calculatePivot(currentDatasetRef.current, pivotConfigRef.current);
-        const fallbackC = buildUnifiedChartSpec(currentDatasetRef.current, fallbackP, chartTypeRef.current, chartSpecConfigRef.current);
-        setActiveResults({ pivotResult: fallbackP, unifiedChartSpec: fallbackC });
-      };
-      workerRef.current = worker;
-    } catch {
-      workerRef.current = null;
-    }
-    return () => {
-      if (worker) worker.terminate();
-    };
+  const stopCalculation = useCallback(() => {
+    ++reqIdRef.current;
+    for (const request of profileRequestsRef.current.values()) request.reject(new DOMException('已取消','AbortError'));
+    profileRequestsRef.current.clear();
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    cachedDatasetRef.current = null;
+    busyRef.current = false;
+    setIsWorkerComputing(false);
   }, []);
 
   useEffect(() => {
-    // Fast path for small datasets: calculate synchronously for immediate 0ms UI feedback
-    if (!currentDataset?.rows || currentDataset.rows.length <= 2500) {
-      setIsWorkerComputing(false);
-      const pRes = calculatePivot(currentDataset, pivotConfig);
-      const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
-      setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
-      return;
-    }
-
-    // Heavy path (>2500 rows, e.g. 100K dataset): offload to Web Worker to keep UI thread 100% smooth
-    const nextId = ++reqIdRef.current;
-    if (workerRef.current) {
-      setIsWorkerComputing(true);
-      try {
-        workerRef.current.postMessage({
-          id: nextId,
-          payload: { dataset: currentDataset, pivotConfig, chartType, chartSpecConfig },
-        });
-      } catch (postErr) {
-        console.warn('postMessage to WebWorker failed, running on main-thread:', postErr);
-        setIsWorkerComputing(false);
-        const pRes = calculatePivot(currentDataset, pivotConfig);
-        const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
-        setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+    // Superseded work is stopped immediately rather than queued behind a stale request.
+    if (busyRef.current) stopCalculation();
+    const id = ++reqIdRef.current;
+    setIsWorkerComputing(true);
+    setComputeProgress(0);
+    setComputeError(null);
+    busyRef.current = true;
+    try {
+      if (!workerRef.current) {
+        workerRef.current = new Worker(new URL('./engine/pivotWorker.js', import.meta.url), { type: 'module' });
       }
-    } else {
-      setIsWorkerComputing(false);
-      const pRes = calculatePivot(currentDataset, pivotConfig);
-      const cSpec = buildUnifiedChartSpec(currentDataset, pRes, chartType, chartSpecConfig);
-      setActiveResults({ pivotResult: pRes, unifiedChartSpec: cSpec });
+      const worker = workerRef.current;
+      worker.onmessage = ({ data }) => {
+        if (data.kind === 'profile') {
+          const request = profileRequestsRef.current.get(data.profileId);
+          profileRequestsRef.current.delete(data.profileId);
+          if (request) { if(data.error) request.reject(new Error(data.error)); else request.resolve(data.result); }
+          return;
+        }
+        if (data.kind === 'drill') {
+          if (data.generation === reqIdRef.current) setDrillDownModal({ ...data.metadata, records: data.records });
+          return;
+        }
+        if (data.id !== reqIdRef.current) return;
+        if (data.progress !== undefined) { setComputeProgress(data.progress); return; }
+        busyRef.current = false;
+        setIsWorkerComputing(false);
+        if (data.success) {
+          data.pivotResult.cellRecordsMap = new Map();
+          setActiveResults({ pivotResult: data.pivotResult, unifiedChartSpec: data.unifiedChartSpec, dataset: currentDataset, config: pivotConfig, chartType, chartSpecConfig });
+        } else { const message = `计算失败：${data.error}；请减少分组字段或拆分数据后重试`; setComputeError(message); showToast(message, 'error'); }
+      };
+      worker.onerror = (event) => {
+        event?.preventDefault?.();
+        stopCalculation();
+        setComputeError('本地计算进程失败，可能内存不足；请减少分组字段或关闭其他标签页后重试');
+        showToast('本地计算进程失败，可能内存不足；请减少分组字段、关闭其他标签页后重试', 'error');
+      };
+      worker.onmessageerror = worker.onerror;
+      worker.postMessage({ id, payload: { dataset: cachedDatasetRef.current === currentDataset ? undefined : currentDataset, pivotConfig, chartType, chartSpecConfig } });
+      cachedDatasetRef.current = currentDataset;
+    } catch {
+      stopCalculation();
+      setComputeError('无法启动本地计算进程，请使用最新版浏览器并刷新页面重试');
+      showToast('无法启动本地计算进程，请使用最新版浏览器并刷新页面重试', 'error');
     }
-  }, [currentDataset, pivotConfig, chartType, chartSpecConfig]);
+  }, [currentDataset, pivotConfig, chartType, chartSpecConfig, showToast, stopCalculation, computeAttempt]);
 
+  useEffect(() => () => { workerRef.current?.terminate(); importTaskRef.current?.cancel(); }, []);
+
+  const runImport = useCallback(async (payload, fileName) => {
+    importTaskRef.current?.cancel();
+    const task = startImportTask(payload, (pct) => setUploadProgress({ fileName, pct, currentChunk: pct, totalChunks: 100 }));
+    importTaskRef.current = task;
+    setUploadProgress({ fileName, pct: 0, currentChunk: 0, totalChunks: 100 });
+    try { return await task.promise; }
+    finally {
+      if (importTaskRef.current === task) { importTaskRef.current = null; setUploadProgress(null); }
+    }
+  }, []);
+
+  const resultIsCurrent = activeResults.dataset === currentDataset && activeResults.config === pivotConfig && activeResults.chartType === chartType && activeResults.chartSpecConfig === chartSpecConfig;
   const pivotResult = activeResults.pivotResult;
   const unifiedChartSpec = activeResults.unifiedChartSpec;
 
@@ -713,14 +750,18 @@ export default function PivotWorkbench() {
     });
   }, []);
 
-  const addFieldToZone = useCallback((zone, fieldName) => {
+  const addFieldToZone = useCallback((zone, fieldName, source) => {
     if (isReadOnly) {
       showToast('当前为只读预览模式 (Viewer)，无法修改透视配置', 'error');
       return;
     }
     if (!currentDataset) return;
     soundEngine.playClick(580);
-    setPivotConfig((prev) => {
+    setPivotConfig((previous) => {
+      // Cross-zone moves form one history transaction, so Undo restores both sides.
+      const prev = source?.itemId && source.source !== zone && source.source !== 'fieldList'
+        ? { ...previous, [source.source]: previous[source.source].filter((item) => item.id !== source.itemId) }
+        : previous;
       const list = prev[zone] || [];
       const fMeta = currentDataset.fields?.find((f) => f.name === fieldName);
 
@@ -731,7 +772,7 @@ export default function PivotWorkbench() {
           const nextGran = nextGranOrder.find((g) => !usedGrans.has(g));
           if (!nextGran) {
             showToast(`「${fieldName}」的所有日期粒度均已添加`, 'error');
-            return prev;
+            return previous;
           }
           const id = `${zone[0]}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
           showToast(`已添加多级日期分组：「${fieldName} (${nextGran})」`);
@@ -743,7 +784,7 @@ export default function PivotWorkbench() {
           };
         }
         showToast(`「${fieldName}」已存在于该区域`, 'error');
-        return prev;
+        return previous;
       }
 
       const id = `${zone[0]}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -862,26 +903,43 @@ export default function PivotWorkbench() {
     });
   }, [isReadOnly]);
 
-  const handleChartPointClick = useCallback((pointData) => {
+  const requestProfile = useCallback((field, dimension, matchLabel) => {
+    if (busyRef.current || !workerRef.current) return Promise.resolve(null);
+    const profileId=++profileIdRef.current;
+    return new Promise((resolve,reject) => {
+      profileRequestsRef.current.set(profileId,{resolve,reject});
+      try { workerRef.current.postMessage({kind:'profile',profileId,field,dimension,matchLabel}); }
+      catch(error) { profileRequestsRef.current.delete(profileId); reject(error); }
+    });
+  }, [currentDataset,isWorkerComputing]);
+
+  const requestDrillDown = useCallback((rowKey, colKey = '__GRAND_TOTAL_COL__', metadata = {}) => {
+    if (busyRef.current || !workerRef.current || computeError || !resultIsCurrent) { showToast('请等待本次计算完成后再查看明细', 'error'); return; }
+    setDrillSearch(''); setDrillPage(1);
+    workerRef.current.postMessage({ kind: 'drill', generation: reqIdRef.current, rowKey: rowKey.replace('__SUBTOTAL__', ''), colKey, metadata });
+  }, [showToast,computeError,resultIsCurrent]);
+
+  const handleTablePointClick = useCallback((point) => {
+    setHighlightedRowKey(point.rowKey);
+  }, []);
+
+  const handleChartPointClick = useCallback(async (pointData) => {
     const now = Date.now();
     if (now - lastChartClickRef.current < 90) return;
     lastChartClickRef.current = now;
     const rk = pointData?.rowKey || pointData?.payload?.rowKey;
-    if (!rk || rk === '__GRAND_TOTAL_ROW__') return;
+    if (!rk) return;
 
     if (chartSpecConfig.clickLinkMode === 'filter') {
       const activeDim = pivotConfig.rows.length > 0 ? pivotConfig.rows[0] : (pivotConfig.columns.length > 0 ? pivotConfig.columns[0] : null);
       if (!activeDim) return;
 
       const firstSeg = rk.split('||')[0];
-      const fMeta = currentDataset?.fields?.find((f) => f.name === activeDim.field);
-      const matchingRawVals = Array.from(
-        new Set(
-          (currentDataset?.rows || [])
-            .filter((r) => formatDimensionValue(r[activeDim.field], activeDim, fMeta) === firstSeg)
-            .map((r) => String(r[activeDim.field] ?? ''))
-        )
-      );
+      let matchingRawVals;
+      try { matchingRawVals = (await requestProfile(activeDim.field, activeDim, firstSeg))?.matchingRawValues; }
+      catch(error) { if(error.name!=='AbortError') showToast(`联动筛选失败：${error.message}；请重试`,'error'); return; }
+      if (!matchingRawVals) { showToast('请等待计算完成后再筛选','error'); return; }
+
 
       setPivotConfig((prev) => {
         const existing = prev.filters.find((f) => f.field === activeDim.field);
@@ -903,21 +961,14 @@ export default function PivotWorkbench() {
         };
       });
     } else {
-      setHighlightedRowKey((prev) => {
-        const nextKey = prev === rk ? null : rk;
-        if (nextKey && tableContainerRef.current) {
-          const rowIndex = pivotResult.tableRows.findIndex((r) => r.rowKey === nextKey);
-          if (rowIndex >= 0) {
-            tableContainerRef.current.scrollTo({
-              top: Math.max(0, rowIndex * 35 - 72),
-              behavior: 'smooth',
-            });
-          }
-        }
-        return nextKey;
+      setHighlightedRowKey(rk);
+      const onlyColumns = !pivotResult.rowConfigs.length && pivotResult.colConfigs.length;
+      requestDrillDown(onlyColumns ? '__GRAND_TOTAL_ROW__' : rk, onlyColumns ? rk : pointData.colKey || '__GRAND_TOTAL_COL__', {
+        rowLabel: pointData.name || rk, colLabel: pointData.colKey || '总计',
+        valLabel: unifiedChartSpec.primarySeriesKey, valueFormatted: pointData.formattedValue || '',
       });
     }
-  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotResult.tableRows, showToast]);
+  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotConfig.columns, pivotResult, showToast, requestDrillDown, unifiedChartSpec.primarySeriesKey, requestProfile]);
 
   const handleFileUpload = useCallback(async (e) => {
     let file = null;
@@ -935,118 +986,34 @@ export default function PivotWorkbench() {
       return;
     }
     try {
-      // 1. 如果是 Excel 工作簿文件 (.xlsx, .xls)
-      if (/\.(xlsx|xls)$/i.test(file.name)) {
-        setUploadProgress({ fileName: file.name, currentChunk: 1, totalChunks: 1, pct: 100 });
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
-        const sheets = workbook.SheetNames.map((sheetName) => {
-          const ws = workbook.Sheets[sheetName];
-          const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-          if (!rawRows || rawRows.length === 0) return null;
-          const headers = Object.keys(rawRows[0] || {});
-          const fields = headers.map((h) => {
-            let numCount = 0;
-            let dateCount = 0;
-            let boolCount = 0;
-            let nonEmpty = 0;
-            const sampleSize = Math.min(30, rawRows.length);
-            for (let i = 0; i < sampleSize; i++) {
-              const val = rawRows[i][h];
-              if (val === '' || val === null || val === undefined) continue;
-              nonEmpty++;
-              if (typeof val === 'boolean' || /^(true|false|是|否)$/i.test(String(val))) {
-                boolCount++;
-              } else if (val instanceof Date || /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(String(val))) {
-                dateCount++;
-              } else if (typeof val === 'number' || !Number.isNaN(Number(String(val).replace(/,/g, '')))) {
-                numCount++;
-              }
-            }
-            // Thresholds unified with csvParser.js (>= 0.7) for consistent type
-            // inference regardless of whether the source file is CSV or Excel.
-            let type = 'text';
-            if (nonEmpty > 0) {
-              if (boolCount / nonEmpty >= 0.7) type = 'boolean';
-              else if (dateCount / nonEmpty >= 0.7) type = 'date';
-              else if (numCount / nonEmpty >= 0.7) type = 'number';
-            }
-            return { name: h, type };
-          });
-          return {
-            name: sheetName,
-            fields,
-            rows: rawRows,
-          };
-        }).filter(Boolean);
-
-        setUploadProgress(null);
-        if (!sheets || sheets.length === 0) {
-          showToast('未能从 Excel 工作簿中解析出有效数据行', 'error');
-          return;
-        }
-        setUploadPreviewModal({
-          fileName: file.name,
-          activeSheetIdx: 0,
-          sheets,
-        });
-        if (e?.target && 'value' in e.target) e.target.value = '';
-        return;
-      }
-
-      // 2. CSV / TSV / 文本表格文件
-      const chunkSize = 64 * 1024;
-      const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize));
-      let accumulatedText = '';
-      const decoder = new TextDecoder('utf-8', { fatal: true });
-      for (let idx = 0; idx < totalChunks; idx++) {
-        setUploadProgress({
-          fileName: file.name,
-          currentChunk: idx + 1,
-          totalChunks,
-          pct: Math.round(((idx + 1) / totalChunks) * 100),
-        });
-        const slice = file.slice(idx * chunkSize, (idx + 1) * chunkSize);
-        const buffer = await slice.arrayBuffer();
-        accumulatedText += decoder.decode(buffer, { stream: true });
-      }
-      accumulatedText += decoder.decode();
-      setUploadProgress(null);
-      const sheet = parseCSVTextToSheet(accumulatedText, file.name);
-      if (!sheet || sheet.rows.length === 0) {
-        showToast('未能从文件中解析出有效数据行', 'error');
-        return;
-      }
-      setUploadPreviewModal({
-        fileName: file.name,
-        activeSheetIdx: 0,
-        sheets: [sheet],
-      });
-    } catch {
-      setUploadProgress(null);
-      showToast('文件读取失败，请上传标准 CSV 或 Excel 表格文件', 'error');
+      const fileLimit = Math.max(32, Math.min(256, (navigator.deviceMemory || 4) * 32)) * 1024 * 1024;
+      if (file.size > fileLimit) throw new Error(`文件超过本机保护上限 ${Math.round(fileLimit / 1024 / 1024)} MB，可能内存不足；请拆分文件、减少字段或在内存更大的设备上重试`);
+      if (!/\.(csv|tsv|txt|xlsx|xls)$/i.test(file.name)) throw new Error('不支持此文件格式，请另存为 CSV、TSV 或 Excel 后重试');
+      importSourceRef.current = { file };
+      const sheets = await runImport({ file }, file.name);
+      setUploadPreviewModal({ fileName: file.name, activeSheetIdx: 0, sheets });
+    } catch (error) {
+      if (error.name !== 'AbortError') showToast(`导入失败：${error.message}`, 'error');
     }
     if (e?.target && 'value' in e.target) e.target.value = '';
-  }, [showToast]);
+  }, [showToast, runImport]);
 
-  const confirmUploadDataset = useCallback((autoInitPivot = true) => {
+  const reparseImport = useCallback(async (options) => {
+    if (!importSourceRef.current || importTaskRef.current) return;
+    try {
+      const sheets = await runImport({ ...importSourceRef.current, options }, uploadPreviewModal.fileName);
+      setUploadPreviewModal((prev) => prev ? { ...prev, sheets, options } : null);
+    } catch (error) { if (error.name !== 'AbortError') showToast(error.message, 'error'); }
+  }, [runImport, showToast, uploadPreviewModal]);
+
+  const confirmUploadDataset = useCallback(async (autoInitPivot = true) => {
     if (!uploadPreviewModal) return;
     const activeIdx = uploadPreviewModal.activeSheetIdx ?? 0;
     const sheet = uploadPreviewModal.sheets[activeIdx] || uploadPreviewModal.sheets[0];
     const sheetSuffix = uploadPreviewModal.sheets.length > 1 ? ` - ${sheet.name || ('Sheet ' + (activeIdx + 1))}` : '';
-    const normalizedRows = sheet.rows.map((r) => {
-      const next = { ...r };
-      sheet.fields.forEach((f) => {
-        if (f.type === 'number') {
-          const raw = String(r[f.name] ?? '').trim();
-          const n = raw ? Number(raw.replace(/,/g, '')) : null;
-          next[f.name] = n === null || Number.isFinite(n) ? n : null;
-        } else if (f.type === 'boolean') {
-          next[f.name] = /^(true|1|是|yes)$/i.test(String(r[f.name] ?? '').trim());
-        }
-      });
-      return next;
-    });
+    let normalizedRows;
+    try { normalizedRows = (await runImport({ sheets: [sheet], normalize: true }, uploadPreviewModal.fileName))[0].rows; }
+    catch (error) { if (error.name !== 'AbortError') showToast(error.message, 'error'); return; }
 
     const newDs = {
       id: `ds_upload_${Date.now()}`,
@@ -1059,7 +1026,10 @@ export default function PivotWorkbench() {
     setHighlightedRowKey(null);
     setHoveredCellTelemetry(null);
 
-    if (autoInitPivot) {
+    if (pendingViewRef.current) {
+      setPivotConfig(pendingViewRef.current);
+      pendingViewRef.current = null;
+    } else if (autoInitPivot) {
       setPivotConfig(buildDefaultPivotConfig(newDs));
     } else {
       setPivotConfig((prev) => ({ ...prev, filters: [], rows: [], columns: [], values: [], collapsedRowKeys: {}, collapsedColKeys: {} }));
@@ -1067,7 +1037,7 @@ export default function PivotWorkbench() {
     setUploadPreviewModal(null);
     soundEngine.playTransitionChord();
     showToast(`成功导入数据集「${newDs.name}」`);
-  }, [uploadPreviewModal, showToast]);
+  }, [uploadPreviewModal, showToast, runImport]);
 
   const generate100kDataset = useCallback((count = 100000) => {
     const regions = ['华东', '华南', '华北', '西南', '华中', '西北'];
@@ -1123,7 +1093,8 @@ export default function PivotWorkbench() {
       return [...prev, preset];
     });
     switchDataset(preset.id, preset);
-    setPivotConfig(buildDefaultPivotConfig(preset));
+    setPivotConfig(pendingViewRef.current || buildDefaultPivotConfig(preset));
+    pendingViewRef.current = null;
     soundEngine?.playTransitionChord?.();
     showToast(`已加载测试集「${preset.name}」`);
   }, [switchDataset, showToast]);
@@ -1162,35 +1133,34 @@ export default function PivotWorkbench() {
     unloadDataset(activeDatasetId);
   }, [activeDatasetId, unloadDataset]);
 
-  const handlePasteText = useCallback((text) => {
-    if (!text || !text.trim()) return;
+  const handlePasteText = useCallback(async (text) => {
+    if (!text?.trim()) return;
     try {
-      const sheet = parseCSVTextToSheet(text, '剪贴板数据');
-      if (!sheet || sheet.rows.length === 0) {
-        showToast('未能从粘贴内容中识别出有效表格行', 'error');
-        return;
-      }
-      setUploadPreviewModal({
-        fileName: 'Clipboard_Data.csv',
-        activeSheetIdx: 0,
-        sheets: [sheet],
-      });
-    } catch (err) {
-      showToast(`解析失败: ${err.message}`, 'error');
-    }
-  }, [showToast]);
+      importSourceRef.current = { text };
+      const sheets = await runImport({ text }, 'Clipboard_Data.csv');
+      setUploadPreviewModal({ fileName: 'Clipboard_Data.csv', activeSheetIdx: 0, sheets });
+    } catch (error) { if (error.name !== 'AbortError') showToast(`解析失败：${error.message}`, 'error'); }
+  }, [showToast, runImport]);
 
   const exportToCSV = useCallback(() => {
+    if (!currentDataset || isWorkerComputing || computeError) { showToast('当前没有可导出的已完成结果，请先加载数据并完成计算', 'error'); return; }
     doExportCSV(currentDataset, pivotResult, showToast);
-  }, [currentDataset, pivotResult, showToast]);
+  }, [currentDataset, pivotResult, showToast, isWorkerComputing, computeError]);
 
   const exportToExcelMerged = useCallback(() => {
+    if (!currentDataset || isWorkerComputing || computeError) { showToast('当前没有可导出的已完成结果，请先加载数据并完成计算', 'error'); return; }
     doExportExcel(currentDataset, pivotResult, showToast);
-  }, [currentDataset, pivotResult, showToast]);
+  }, [currentDataset, pivotResult, showToast, isWorkerComputing, computeError]);
 
   const exportChartAsPNG = useCallback(() => {
+    if (!currentDataset || isWorkerComputing || computeError) { showToast('当前没有可导出的已完成结果，请先加载数据并完成计算', 'error'); return; }
     doExportPNG(currentDataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast);
-  }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode]);
+  }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode, isWorkerComputing, computeError]);
+
+  const exportChartAsSVG = useCallback(() => {
+    if (!currentDataset || isWorkerComputing || computeError) { showToast('当前没有可导出的已完成结果，请先加载数据并完成计算', 'error'); return; }
+    doExportSVG(currentDataset, unifiedChartSpec, chartType, darkMode, viewMode, showToast);
+  }, [chartType, currentDataset, darkMode, showToast, unifiedChartSpec, viewMode, isWorkerComputing, computeError]);
 
   const exportPDFReport = useCallback(() => {
     doExportPDF(setIsPrintingReport);
@@ -1199,26 +1169,28 @@ export default function PivotWorkbench() {
   const applyShareTokenPayload = useCallback((rawInput) => {
     if (!rawInput || !rawInput.trim()) return false;
     try {
-      const tokenPart = rawInput.includes('share_token=') ? rawInput.split('share_token=')[1].split('&')[0] : rawInput.trim();
-      const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(tokenPart)))));
-      if (decoded.fullConfig) setPivotConfig(decoded.fullConfig);
+      const decoded = decodeView(rawInput);
+      pendingViewRef.current = currentDataset ? null : decoded.fullConfig;
+      setPivotConfig(decoded.fullConfig);
       if (decoded.cf) setCondFormat(decoded.cf);
       if (decoded.csc) setChartSpecConfig((p) => ({ ...p, ...decoded.csc }));
       if (decoded.vm) setViewMode(decoded.vm);
       if (decoded.ct) setChartType(decoded.ct);
       if (decoded.ts) setTableSettings((p) => ({ ...p, ...decoded.ts }));
-      showToast('已从 Share Token 成功还原透视工作台视图！');
+      showToast(currentDataset ? '已恢复视图配置，请核对字段是否匹配' : '已载入视图配置，请自行加载相同字段的数据');
       return true;
     } catch {
       showToast('Share Token 格式无效，无法解析还原', 'error');
       return false;
     }
-  }, [showToast]);
+  }, [showToast, currentDataset, setPivotConfig]);
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('share_token');
+    const token = new URLSearchParams(window.location.hash.slice(1)).get('share_token') || new URLSearchParams(window.location.search).get('share_token');
     if (token) applyShareTokenPayload(token);
-  }, [applyShareTokenPayload]);
+    // Read once: data import must not reapply an old URL over subsequent user edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Spotlight Command Palette Actions
   const commandActions = useMemo(() => {
@@ -1231,14 +1203,14 @@ export default function PivotWorkbench() {
       ...(currentStoryShots.length > 0 ? currentStoryShots : KEYNOTE_STORYBOARD_SHOTS).map((s, idx) => ({
         id: `cmd_shot_${idx}`,
         category: 'Keynote 叙事分镜',
-        label: `切换分镜 ${s.number}: ${s.title}`,
+        label: `${t('切换分镜')} ${s.number}: ${s.title}`,
         shortcut: `0${idx + 1}`,
         run: () => applyKeynoteShot(idx),
       })),
       ...VISUAL_CHART_TYPES.map((ct) => ({
         id: `cmd_chart_${ct.value}`,
-        category: '15 种可视化图表切换',
-        label: `切换图表为: ${ct.label}`,
+        category: '图表切换',
+        label: `${t('切换图表为:')} ${t(ct.label)}`,
         shortcut: ct.short,
         run: () => { setChartType(ct.value); if (viewMode === 'table') setViewMode('split'); },
       })),
@@ -1259,8 +1231,8 @@ export default function PivotWorkbench() {
     ];
     if (!commandQuery.trim()) return list;
     const q = commandQuery.toLowerCase();
-    return list.filter((item) => item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q));
-  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, pivotResult, tableSettings, showToast]);
+    return list.filter((item) => [item.label, item.category, t(item.label), t(item.category), item.shortcut].some(text => text.toLowerCase().includes(q)));
+  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, locale, pivotResult, tableSettings, showToast]);
 
   // Default and synchronized height matching the PivotTable's rendered dimension
   const defaultTableHeight = useMemo(() => {
@@ -1317,15 +1289,17 @@ export default function PivotWorkbench() {
   }, [isVirtualized, pivotResult.tableRows, scrollTop]);
 
   return (
-    <div className={darkMode && !isPrintingReport ? 'dark' : ''}>
+    <div data-testid="pivot-workbench" data-calculation-status={isWorkerComputing ? 'running' : computeError ? 'failed' : resultIsCurrent ? 'idle' : 'pending'} className={darkMode && !isPrintingReport ? 'dark' : ''}>
       <div className={`min-h-[100dvh] h-auto md:h-[100dvh] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans print:bg-white print:text-black apple-transition ${isPrintingReport ? 'overflow-visible' : 'overflow-x-hidden md:overflow-hidden'}`}>
         <div className="hidden print:block px-6 py-4 border-b border-black/15">
-          <h1 className="text-base font-semibold tracking-tight text-black">PivotEngine Studio [Monokai Pro] 数据透视分析报告 — {currentDataset?.name || '空白工程'}</h1>
-          <p className="text-[11px] text-[#75715E] mt-1">导出时间: {new Date().toLocaleString('zh-CN')} · 有效记录: {pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()} 行 · 导出人: {currentUser.name}</p>
+          <h1 className="text-base font-semibold tracking-tight text-black">{t("PivotEngine Studio [Monokai Pro] 数据透视分析报告 —") + ' '}{currentDataset?.name || '空白工程'}</h1>
+          <p className="text-[11px] text-ink-muted mt-1">{t("导出时间:") + ' '}{new Date().toLocaleString('zh-CN')}{' ' + t("· 有效记录:") + ' '}{pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()}{' ' + t("行 · 导出人:") + ' '}{currentUser.name}</p>
         </div>
 
         {/* Modular Header Bar */}
         <HeaderBar
+          theme={theme} setTheme={setTheme}
+          locale={locale} onLocaleChange={(value) => { const saved = setLocale(value); setLocaleState(value); if (!saved) showToast('无法保存语言偏好，当前标签页内仍有效', 'error'); }}
           canUndo={canUndo}
           canRedo={canRedo}
           undo={undo}
@@ -1357,12 +1331,25 @@ export default function PivotWorkbench() {
           exportToExcelMerged={exportToExcelMerged}
           exportToCSV={exportToCSV}
           exportChartAsPNG={exportChartAsPNG}
+          exportChartAsSVG={exportChartAsSVG}
           exportPDFReport={exportPDFReport}
           showToast={showToast}
           toastMessage={toastMessage}
           setToastMessage={setToastMessage}
         />
 
+        {(uploadProgress || isWorkerComputing) && (
+          <div className="flex items-center gap-3 px-4 py-2 shrink-0" role="status">
+            <span>{uploadProgress ? `正在导入 ${uploadProgress.fileName}` : t("正在计算")}</span>
+            <progress aria-label={uploadProgress ? t('导入进度') : t('计算进度')} max="100" value={uploadProgress?.pct ?? computeProgress} className="flex-1" />
+            <span>{uploadProgress?.pct ?? computeProgress}%</span>
+            <button onClick={() => { if (uploadProgress) importTaskRef.current?.cancel(); else { stopCalculation(); setComputeError('已取消计算，当前显示上次成功结果；可调整配置或重新计算'); } showToast('已取消，保留上次计算结果'); }}>{t("取消")}</button>
+          </div>
+        )}
+
+        {computeError && <div role="alert" className="px-4 py-2 border-b border-[#F92672] text-ink-pink flex flex-wrap gap-3 items-center">
+          <span>{computeError}</span><button onClick={() => setComputeAttempt((value) => value + 1)} className="border rounded px-2 py-1">重新计算</button>
+        </div>}
         {/* Workspace Dataset Tab Strip */}
         <DatasetTabStrip
           datasets={datasets}
@@ -1375,9 +1362,9 @@ export default function PivotWorkbench() {
           soundEngine={soundEngine}
         />
 
-        <div role="status" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
+        <div role="status" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-ink-muted dark:text-[#B8B5A8] apple-font-mono">
           <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#66D9EF]" />
-          <span className="truncate">数据来源：{!currentDataset ? '未载入数据集 · 等待输入以开启透视分析 · 本地 JavaScript 极速计算引擎就绪' : currentDataset.id === RETAIL_TEST_DATASET?.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {(pivotResult?.filteredCount || 0).toLocaleString()} / {(pivotResult?.totalCount || 0).toLocaleString()} 行 · 本地 JavaScript 计算</span>
+          <span className="truncate">{t("数据来源：")}{!currentDataset ? t("未载入数据集 · 等待输入以开启透视分析 · 本地 JavaScript 极速计算引擎就绪") : currentDataset.id === RETAIL_TEST_DATASET?.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {(pivotResult?.filteredCount || 0).toLocaleString()} / {(pivotResult?.totalCount || 0).toLocaleString()}{' ' + t("行 · 本地 JavaScript 计算")}</span>
         </div>
 
         {/* Bento KPI Cards Strip with Mini Sparklines */}
@@ -1386,19 +1373,18 @@ export default function PivotWorkbench() {
             {unifiedChartSpec.kpiCards.map((kpi) => (
               <div key={kpi.id} className="px-4 py-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822] apple-specular-card flex items-center justify-between gap-3 apple-transition hover:border-[#66D9EF]/60">
                 <div className="min-w-0">
-                  <div className="text-[11px] font-medium text-[#75715E] dark:text-[#908E80] flex items-center gap-1.5 truncate apple-font-mono">
+                  <div className="text-[11px] font-medium text-ink-muted flex items-center gap-1.5 truncate apple-font-mono">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: kpi.color }} />
                     <span className="truncate">{kpi.title}</span>
-                    {kpi.unit && <span className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[#F92672] text-[10px] apple-font-mono shrink-0">{kpi.unit}</span>}
+                    {kpi.unit && <span className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-ink-pink text-[10px] apple-font-mono shrink-0">{kpi.unit}</span>}
                   </div>
                   <div className="text-base font-bold tracking-tight apple-font-mono text-[#272822] dark:text-[#F8F8F2] mt-0.5">{kpi.formattedCurrent}</div>
                   {kpi.comparison && (
                     <div className="flex items-center gap-1.5 mt-1">
-                      <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold apple-font-mono ${kpi.comparison.isPositive ? 'bg-[#A6E22E]/15 text-[#4A7500] dark:text-[#A6E22E] border border-[#A6E22E]/30' : 'bg-[#F92672]/15 text-[#F92672] border border-[#F92672]/30'}`}>
+                      <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold apple-font-mono ${kpi.comparison.isPositive ? 'bg-[#A6E22E]/15 text-ink-green border border-[#A6E22E]/30' : 'bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30'}`}>
                         {kpi.comparison.pctFormatted}
                       </span>
-                      <span className="text-[9px] text-[#75715E] dark:text-[#908E80] truncate max-w-[125px]" title={`较 ${kpi.comparison.baselineLabel}`}>
-                        较 {kpi.comparison.baselineLabel}
+                      <span className="text-[9px] text-ink-muted truncate max-w-[125px]" title={`较 ${kpi.comparison.baselineLabel}`}>{' ' + t("较") + ' '}{kpi.comparison.baselineLabel}
                       </span>
                     </div>
                   )}
@@ -1426,6 +1412,8 @@ export default function PivotWorkbench() {
           <>
             {/* Modular Field Shelf and Dropzone Shelf */}
             <FieldShelf
+          requestProfile={requestProfile}
+          onPasteText={handlePasteText}
               cinemaTheaterMode={cinemaTheaterMode}
               isReadOnly={isReadOnly}
               datasets={datasets}
@@ -1471,17 +1459,13 @@ export default function PivotWorkbench() {
         >
           {/* 字段有效性自愈横幅: 当配置中遗留失效字段时提醒用户并提供一键重置 */}
           {pivotResult?.sanitizedInfo?.hasInvalidFields && (
-            <div className="mx-2.5 sm:mx-4 mb-2 p-2.5 rounded-xl bg-[#FD971F]/15 border border-[#FD971F]/40 flex flex-wrap items-center justify-between gap-2 text-xs apple-font-mono text-[#C86400] dark:text-[#FD971F] animate-apple-modal shrink-0">
+            <div className="mx-2.5 sm:mx-4 mb-2 p-2.5 rounded-xl bg-[#FD971F]/15 border border-[#FD971F]/40 flex flex-wrap items-center justify-between gap-2 text-xs apple-font-mono text-ink-orange animate-apple-modal shrink-0">
               <div className="flex items-center gap-2">
-                <span className="font-bold">⚠️ 配置自愈提示:</span>
-                <span>
-                  检测到当前数据集中不存在的失效字段
-                  {pivotResult.sanitizedInfo.ignoredFilters.length > 0 && ` [筛选: ${pivotResult.sanitizedInfo.ignoredFilters.join(', ')}]`}
+                <span className="font-bold">{t("⚠️ 配置自愈提示:")}</span>
+                <span>{' ' + t("检测到当前数据集中不存在的失效字段") + ' '}{pivotResult.sanitizedInfo.ignoredFilters.length > 0 && ` [筛选: ${pivotResult.sanitizedInfo.ignoredFilters.join(', ')}]`}
                   {pivotResult.sanitizedInfo.ignoredRows.length > 0 && ` [行: ${pivotResult.sanitizedInfo.ignoredRows.join(', ')}]`}
                   {pivotResult.sanitizedInfo.ignoredCols.length > 0 && ` [列: ${pivotResult.sanitizedInfo.ignoredCols.join(', ')}]`}
-                  {pivotResult.sanitizedInfo.ignoredVals.length > 0 && ` [指标: ${pivotResult.sanitizedInfo.ignoredVals.join(', ')}]`}
-                  ，已自动安全脱落以保障计算。
-                </span>
+                  {pivotResult.sanitizedInfo.ignoredVals.length > 0 && ` [指标: ${pivotResult.sanitizedInfo.ignoredVals.join(', ')}]`}{' ' + t("，已自动安全脱落以保障计算。") + ' '}</span>
               </div>
               <button
                 onClick={() => {
@@ -1490,26 +1474,25 @@ export default function PivotWorkbench() {
                   showToast('已重置为当前数据集的推荐默认透视配置');
                 }}
                 className="px-2.5 py-1 rounded-lg bg-[#FD971F] text-[#1E1F1C] font-bold text-[10px] shrink-0 hover:opacity-90 transition"
-              >
-                一键重置为默认透视
-              </button>
+              >{' ' + t("一键重置为默认透视") + ' '}</button>
             </div>
           )}
 
-          {/* Main Work Content Area: Split Container with Table and Chart Studio */}
+          {/* Preserve usable pane heights; scroll the workspace when both cannot fit. */}
         <div
           ref={splitContainerRef}
           
-          className={`flex-1 flex flex-col min-h-[480px] bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible h-auto' : 'overflow-hidden'}`}
+          className={`flex-1 flex flex-col min-h-[480px] md:min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible h-auto' : 'overflow-auto'}`}
         >
           {(viewMode !== 'chart' || isPrintingReport) && (
             <div
               style={{
-                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%` } : {}),
+                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%`, minHeight: 480 } : {}),
               }}
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col w-full min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
+                requestProfile={requestProfile}
                 pivotResult={pivotResult}
                 pivotConfig={pivotConfig}
                 setPivotConfig={setPivotConfig}
@@ -1530,7 +1513,8 @@ export default function PivotWorkbench() {
                 highlightedRowKey={highlightedRowKey}
                 hoveredCellTelemetry={hoveredCellTelemetry}
                 setHoveredCellTelemetry={setHoveredCellTelemetry}
-                handleChartPointClick={handleChartPointClick}
+                handleChartPointClick={handleTablePointClick}
+                requestDrillDown={requestDrillDown}
                 setDrillSearch={setDrillSearch}
                 setDrillPage={setDrillPage}
                 setDrillDownModal={setDrillDownModal}
@@ -1550,7 +1534,7 @@ export default function PivotWorkbench() {
             <div
               id="split-resizer"
               role="separator"
-              aria-label="调整透视表与图表上下高度"
+              aria-label={t("调整透视表与图表上下高度")}
               aria-orientation="horizontal"
               aria-valuemin={20}
               aria-valuemax={80}
@@ -1574,10 +1558,10 @@ export default function PivotWorkbench() {
                 setSplitRatioPct(50);
                 showToast('已复位表图高度比例为 50 : 50');
               }}
-              title="上下拖拽无级调节表图高度 · 双击复位 (50:50)"
+              title={t("上下拖拽无级调节表图高度 · 双击复位 (50:50)")}
               className={`flex w-full h-2.5 rounded-full items-center justify-center cursor-row-resize focus-visible:ring-2 focus-visible:ring-[#66D9EF] select-none transition-colors shrink-0 group ${isResizingSplit ? 'bg-[#F92672]/30' : 'hover:bg-[#66D9EF]/20'}`}
             >
-              <div className={`h-1 w-12 rounded-full transition-colors ${isResizingSplit ? 'bg-[#F92672]' : 'bg-[#D6D4C8] dark:bg-[#3E3D32] group-hover:bg-[#66D9EF]'}`} />
+              <div className={`h-1 w-12 rounded-full transition-colors ${isResizingSplit ? 'bg-action' : 'bg-[#D6D4C8] dark:bg-[#3E3D32] group-hover:bg-[#66D9EF]'}`} />
             </div>
           )}
 
@@ -1585,7 +1569,7 @@ export default function PivotWorkbench() {
             <div
               id="pivot-chart-container"
               style={{
-                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%` } : {}),
+                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%`, minHeight: 460 } : {}),
               }}
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col w-full min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
@@ -1648,10 +1632,12 @@ export default function PivotWorkbench() {
         />
 
         <UploadModal
+          onReparse={reparseImport}
+          isImporting={Boolean(uploadProgress)}
           uploadPreviewModal={uploadPreviewModal}
           setUploadPreviewModal={setUploadPreviewModal}
           confirmUploadDataset={confirmUploadDataset}
-          onClose={() => setUploadPreviewModal(null)}
+          onClose={() => { importTaskRef.current?.cancel(); setUploadPreviewModal(null); }}
         />
 
         <BinModal
@@ -1665,6 +1651,7 @@ export default function PivotWorkbench() {
         />
 
         <FilterModal
+          requestProfile={requestProfile}
           activeHeaderFilterModal={activeHeaderFilterModal}
           pivotConfig={pivotConfig}
           setPivotConfig={setPivotConfig}
@@ -1686,6 +1673,7 @@ export default function PivotWorkbench() {
         />
 
         <DataSourceModal
+          runImport={runImport}
           activeDataSourceModal={activeDataSourceModal}
           onClose={() => setActiveDataSourceModal(null)}
           gsheetUrlInput={gsheetUrlInput}
@@ -1715,6 +1703,7 @@ export default function PivotWorkbench() {
         />
 
         <WorkspaceModal
+          restorePivotConfig={(config, datasetAvailable) => { pendingViewRef.current = datasetAvailable ? null : config; setPivotConfig(config); }}
           isOpen={showWorkspaceModal}
           onClose={() => setShowWorkspaceModal(false)}
           currentUser={currentUser}
