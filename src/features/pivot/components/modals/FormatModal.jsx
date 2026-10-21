@@ -75,21 +75,22 @@ export function FormatModal({
       >
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
-            <Palette className="w-4 h-4 text-[#FD971F]" />
+            <Palette className="w-4 h-4 text-ink-orange" />
             <span>{t("FORMAT_STUDIO // 格式、数据居中对齐、行高列宽与显示")}</span>
           </h3>
-          <button onClick={onClose} aria-label={t("关闭数值与条件格式设置")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label={t("关闭数值与条件格式设置")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-ink-muted hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-5 space-y-5 overflow-y-auto text-xs">
           {/* Section 1: Conditional Formatting */}
           <div className="space-y-3">
-            <div className="font-bold text-[#F92672] apple-font-mono">{t("1. 透视表条件格式 (色阶 / 数据条 / 阈值标红)")}</div>
+            <div className="font-bold text-ink-pink apple-font-mono">{t("1. 透视表条件格式 (色阶 / 数据条 / 阈值标红)")}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">{t("单元格背景色阶 (Color Scale):")}</label>
+                <label className="block text-[10px] text-ink-muted mb-1 apple-font-mono">{t("单元格背景色阶 (Color Scale):")}</label>
                 <select
+                  aria-label={t("单元格背景色阶 (Color Scale):")}
                   value={condFormat.colorScale}
                   onChange={(e) => setCondFormat((p) => ({ ...p, colorScale: e.target.value }))}
                   className="w-full px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] apple-font-mono"
@@ -127,6 +128,7 @@ export function FormatModal({
               <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] apple-font-mono">
                 <span>{t("当数值")}</span>
                 <select
+                  aria-label={t("阈值比较方式")}
                   value={condFormat.customRuleOp}
                   onChange={(e) => setCondFormat((p) => ({ ...p, customRuleOp: e.target.value }))}
                   className="px-2 py-1 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E]"
@@ -137,11 +139,12 @@ export function FormatModal({
                 </select>
                 <input
                   type="number"
+                  aria-label={t("阈值")}
                   value={condFormat.customRuleValue}
                   onChange={(e) => setCondFormat((p) => ({ ...p, customRuleValue: e.target.value }))}
                   className="w-32 px-2 py-1 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E]"
                 />
-                <span className="text-[#F92672] font-bold">{t("时以品红加粗下划线高亮")}</span>
+                <span className="text-ink-pink font-bold">{t("时以品红加粗下划线高亮")}</span>
               </div>
             )}
           </div>
@@ -149,13 +152,13 @@ export function FormatModal({
           {/* Section 2: Table Layout, Alignment & Density */}
           {tableSettings && setTableSettings && (
             <div className="space-y-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-4">
-              <div className="font-bold text-[#A6E22E] apple-font-mono flex items-center gap-1.5">
+              <div className="font-bold text-ink-green apple-font-mono flex items-center gap-1.5">
                 <Table className="w-3.5 h-3.5" />
                 <span>{t("2. 透视表数据对齐方式与行高密度设置")}</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[10px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">{' ' + t("数据与表头对齐方式:") + ' '}</label>
+                  <label className="block text-[10px] text-ink-muted mb-1 apple-font-mono">{' ' + t("数据与表头对齐方式:") + ' '}</label>
                   <div className="flex items-center bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg p-1">
                     {[
                       { id: 'center', label: '居中对齐 (默认)', icon: AlignCenter },
@@ -172,7 +175,7 @@ export function FormatModal({
                           className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[10px] font-semibold transition ${
                             active
                               ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-sm'
-                              : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+                              : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
                           }`}
                         >
                           <Icon className="w-3 h-3" />
@@ -184,8 +187,9 @@ export function FormatModal({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] text-[#75715E] dark:text-[#908E80] mb-1 apple-font-mono">{' ' + t("行高密度规格:") + ' '}</label>
+                  <label className="block text-[10px] text-ink-muted mb-1 apple-font-mono">{' ' + t("行高密度规格:") + ' '}</label>
                   <select
+                    aria-label={t("行高密度规格:")}
                     value={tableSettings.density || 'normal'}
                     onChange={(e) => {
                       const nextD = e.target.value;
@@ -227,11 +231,11 @@ export function FormatModal({
           {/* Section 3: Values & Formatting */}
           <div className="space-y-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-4">
             <div className="flex items-center justify-between">
-              <div className="font-bold text-[#66D9EF] apple-font-mono">{t("3. 值指标显示方式 (占比/环比/累计) 与衍生计算度量")}</div>
+              <div className="font-bold text-ink-cyan apple-font-mono">{t("3. 值指标显示方式 (占比/环比/累计) 与衍生计算度量")}</div>
               <button
                 type="button"
                 onClick={() => setShowCalcBuilder((prev) => !prev)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#A6E22E]/15 border border-[#A6E22E]/40 text-[#4A7500] dark:text-[#A6E22E] text-[10.5px] font-bold apple-font-mono hover:bg-[#A6E22E]/25 transition"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#A6E22E]/15 border border-[#A6E22E]/40 text-ink-green text-[10.5px] font-bold apple-font-mono hover:bg-[#A6E22E]/25 transition"
               >
                 <Calculator className="w-3.5 h-3.5" />
                 <span>{showCalcBuilder ? t("收起公式构建") : t("+ 新建衍生计算指标")}</span>
@@ -241,15 +245,16 @@ export function FormatModal({
             {/* Calculated Field Builder Inline Card */}
             {showCalcBuilder && (
               <div className="p-3.5 rounded-xl bg-[#FAF8F1] dark:bg-[#1E1F1C] border border-[#A6E22E]/50 space-y-3 apple-font-mono text-xs animate-apple-modal">
-                <div className="flex items-center justify-between text-[#4A7500] dark:text-[#A6E22E] font-bold">
+                <div className="flex items-center justify-between text-ink-green font-bold">
                   <span>{t("新建复合计算度量 (跨指标聚合级公式运算)")}</span>
-                  <span className="text-[10px] text-[#75715E]">{t("如: [毛利润] / [销售额]")}</span>
+                  <span className="text-[10px] text-ink-muted">{t("如: [毛利润] / [销售额]")}</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
                   <div>
-                    <label className="block text-[9.5px] text-[#75715E] mb-1">{t("指标名称:")}</label>
+                    <label className="block text-[9.5px] text-ink-muted mb-1">{t("指标名称:")}</label>
                     <input
                       type="text"
+                      aria-label={t("指标名称:")}
                       value={calcForm.name}
                       onChange={(e) => setCalcForm((p) => ({ ...p, name: e.target.value }))}
                       placeholder={t("如: 毛利率")}
@@ -257,8 +262,9 @@ export function FormatModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-[9.5px] text-[#75715E] mb-1">{t("指标 A (分子/首项):")}</label>
+                    <label className="block text-[9.5px] text-ink-muted mb-1">{t("指标 A (分子/首项):")}</label>
                     <select
+                      aria-label={t("指标 A (分子/首项):")}
                       value={calcForm.operandA}
                       onChange={(e) => setCalcForm((p) => ({ ...p, operandA: e.target.value }))}
                       className="w-full px-2.5 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs"
@@ -271,11 +277,12 @@ export function FormatModal({
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
                     <div>
-                      <label className="block text-[9.5px] text-[#75715E] mb-1">{t("运算符:")}</label>
+                      <label className="block text-[9.5px] text-ink-muted mb-1">{t("运算符:")}</label>
                       <select
+                        aria-label={t("运算符:")}
                         value={calcForm.op}
                         onChange={(e) => setCalcForm((p) => ({ ...p, op: e.target.value }))}
-                        className="w-full px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs text-center font-bold text-[#F92672]"
+                        className="w-full px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs text-center font-bold text-ink-pink"
                       >
                         <option value="/">{t("÷ (除法)")}</option>
                         <option value="*">{t("× (乘法)")}</option>
@@ -284,8 +291,9 @@ export function FormatModal({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[9.5px] text-[#75715E] mb-1">{t("指标 B (分母):")}</label>
+                      <label className="block text-[9.5px] text-ink-muted mb-1">{t("指标 B (分母):")}</label>
                       <select
+                        aria-label={t("指标 B (分母):")}
                         value={calcForm.operandB}
                         onChange={(e) => setCalcForm((p) => ({ ...p, operandB: e.target.value }))}
                         className="w-full px-2.5 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs"
@@ -319,29 +327,30 @@ export function FormatModal({
             )}
 
             {pivotConfig.values.length === 0 ? (
-              <div className="text-[#75715E] italic apple-font-mono">{t("/* 当前值区域为空，请先拖入值指标 */")}</div>
+              <div className="text-ink-muted italic apple-font-mono">{t("/* 当前值区域为空，请先拖入值指标 */")}</div>
             ) : (
               pivotConfig.values.map((vItem) => (
                 <div key={vItem.id} className="p-3 rounded-xl bg-[#EFECE1]/50 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] grid grid-cols-1 sm:grid-cols-4 gap-2.5 items-center apple-font-mono">
                   <div className="min-w-0">
-                    <div className="font-bold text-[#FD971F] truncate flex items-center gap-1.5">
+                    <div className="font-bold text-ink-orange truncate flex items-center gap-1.5">
                       {vItem.isCalculated && (
-                        <span className="px-1.5 py-0.2 rounded bg-[#AE81FF]/20 text-[#6B38FB] dark:text-[#AE81FF] text-[8.5px] font-bold uppercase tracking-wider shrink-0">
+                        <span className="px-1.5 py-0.2 rounded bg-[#AE81FF]/20 text-ink-purple text-[8.5px] font-bold uppercase tracking-wider shrink-0">
                           CALC
                         </span>
                       )}
                       <span className="truncate">{vItem.field}</span>
                     </div>
                     {vItem.isCalculated ? (
-                      <div className="text-[9px] text-[#75715E] truncate mt-0.5">{' ' + t("公式: [")}{baseValues.find(b => b.id === vItem.operandA)?.field || vItem.operandA}] {vItem.op} [{baseValues.find(b => b.id === vItem.operandB)?.field || vItem.operandB}]
+                      <div className="text-[9px] text-ink-muted truncate mt-0.5">{' ' + t("公式: [")}{baseValues.find(b => b.id === vItem.operandA)?.field || vItem.operandA}] {vItem.op} [{baseValues.find(b => b.id === vItem.operandB)?.field || vItem.operandB}]
                       </div>
                     ) : (
-                      <div className="text-[9px] text-[#75715E] truncate mt-0.5">{t("聚合:") + ' '}{vItem.agg}</div>
+                      <div className="text-[9px] text-ink-muted truncate mt-0.5">{t("聚合:") + ' '}{vItem.agg}</div>
                     )}
                   </div>
                   <div>
-                    <label className="block text-[9px] text-[#75715E] mb-0.5">{t("显示方式 (Show As):")}</label>
+                    <label className="block text-[9px] text-ink-muted mb-0.5">{t("显示方式 (Show As):")}</label>
                     <select
+                      aria-label={`${vItem.field} · ${t("显示方式 (Show As):")}`}
                       value={vItem.showAs || 'normal'}
                       onChange={(e) => {
                         const nextShowAs = e.target.value;
@@ -358,11 +367,12 @@ export function FormatModal({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[9px] text-[#75715E] mb-0.5">{t("单位/符号与小数位:")}</label>
+                    <label className="block text-[9px] text-ink-muted mb-0.5">{t("单位/符号与小数位:")}</label>
                     <div className="flex items-center gap-1">
                       <input
                         type="text"
                         placeholder={t("单位(如¥,ms,MB)")}
+                        aria-label={`${vItem.field} · ${t("单位/符号")}`}
                         value={vItem.format?.currency ?? ''}
                         onChange={(e) => {
                           const cur = e.target.value;
@@ -376,6 +386,7 @@ export function FormatModal({
                         className="w-20 px-1.5 py-1 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px]"
                       />
                       <select
+                        aria-label={`${vItem.field} · ${t("小数位数")}`}
                         value={vItem.format?.decimals ?? (vItem.format?.isPercent ? 1 : 0)}
                         onChange={(e) => {
                           const dec = Number(e.target.value);
@@ -416,7 +427,7 @@ export function FormatModal({
                       <button
                         type="button"
                         onClick={() => handleRemoveValue(vItem.id)}
-                        className="p-1 rounded text-[#75715E] hover:text-[#F92672] transition"
+                        className="p-1 rounded text-ink-muted hover:text-[#F92672] transition"
                         title={t("删除该计算指标")}
                       >
                         <Trash2 className="w-3.5 h-3.5" />

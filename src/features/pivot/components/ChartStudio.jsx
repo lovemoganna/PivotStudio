@@ -50,18 +50,18 @@ export function ChartStudio({
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
         <div>
           <h3 className="text-xs font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2 apple-font-mono">
-            <BarChart3 className="w-4 h-4 text-[#F92672]" />
+            <BarChart3 className="w-4 h-4 text-ink-pink" />
             <span>{t(VISUAL_CHART_TYPES.find((type) => type.value === chartType)?.label || chartType)}</span>
             {unifiedChartSpec.derivedSeriesKey && (
-              <span className="px-1.5 py-0.2 rounded bg-[#AE81FF]/20 text-[#AE81FF] text-[9px]">
+              <span className="px-1.5 py-0.2 rounded bg-[#AE81FF]/20 text-ink-purple text-[9px]">
                 +{unifiedChartSpec.derivedSeriesKey}
               </span>
             )}
           </h3>
-          <p className="text-[10px] text-[#75715E] dark:text-[#908E80] mt-0.5 apple-font-mono flex items-center gap-2">
+          <p className="text-[10px] text-ink-muted mt-0.5 apple-font-mono flex items-center gap-2">
             <span>{t("维度：")}{unifiedChartSpec.xDimensionLabel}{' ' + t("· 指标：")}{unifiedChartSpec.primarySeriesKey}</span>
             {!unifiedChartSpec.canStack && (chartType === 'stacked_bar' || chartType === 'stacked_area') && (
-              <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-[#FD971F] border border-[#FD971F]/30 text-[9px]">{' ' + t("量纲不同已自动按分组呈现") + ' '}</span>
+              <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-ink-orange border border-[#FD971F]/30 text-[9px]">{' ' + t("量纲不同已自动按分组呈现") + ' '}</span>
             )}
           </p>
         </div>
@@ -78,7 +78,7 @@ export function ChartStudio({
               soundEngine?.playClick(560);
               setChartSpecConfig((p) => ({ ...p, clickLinkMode: p.clickLinkMode === 'highlight' ? 'filter' : 'highlight' }));
             }}
-            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold border transition ${chartSpecConfig.clickLinkMode === 'filter' ? 'bg-[#FD971F]/15 text-[#FD971F] border-[#FD971F]/40' : 'bg-[#EFECE1] dark:bg-[#1E1F1C] text-[#75715E] dark:text-[#908E80] border-[#D6D4C8] dark:border-[#3E3D32]'}`}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold border transition ${chartSpecConfig.clickLinkMode === 'filter' ? 'bg-[#FD971F]/15 text-ink-orange border-[#FD971F]/40' : 'bg-[#EFECE1] dark:bg-[#1E1F1C] text-ink-muted border-[#D6D4C8] dark:border-[#3E3D32]'}`}
           >{' ' + t("联动:") + ' '}{chartSpecConfig.clickLinkMode === 'filter' ? t("全局筛选") : t("明细下钻")}
           </button>
           <button
@@ -89,7 +89,7 @@ export function ChartStudio({
             className="px-2.5 py-1 rounded-md bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-[10px] font-semibold flex items-center gap-1 transition"
             title={t("图表规格微调 (TopN / 衍生序列 / 缺失值 / 标签)")}
           >
-            <Sliders className="w-3 h-3 text-[#66D9EF]" />
+            <Sliders className="w-3 h-3 text-ink-cyan" />
             <span>{t("规格")}</span>
           </button>
           <button
@@ -97,7 +97,7 @@ export function ChartStudio({
               soundEngine?.playClick(600);
               setIsChartFullscreen((prev) => !prev);
             }}
-            className="p-1.5 rounded-md bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:text-[#F92672] text-[#75715E] dark:text-[#908E80]"
+            className="p-1.5 rounded-md bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:text-[#F92672] text-ink-muted"
             title={t("全屏切换")} aria-label={isChartFullscreen ? "退出图表全屏" : "图表全屏"}
           >
             {isChartFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
@@ -109,16 +109,17 @@ export function ChartStudio({
               <div className="fixed inset-0 z-30" onClick={() => setShowChartStudioPopover(false)} />
             <div className="absolute right-0 top-9 z-40 w-[min(20rem,calc(100vw-2rem))] p-4 rounded-xl bg-[#FFFDF7]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-2xl border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl space-y-3 text-xs animate-apple-modal">
               <div className="flex items-center justify-between border-b border-[#3E3D32]/50 pb-2">
-                <span className="font-bold text-[11px] text-[#F92672]">{t("CHART_SPEC // 规格与衍生分析")}</span>
-                <button onClick={() => setShowChartStudioPopover(false)} aria-label={t("关闭图表规格面板")} className="p-1 rounded hover:bg-white/10 text-[#75715E]">
+                <span className="font-bold text-[11px] text-ink-pink">{t("CHART_SPEC // 规格与衍生分析")}</span>
+                <button onClick={() => setShowChartStudioPopover(false)} aria-label={t("关闭图表规格面板")} className="p-1 rounded hover:bg-white/10 text-ink-muted">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
               {pivotResult.valConfigs.length > 1 && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] text-[#908E80] mb-1">{t("主指标绑定:")}</label>
+                    <label className="block text-[10px] text-ink-muted mb-1">{t("主指标绑定:")}</label>
                     <select
+                    aria-label={t("主指标绑定:")}
                       value={chartSpecConfig.primaryValueId || pivotResult.valConfigs[0]?.id || ''}
                       onChange={(e) => setChartSpecConfig((p) => ({ ...p, primaryValueId: e.target.value }))}
                       className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
@@ -129,8 +130,9 @@ export function ChartStudio({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] text-[#908E80] mb-1">{t("次轴/Y轴指标:")}</label>
+                    <label className="block text-[10px] text-ink-muted mb-1">{t("次轴/Y轴指标:")}</label>
                     <select
+                    aria-label={t("次轴/Y轴指标:")}
                       value={chartSpecConfig.secondaryValueId || pivotResult.valConfigs[1]?.id || ''}
                       onChange={(e) => setChartSpecConfig((p) => ({ ...p, secondaryValueId: e.target.value }))}
                       className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
@@ -144,8 +146,9 @@ export function ChartStudio({
               )}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] text-[#908E80] mb-1">{t("图表内排序:")}</label>
+                  <label className="block text-[10px] text-ink-muted mb-1">{t("图表内排序:")}</label>
                   <select
+                    aria-label={t("图表内排序:")}
                     value={chartSpecConfig.sortMode}
                     onChange={(e) => setChartSpecConfig((p) => ({ ...p, sortMode: e.target.value }))}
                     className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
@@ -156,8 +159,9 @@ export function ChartStudio({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#908E80] mb-1">{t("TopN 焦点截断:")}</label>
+                  <label className="block text-[10px] text-ink-muted mb-1">{t("TopN 焦点截断:")}</label>
                   <select
+                    aria-label={t("TopN 焦点截断:")}
                     value={chartSpecConfig.topN}
                     onChange={(e) => setChartSpecConfig((p) => ({ ...p, topN: Number(e.target.value) }))}
                     className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
@@ -172,8 +176,9 @@ export function ChartStudio({
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[10px] text-[#908E80] mb-1">{t("衍生分析序列:")}</label>
+                  <label className="block text-[10px] text-ink-muted mb-1">{t("衍生分析序列:")}</label>
                   <select
+                    aria-label={t("衍生分析序列:")}
                     value={chartSpecConfig.lineDerivedMetric}
                     onChange={(e) => setChartSpecConfig((p) => ({ ...p, lineDerivedMetric: e.target.value }))}
                     className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
@@ -185,8 +190,9 @@ export function ChartStudio({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-[#908E80] mb-1">{t("缺失值处理策略:")}</label>
+                  <label className="block text-[10px] text-ink-muted mb-1">{t("缺失值处理策略:")}</label>
                   <select
+                    aria-label={t("缺失值处理策略:")}
                     value={chartSpecConfig.missingValueMode}
                     onChange={(e) => setChartSpecConfig((p) => ({ ...p, missingValueMode: e.target.value }))}
                     className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
@@ -199,8 +205,9 @@ export function ChartStudio({
               </div>
               {chartType === 'histogram' && (
                 <div>
-                  <label className="block text-[10px] text-[#908E80] mb-1">{t("直方图分箱数量 (Bins):")}</label>
+                  <label className="block text-[10px] text-ink-muted mb-1">{t("直方图分箱数量 (Bins):")}</label>
                   <select
+                    aria-label={t("直方图分箱数量 (Bins):")}
                     value={chartSpecConfig.histogramBins}
                     onChange={(e) => setChartSpecConfig((p) => ({ ...p, histogramBins: Number(e.target.value) }))}
                     className="w-full px-2.5 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
@@ -214,7 +221,7 @@ export function ChartStudio({
                 </div>
               )}
               <label className="flex items-center justify-between pt-1 cursor-pointer text-[11px]">
-                <span className="text-[#908E80]">{t("显示柱体/节点数值标签")}</span>
+                <span className="text-ink-muted">{t("显示柱体/节点数值标签")}</span>
                 <input
                   type="checkbox"
                   checked={chartSpecConfig.showDataLabels}
@@ -223,7 +230,7 @@ export function ChartStudio({
                 />
               </label>
               <label className="flex items-center justify-between pt-1 cursor-pointer text-[11px]">
-                <span className="text-[#908E80]">{t("显示全局均值参考线 (Avg)")}</span>
+                <span className="text-ink-muted">{t("显示全局均值参考线 (Avg)")}</span>
                 <input
                   type="checkbox"
                   checked={chartSpecConfig.showAvgReferenceLine}
@@ -246,7 +253,7 @@ export function ChartStudio({
               soundEngine?.playClick(540);
               setChartType(ct.value);
             }}
-            className={`px-2 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap transition ${chartType === ct.value ? 'bg-[#F92672] text-[#F8F8F2]' : 'bg-[#EFECE1]/70 dark:bg-[#1E1F1C] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+            className={`px-2 py-0.5 rounded text-[9px] font-semibold whitespace-nowrap transition ${chartType === ct.value ? 'bg-action text-[#F8F8F2]' : 'bg-[#EFECE1]/70 dark:bg-[#1E1F1C] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
           >
             {t(ct.short)}
           </button>
@@ -254,18 +261,18 @@ export function ChartStudio({
       </div>}
 
       {/* Main Chart Canvas */}
-      <div className="flex-1 w-full h-full min-h-0 flex items-center justify-center overflow-hidden">
+      <div className="flex-1 w-full min-h-[260px] flex items-center justify-center overflow-hidden">
         {!unifiedChartSpec.hasValues ? (
           <div className="flex flex-col items-center justify-center p-8 text-center apple-font-mono animate-fadeIn">
-            <div className="w-12 h-12 rounded-2xl bg-[#FD971F]/10 border border-[#FD971F]/30 flex items-center justify-center mb-3 text-[#FD971F] shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-[#FD971F]/10 border border-[#FD971F]/30 flex items-center justify-center mb-3 text-ink-orange shadow-sm">
               <Sliders className="w-6 h-6" />
             </div>
             <h4 className="text-sm font-semibold text-[#272822] dark:text-[#F8F8F2] mb-1.5">{' ' + t("未配置度量指标 (Values)") + ' '}</h4>
-            <p className="text-xs text-[#75715E] dark:text-[#908E80] max-w-sm leading-relaxed mb-4">{' ' + t("当前透视配置中缺少度量值。请在左侧字段架中点击或拖拽数值字段至【指标 / 值 (Values)】区域以生成图表。") + ' '}</p>
-            <div className="px-3 py-1 rounded-full bg-[#3E3D32]/40 text-[10px] text-[#A6E22E] border border-[#A6E22E]/30">{' ' + t("提示: 可在左侧点击或拖入数值指标，或将任意维度加入值区域设为计数 (COUNT)") + ' '}</div>
+            <p className="text-xs text-ink-muted max-w-sm leading-relaxed mb-4">{' ' + t("当前透视配置中缺少度量值。请在左侧字段架中点击或拖拽数值字段至【指标 / 值 (Values)】区域以生成图表。") + ' '}</p>
+            <div className="px-3 py-1 rounded-full bg-[#3E3D32]/40 text-[10px] text-ink-green border border-[#A6E22E]/30">{' ' + t("提示: 可在左侧点击或拖入数值指标，或将任意维度加入值区域设为计数 (COUNT)") + ' '}</div>
           </div>
         ) : unifiedChartSpec.items.length === 0 ? (
-          <div className="text-center text-xs text-[#75715E] dark:text-[#908E80] py-12 apple-font-mono">{' ' + t("/* 当前筛选条件下暂无可展示的数据行 */") + ' '}</div>
+          <div className="text-center text-xs text-ink-muted py-12 apple-font-mono">{' ' + t("/* 当前筛选条件下暂无可展示的数据行 */") + ' '}</div>
         ) : chartType === 'heatmap' ? (
           <div className="w-full h-full overflow-auto">
             {(() => {
@@ -309,7 +316,7 @@ export function ChartStudio({
             </svg>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%" minHeight={160}>
+          <ResponsiveContainer width="100%" height="100%" minHeight={260}>
             {chartType === 'line' ? (
               <LineChart data={unifiedChartSpec.items} margin={{ top: 24, right: 24, left: 10, bottom: unifiedChartSpec.items.length > 5 ? 44 : 24 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
@@ -691,16 +698,16 @@ export function ChartStudio({
             aria-expanded={showLensPresets}
             aria-controls="pivot-lens-presets"
             onClick={() => setShowLensPresets((open) => !open)}
-            className="text-[#0088A3] dark:text-[#66D9EF] font-semibold px-2 py-1 rounded border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]"
+            className="text-ink-cyan font-semibold px-2 py-1 rounded border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]"
           >{t("分析视角") + ' '}{showLensPresets ? t("收起") : t("展开")}</button>
-          <span className="text-[#75715E] dark:text-[#B8B5A8] hidden sm:inline">{' ' + t("单击图表查看明细；单击表格高亮，双击查看明细") + ' '}</span>
+          <span className="text-ink-muted dark:text-[#B8B5A8] hidden sm:inline">{' ' + t("单击图表查看明细；单击表格高亮，双击查看明细") + ' '}</span>
         </div>
         {showLensPresets && <div id="pivot-lens-presets" className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {KEYNOTE_STORYBOARD_SHOTS.map((shot, idx) => (
             <button
               key={shot.id}
               onClick={() => applyKeynoteShot(idx)}
-              className={`px-2 py-1 rounded border transition shrink-0 ${keynoteShotIdx === idx ? 'bg-[#A6E22E]/20 border-[#A6E22E]/50 text-[#4A7500] dark:text-[#A6E22E] font-bold' : 'bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+              className={`px-2 py-1 rounded border transition shrink-0 ${keynoteShotIdx === idx ? 'bg-[#A6E22E]/20 border-[#A6E22E]/50 text-ink-green font-bold' : 'bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
               title={shot.title}
             >{shot.number}·{shot.title.slice(0, 4)}</button>
           ))}

@@ -39,12 +39,20 @@ jobs:
         env:
           CHROME_BIN: ${{ steps.browser-chrome.outputs.chrome-path }}
         run: npm run test:browser -- --project=chromium
+      - name: UI quality screenshots and accessibility checks
+        env:
+          CHROME_BIN: ${{ steps.browser-chrome.outputs.chrome-path }}
+          AUDIT_PHASE: ci
+          AUDIT_ENFORCE: '1'
+        run: node scripts/quality-audit.mjs
       - name: Upload responsive screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pivotstudio-browser-evidence
-          path: artifacts/browser/*
+          path: |
+            artifacts/browser/*
+            artifacts/quality/ci/**
           if-no-files-found: ignore
 
   webkit:

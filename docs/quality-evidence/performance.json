@@ -1,0 +1,47 @@
+{
+  "before": [
+    {
+      "value": "count",
+      "browserInputToPaintMs": 201,
+      "hostWallMs": 306
+    },
+    {
+      "value": "avg",
+      "browserInputToPaintMs": 224,
+      "hostWallMs": 311
+    },
+    {
+      "value": "count_distinct",
+      "browserInputToPaintMs": 215,
+      "hostWallMs": 292
+    },
+    {
+      "value": "sum",
+      "browserInputToPaintMs": 222,
+      "hostWallMs": 338
+    }
+  ],
+  "after": [
+    {
+      "value": "count",
+      "browserInputToPaintMs": 171,
+      "hostWallMs": 257
+    },
+    {
+      "value": "avg",
+      "browserInputToPaintMs": 170,
+      "hostWallMs": 229
+    },
+    {
+      "value": "count_distinct",
+      "browserInputToPaintMs": 161,
+      "hostWallMs": 220
+    },
+    {
+      "value": "sum",
+      "browserInputToPaintMs": 251,
+      "hostWallMs": 291
+    }
+  ],
+  "scope": "Same Chromium executable, host, 100k-row low-cardinality synthetic CSV, 1440x1000, real change events to two animation frames after current result commit. No claim of faster aggregation or universal SLA."
+}

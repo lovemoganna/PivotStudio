@@ -4,6 +4,8 @@ React + Vite browser-based pivot analysis workbench.
 
 ## Running locally
 
+Use Node.js 22.12 or newer for the development validation tools.
+
 ```sh
 npm ci
 npm test
@@ -37,3 +39,22 @@ See [feature audit](docs/FEATURE_STATUS.md) for verification scope and known ris
 
 
 System/manual themes and Chinese/English UI are available. Files never upload to a server. Resource guards and detailed validation evidence are documented in [R1–R8 acceptance](docs/R1-R8-ACCEPTANCE.md).
+
+## UI quality regression
+
+`tests/browser/quality.spec.js` exercises readable split panes, keyboard import,
+long-field previews, named form controls, local clipboard fallback, desktop toolbar
+access, mobile settings and touch targets. `@axe-core/playwright` is a development-only
+dependency for repeatable accessibility checks; it is excluded from the production app.
+
+```sh
+# Uses an installed Playwright Chromium, or a custom CHROME_BIN executable.
+AUDIT_PHASE=after AUDIT_ENFORCE=1 node scripts/quality-audit.mjs
+```
+
+The audit saves screenshots, geometry and axe results under `artifacts/quality/` at
+360/768/1280/1440 CSS pixels. Install system CJK fonts for Chinese screenshot review.
+`AUDIT_ROOT` can select a detached baseline checkout; the runner also isolates its
+Tailwind working directory. `AUDIT_FONT_DIR` optionally selects a local
+`@fontsource/noto-sans-sc` folder for identical font files across both captures.
+See [UI quality evidence](docs/UI-QUALITY-LOOP.md) for the actual findings and limits.

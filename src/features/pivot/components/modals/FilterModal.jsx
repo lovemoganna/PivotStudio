@@ -95,10 +95,10 @@ export function FilterModal({
       >
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-[#A6E22E]" />
+            <Filter className="w-3.5 h-3.5 text-ink-green" />
             <span>{t("FILTER // 筛选「")}{liveDim.field}」({allDistinctVals.length}{t("项)")}</span>
           </h3>
-          <button onClick={onClose} aria-label={t("关闭字段筛选")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label={t("关闭字段筛选")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-ink-muted hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -112,7 +112,7 @@ export function FilterModal({
           />
           <button
             onClick={resetAll}
-            className="px-2.5 py-1 rounded-lg bg-[#A6E22E]/20 text-[#4A7500] dark:text-[#A6E22E] text-[10px] font-bold apple-font-mono"
+            className="px-2.5 py-1 rounded-lg bg-[#A6E22E]/20 text-ink-green text-[10px] font-bold apple-font-mono"
           >{' ' + t("全选重置") + ' '}</button>
         </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
@@ -133,7 +133,7 @@ export function FilterModal({
                 </label>
                 <button
                   onClick={() => selectOnlyThis(val)}
-                  className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 rounded bg-[#F92672]/15 text-[#F92672] text-[9px] font-semibold transition"
+                  className="opacity-0 group-hover:opacity-100 px-1.5 py-0.5 rounded bg-[#F92672]/15 text-ink-pink text-[9px] font-semibold transition"
                 >{' ' + t("仅此项") + ' '}</button>
               </div>
             );

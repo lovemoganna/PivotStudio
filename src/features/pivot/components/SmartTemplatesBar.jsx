@@ -120,8 +120,8 @@ export function SmartTemplatesBar({
 
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 text-[10px] apple-font-mono scrollbar-none">
-      <span className="text-[#66D9EF] font-bold flex items-center gap-1 shrink-0 mr-1">
-        <Sparkles className="w-3 h-3 text-[#E6DB74]" />
+      <span className="text-ink-cyan font-bold flex items-center gap-1 shrink-0 mr-1">
+        <Sparkles className="w-3 h-3 text-ink-yellow" />
         <span>{t("智能透视推荐:")}</span>
       </span>
 
@@ -132,7 +132,7 @@ export function SmartTemplatesBar({
         className="flex items-center gap-1 px-2 py-0.8 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-[#272822] dark:text-[#F8F8F2] hover:text-[#66D9EF] transition shrink-0 disabled:opacity-40"
         title={t("按主指标降序排列，同时展现数值与占总计百分比")}
       >
-        <Trophy className="w-3 h-3 text-[#FD971F]" />
+        <Trophy className="w-3 h-3 text-ink-orange" />
         <span>{t("Top-N 排行与占比")}</span>
       </button>
 
@@ -143,7 +143,7 @@ export function SmartTemplatesBar({
         className="flex items-center gap-1 px-2 py-0.8 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] hover:text-[#A6E22E] transition shrink-0 disabled:opacity-40"
         title={t("时序交叉分期，自动计算较上期环比变动率 (%)")}
       >
-        <Calendar className="w-3 h-3 text-[#A6E22E]" />
+        <Calendar className="w-3 h-3 text-ink-green" />
         <span>{t("时序环比变动率")}</span>
       </button>
 
@@ -154,7 +154,7 @@ export function SmartTemplatesBar({
         className="flex items-center gap-1 px-2 py-0.8 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] text-[#272822] dark:text-[#F8F8F2] hover:text-[#F92672] transition shrink-0 disabled:opacity-40"
         title={t("双维度行列交叉透视，自动挂载三色热力图色阶")}
       >
-        <Grid3X3 className="w-3 h-3 text-[#F92672]" />
+        <Grid3X3 className="w-3 h-3 text-ink-pink" />
         <span>{t("交叉热力矩阵")}</span>
       </button>
 
@@ -165,7 +165,7 @@ export function SmartTemplatesBar({
         className="flex items-center gap-1 px-2 py-0.8 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#AE81FF] text-[#272822] dark:text-[#F8F8F2] hover:text-[#AE81FF] transition shrink-0 disabled:opacity-40"
         title={t("快速将数据集中前4个数值度量并列聚合")}
       >
-        <Layers className="w-3 h-3 text-[#AE81FF]" />
+        <Layers className="w-3 h-3 text-ink-purple" />
         <span>{t("全量度量罗盘")}</span>
       </button>
     </div>

@@ -1198,14 +1198,14 @@ export default function PivotWorkbench() {
       ...(currentStoryShots.length > 0 ? currentStoryShots : KEYNOTE_STORYBOARD_SHOTS).map((s, idx) => ({
         id: `cmd_shot_${idx}`,
         category: 'Keynote 叙事分镜',
-        label: `切换分镜 ${s.number}: ${s.title}`,
+        label: `${t('切换分镜')} ${s.number}: ${s.title}`,
         shortcut: `0${idx + 1}`,
         run: () => applyKeynoteShot(idx),
       })),
       ...VISUAL_CHART_TYPES.map((ct) => ({
         id: `cmd_chart_${ct.value}`,
-        category: '15 种可视化图表切换',
-        label: `切换图表为: ${ct.label}`,
+        category: '图表切换',
+        label: `${t('切换图表为:')} ${t(ct.label)}`,
         shortcut: ct.short,
         run: () => { setChartType(ct.value); if (viewMode === 'table') setViewMode('split'); },
       })),
@@ -1226,8 +1226,8 @@ export default function PivotWorkbench() {
     ];
     if (!commandQuery.trim()) return list;
     const q = commandQuery.toLowerCase();
-    return list.filter((item) => item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q));
-  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, pivotResult, tableSettings, showToast]);
+    return list.filter((item) => [item.label, item.category, t(item.label), t(item.category), item.shortcut].some(text => text.toLowerCase().includes(q)));
+  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, locale, pivotResult, tableSettings, showToast]);
 
   // Default and synchronized height matching the PivotTable's rendered dimension
   const defaultTableHeight = useMemo(() => {
@@ -1288,7 +1288,7 @@ export default function PivotWorkbench() {
       <div className={`min-h-[100dvh] h-auto md:h-[100dvh] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans print:bg-white print:text-black apple-transition ${isPrintingReport ? 'overflow-visible' : 'overflow-x-hidden md:overflow-hidden'}`}>
         <div className="hidden print:block px-6 py-4 border-b border-black/15">
           <h1 className="text-base font-semibold tracking-tight text-black">{t("PivotEngine Studio [Monokai Pro] 数据透视分析报告 —") + ' '}{currentDataset?.name || '空白工程'}</h1>
-          <p className="text-[11px] text-[#75715E] mt-1">{t("导出时间:") + ' '}{new Date().toLocaleString('zh-CN')}{' ' + t("· 有效记录:") + ' '}{pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()}{' ' + t("行 · 导出人:") + ' '}{currentUser.name}</p>
+          <p className="text-[11px] text-ink-muted mt-1">{t("导出时间:") + ' '}{new Date().toLocaleString('zh-CN')}{' ' + t("· 有效记录:") + ' '}{pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()}{' ' + t("行 · 导出人:") + ' '}{currentUser.name}</p>
         </div>
 
         {/* Modular Header Bar */}
@@ -1342,7 +1342,7 @@ export default function PivotWorkbench() {
           </div>
         )}
 
-        {computeError && <div role="alert" className="px-4 py-2 border-b border-[#F92672] text-[#F92672] flex flex-wrap gap-3 items-center">
+        {computeError && <div role="alert" className="px-4 py-2 border-b border-[#F92672] text-ink-pink flex flex-wrap gap-3 items-center">
           <span>{computeError}</span><button onClick={() => setComputeAttempt((value) => value + 1)} className="border rounded px-2 py-1">重新计算</button>
         </div>}
         {/* Workspace Dataset Tab Strip */}
@@ -1357,7 +1357,7 @@ export default function PivotWorkbench() {
           soundEngine={soundEngine}
         />
 
-        <div role="status" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-[#75715E] dark:text-[#B8B5A8] apple-font-mono">
+        <div role="status" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-ink-muted dark:text-[#B8B5A8] apple-font-mono">
           <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#66D9EF]" />
           <span className="truncate">{t("数据来源：")}{!currentDataset ? t("未载入数据集 · 等待输入以开启透视分析 · 本地 JavaScript 极速计算引擎就绪") : currentDataset.id === RETAIL_TEST_DATASET?.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {(pivotResult?.filteredCount || 0).toLocaleString()} / {(pivotResult?.totalCount || 0).toLocaleString()}{' ' + t("行 · 本地 JavaScript 计算")}</span>
         </div>
@@ -1368,18 +1368,18 @@ export default function PivotWorkbench() {
             {unifiedChartSpec.kpiCards.map((kpi) => (
               <div key={kpi.id} className="px-4 py-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822] apple-specular-card flex items-center justify-between gap-3 apple-transition hover:border-[#66D9EF]/60">
                 <div className="min-w-0">
-                  <div className="text-[11px] font-medium text-[#75715E] dark:text-[#908E80] flex items-center gap-1.5 truncate apple-font-mono">
+                  <div className="text-[11px] font-medium text-ink-muted flex items-center gap-1.5 truncate apple-font-mono">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: kpi.color }} />
                     <span className="truncate">{kpi.title}</span>
-                    {kpi.unit && <span className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[#F92672] text-[10px] apple-font-mono shrink-0">{kpi.unit}</span>}
+                    {kpi.unit && <span className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-ink-pink text-[10px] apple-font-mono shrink-0">{kpi.unit}</span>}
                   </div>
                   <div className="text-base font-bold tracking-tight apple-font-mono text-[#272822] dark:text-[#F8F8F2] mt-0.5">{kpi.formattedCurrent}</div>
                   {kpi.comparison && (
                     <div className="flex items-center gap-1.5 mt-1">
-                      <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold apple-font-mono ${kpi.comparison.isPositive ? 'bg-[#A6E22E]/15 text-[#4A7500] dark:text-[#A6E22E] border border-[#A6E22E]/30' : 'bg-[#F92672]/15 text-[#F92672] border border-[#F92672]/30'}`}>
+                      <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold apple-font-mono ${kpi.comparison.isPositive ? 'bg-[#A6E22E]/15 text-ink-green border border-[#A6E22E]/30' : 'bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30'}`}>
                         {kpi.comparison.pctFormatted}
                       </span>
-                      <span className="text-[9px] text-[#75715E] dark:text-[#908E80] truncate max-w-[125px]" title={`较 ${kpi.comparison.baselineLabel}`}>{' ' + t("较") + ' '}{kpi.comparison.baselineLabel}
+                      <span className="text-[9px] text-ink-muted truncate max-w-[125px]" title={`较 ${kpi.comparison.baselineLabel}`}>{' ' + t("较") + ' '}{kpi.comparison.baselineLabel}
                       </span>
                     </div>
                   )}
@@ -1454,7 +1454,7 @@ export default function PivotWorkbench() {
         >
           {/* 字段有效性自愈横幅: 当配置中遗留失效字段时提醒用户并提供一键重置 */}
           {pivotResult?.sanitizedInfo?.hasInvalidFields && (
-            <div className="mx-2.5 sm:mx-4 mb-2 p-2.5 rounded-xl bg-[#FD971F]/15 border border-[#FD971F]/40 flex flex-wrap items-center justify-between gap-2 text-xs apple-font-mono text-[#C86400] dark:text-[#FD971F] animate-apple-modal shrink-0">
+            <div className="mx-2.5 sm:mx-4 mb-2 p-2.5 rounded-xl bg-[#FD971F]/15 border border-[#FD971F]/40 flex flex-wrap items-center justify-between gap-2 text-xs apple-font-mono text-ink-orange animate-apple-modal shrink-0">
               <div className="flex items-center gap-2">
                 <span className="font-bold">{t("⚠️ 配置自愈提示:")}</span>
                 <span>{' ' + t("检测到当前数据集中不存在的失效字段") + ' '}{pivotResult.sanitizedInfo.ignoredFilters.length > 0 && ` [筛选: ${pivotResult.sanitizedInfo.ignoredFilters.join(', ')}]`}
@@ -1473,16 +1473,16 @@ export default function PivotWorkbench() {
             </div>
           )}
 
-          {/* Main Work Content Area: Split Container with Table and Chart Studio */}
+          {/* Preserve usable pane heights; scroll the workspace when both cannot fit. */}
         <div
           ref={splitContainerRef}
           
-          className={`flex-1 flex flex-col min-h-[480px] bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible h-auto' : 'overflow-hidden'}`}
+          className={`flex-1 flex flex-col min-h-[480px] md:min-h-0 bg-[#F7F6F0] dark:bg-[#1E1F1C] p-2.5 sm:p-4 gap-2 animate-apple-stage ${isPrintingReport ? 'overflow-visible h-auto' : 'overflow-auto'}`}
         >
           {(viewMode !== 'chart' || isPrintingReport) && (
             <div
               style={{
-                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%` } : {}),
+                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%`, minHeight: 480 } : {}),
               }}
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col w-full min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
@@ -1556,7 +1556,7 @@ export default function PivotWorkbench() {
               title={t("上下拖拽无级调节表图高度 · 双击复位 (50:50)")}
               className={`flex w-full h-2.5 rounded-full items-center justify-center cursor-row-resize focus-visible:ring-2 focus-visible:ring-[#66D9EF] select-none transition-colors shrink-0 group ${isResizingSplit ? 'bg-[#F92672]/30' : 'hover:bg-[#66D9EF]/20'}`}
             >
-              <div className={`h-1 w-12 rounded-full transition-colors ${isResizingSplit ? 'bg-[#F92672]' : 'bg-[#D6D4C8] dark:bg-[#3E3D32] group-hover:bg-[#66D9EF]'}`} />
+              <div className={`h-1 w-12 rounded-full transition-colors ${isResizingSplit ? 'bg-action' : 'bg-[#D6D4C8] dark:bg-[#3E3D32] group-hover:bg-[#66D9EF]'}`} />
             </div>
           )}
 
@@ -1564,7 +1564,7 @@ export default function PivotWorkbench() {
             <div
               id="pivot-chart-container"
               style={{
-                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%` } : {}),
+                ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%`, minHeight: 460 } : {}),
               }}
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col w-full min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'h-auto' : ''}`}
             >

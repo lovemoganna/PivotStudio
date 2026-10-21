@@ -54,10 +54,10 @@ export function WorkspaceModal({
       >
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
-            <FolderOpen className="w-4 h-4 text-[#F92672]" />
+            <FolderOpen className="w-4 h-4 text-ink-pink" />
             <span>{t("WORKSPACE_HUB // 本机快照与配置分享")}</span>
           </h3>
-          <button onClick={onClose} aria-label={t("关闭本机工作区与配置分享")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label={t("关闭本机工作区与配置分享")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-ink-muted hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -75,7 +75,7 @@ export function WorkspaceModal({
                     setCurrentUser(u);
                     showToast?.(`已切换身份为：${u.name}`);
                   }}
-                  className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold ${currentUser.role === u.role ? 'bg-[#F92672] text-[#F8F8F2] border-[#F92672]' : 'border-[#D6D4C8] dark:border-[#3E3D32]'}`}
+                  className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold ${currentUser.role === u.role ? 'bg-action text-[#F8F8F2] border-[#F92672]' : 'border-[#D6D4C8] dark:border-[#3E3D32]'}`}
                 >
                   {u.name}
                 </button>
@@ -84,7 +84,7 @@ export function WorkspaceModal({
           </div>
 
           <div className="space-y-2">
-            <div className="font-bold text-[#A6E22E]">{t("保存或切换本机工作区快照 (")}{savedWorkspaces.length})</div>
+            <div className="font-bold text-ink-green">{t("保存或切换本机工作区快照 (")}{savedWorkspaces.length})</div>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -125,7 +125,7 @@ export function WorkspaceModal({
                 <div key={ws.id} className="p-2.5 rounded-lg bg-[#EFECE1]/40 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-bold truncate">{ws.name}</div>
-                    <div className="text-[9px] text-[#75715E]">{ws.updatedAt} · {ws.author}</div>
+                    <div className="text-[9px] text-ink-muted">{ws.updatedAt} · {ws.author}</div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
@@ -143,12 +143,12 @@ export function WorkspaceModal({
                         onClose();
                         showToast?.(`已加载工作区「${ws.name}」`);
                       }}
-                      className="px-2.5 py-1 rounded bg-[#66D9EF]/20 text-[#0088A3] dark:text-[#66D9EF] text-[10px] font-bold"
+                      className="px-2.5 py-1 rounded bg-[#66D9EF]/20 text-ink-cyan text-[10px] font-bold"
                     >{' ' + t("载入") + ' '}</button>
                     {!isReadOnly && (
                       <button
                         onClick={() => setSavedWorkspaces((prev) => prev.filter((x) => x.id !== ws.id))}
-                        className="px-2 py-1 rounded bg-[#F92672]/15 text-[#F92672] text-[10px]"
+                        className="px-2 py-1 rounded bg-[#F92672]/15 text-ink-pink text-[10px]"
                       >{' ' + t("删除") + ' '}</button>
                     )}
                   </div>
@@ -158,8 +158,8 @@ export function WorkspaceModal({
           </div>
 
           <div className="space-y-2 border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3">
-            <div className="font-bold text-[#66D9EF]">{t("分享视图配置（不包含数据）")}</div>
-            <p className="text-[10px] leading-relaxed text-[#75715E] dark:text-[#908E80]">{t("配置链接使用 Base64，不是加密或鉴权。打开链接后请自行加载字段匹配的数据。工作区快照保存在本机浏览器，不同步到服务器。")}</p>
+            <div className="font-bold text-ink-cyan">{t("分享视图配置（不包含数据）")}</div>
+            <p className="text-[10px] leading-relaxed text-ink-muted">{t("配置链接使用 Base64，不是加密或鉴权。打开链接后请自行加载字段匹配的数据。工作区快照保存在本机浏览器，不同步到服务器。")}</p>
             {(() => {
               let shareLink;
               try { shareLink = createShareLink({ vm:viewMode, ct:chartType, cf:condFormat, csc:chartSpecConfig, fullConfig:pivotConfig, ts:tableSettings }, window.location); }
@@ -188,7 +188,7 @@ export function WorkspaceModal({
                           onClose();
                         }
                       }}
-                      className="px-3 py-1 rounded bg-[#F92672] text-[#F8F8F2] font-bold text-[10px]"
+                      className="px-3 py-1 rounded bg-action text-[#F8F8F2] font-bold text-[10px]"
                     >{' ' + t("还原视图") + ' '}</button>
                   </div>
                 </div>

@@ -31,10 +31,10 @@ export function TestSuiteModal({
       >
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[#A6E22E]" />
+            <CheckCircle2 className="w-4 h-4 text-ink-green" />
             <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2]">{' ' + t("内置演示数据计算校验（不替代自动化回归） (")}{liveEngineTestResults.filter((result) => result.passed).length}{t("/5 通过)") + ' '}</h3>
           </div>
-          <button onClick={onClose} aria-label={t("关闭内置校验结果")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#75715E] hover:text-[#F92672]">
+          <button onClick={onClose} aria-label={t("关闭内置校验结果")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-ink-muted hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -43,13 +43,13 @@ export function TestSuiteModal({
             <div key={result.id} className="p-3.5 rounded-xl bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${result.passed ? 'bg-[#A6E22E]/20 text-[#4A7500] dark:text-[#A6E22E]' : 'bg-[#F92672]/20 text-[#F92672]'}`}>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${result.passed ? 'bg-[#A6E22E]/20 text-ink-green' : 'bg-[#F92672]/20 text-ink-pink'}`}>
                     {result.passed ? 'PASS ✓' : 'FAIL'}
                   </span>
                   <span className="font-bold text-[#272822] dark:text-[#F8F8F2]">{result.name}</span>
                 </div>
-                <div className="text-[10px] text-[#75715E] dark:text-[#908E80]">{t("预期结果:") + ' '}{result.expectedSummary}</div>
-                <div className="text-[10px] text-[#0088A3] dark:text-[#66D9EF]">{t("实测输出:") + ' '}{result.actualSummary}</div>
+                <div className="text-[10px] text-ink-muted">{t("预期结果:") + ' '}{result.expectedSummary}</div>
+                <div className="text-[10px] text-ink-cyan">{t("实测输出:") + ' '}{result.actualSummary}</div>
               </div>
               <button
                 disabled={isReadOnly}
@@ -71,7 +71,7 @@ export function TestSuiteModal({
                   soundEngine?.playTransitionChord();
                   showToast?.(`已将「${result.name}」载入主工作台`);
                 }}
-                className="px-3 py-1.5 rounded-lg bg-[#F92672] text-[#F8F8F2] text-[10px] font-bold shrink-0 disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg bg-action text-[#F8F8F2] text-[10px] font-bold shrink-0 disabled:opacity-40"
               >{' ' + t("载入到透视表查看") + ' '}</button>
             </div>
           ))}
