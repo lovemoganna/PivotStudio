@@ -281,7 +281,7 @@ export function ChartStudio({
         {unifiedChartSpec.renderLimit ? (
           <div role="status" className="p-6 max-w-lg text-center space-y-3">
             <h4 className="text-sm font-semibold">{t("图表分组过多")}</h4>
-            <p className="text-xs text-ink-muted">{unifiedChartSpec.renderLimit.groupCount.toLocaleString()} {t("个分组超过图表上限 200；表格和 KPI 保持全量。请筛选、减少维度或设置 TopN。")}</p>
+            <p className="text-xs text-ink-muted">{unifiedChartSpec.renderLimit.groupCount.toLocaleString()} {t("个分组超过当前图表上限：")}{unifiedChartSpec.renderLimit.maximum.toLocaleString()}{t("；表格和 KPI 保持全量。请筛选、减少维度或设置 TopN。")}</p>
             <button className="px-3 py-2 rounded-lg bg-action text-[#F8F8F2] text-xs" onClick={(event) => { restoreScopeFocusRef.current = document.activeElement === event.currentTarget; setChartSpecConfig((prev) => ({ ...prev, topN: 10, sortMode: 'desc' })); }}>{t("按主指标显示 Top 10")}</button>
           </div>
         ) : !unifiedChartSpec.hasValues ? (
@@ -307,7 +307,7 @@ export function ChartStudio({
               const metric = unifiedChartSpec.primaryValCfg;
               const magnitude = Math.max(1,...shownRows.flatMap((row) => groups.map((group) => Math.abs(pivotResult.displayMatrix[`${row.rowKey}@@${group.key}@@${metric.id}`]?.display || 0))));
               return <>
-                <svg data-chart-svg="true" role="img" aria-label={t("矩阵热力图")} width={Math.max(500,160+groups.length*110)} height={Math.max(180,60+shownRows.length*38)}>
+                <svg data-chart-svg="true" role="group" aria-label={t("矩阵热力图")} width={Math.max(500,160+groups.length*110)} height={Math.max(180,60+shownRows.length*38)}>
                   {groups.map((group,index) => <text key={group.key} x={165+index*110} y={22} fill={darkMode?'#F8F8F2':'#272822'} fontSize="11">{group.pathLabels?.join(' / ') || '总计'}</text>)}
                   {shownRows.map((row,r) => <g key={row.rowKey}>
                     <text x="4" y={58+r*38} fill={darkMode?'#F8F8F2':'#272822'} fontSize="11">{row.label.slice(0,18)}</text>
@@ -328,7 +328,7 @@ export function ChartStudio({
           </div>
         ) : chartType === 'funnel' ? (
           <div className="w-full h-full overflow-auto">
-            <svg data-chart-svg="true" role="img" aria-label={t("漏斗图")} width="800" height={Math.max(220,unifiedChartSpec.funnelItems.length*54+24)}>
+            <svg data-chart-svg="true" role="group" aria-label={t("漏斗图")} width="800" height={Math.max(220,unifiedChartSpec.funnelItems.length*54+24)}>
               {unifiedChartSpec.funnelItems.map((item,index) => {
                 const width = item.widthPct*5.5, x=180+(550-width)/2, y=12+index*54;
                 return <g key={item.rowKey} onClick={() => handleChartPointClick(item)} role="button" tabIndex={0} aria-label={`${item.name}: ${item.formattedValue}`}>

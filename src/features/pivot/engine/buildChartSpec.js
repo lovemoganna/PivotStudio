@@ -155,8 +155,9 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
 
   const groupCount = dataRows.length || pivotResult.leafColGroups?.length || 1;
   const requestedCount = chartSpecConfig?.topN > 0 ? Math.min(groupCount, chartSpecConfig.topN) : groupCount;
+  const maximumGroups = chartType === 'heatmap' || chartType === 'funnel' ? 200 : 2000;
   // Unbounded SVG marks can block input for tens of seconds. Require an explicit scope.
-  if (chartType !== 'histogram' && requestedCount > 200) {
+  if (chartType !== 'histogram' && requestedCount > maximumGroups) {
     const series = seriesMetaList[0];
     const values = dataRows.length
       ? dataRows.map((row) => Number(pivotResult.displayMatrix[`${row.rowKey}@@${series.colKey}@@${series.valCfg.id}`]?.display ?? 0))
@@ -164,7 +165,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     return { ...emptySpec, hasValues: true, kpiCards, seriesMetaList, xDimensionLabel,
       primarySeriesKey, secondarySeriesKey, primaryStats: summarizeValues(values),
       canStack: hasColGroups || (valConfigs.length > 1 && valConfigs.every((value) => UnifiedFormatter.inferUnit(value) === UnifiedFormatter.inferUnit(valConfigs[0]))),
-      renderLimit: { groupCount, maximum: 200 } };
+      renderLimit: { groupCount, maximum: maximumGroups } };
   }
 
   const lastSeenBySeries = {};

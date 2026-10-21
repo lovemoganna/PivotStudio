@@ -8,36 +8,37 @@ const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('d
 const preview=page=>page.getByRole('dialog',{name:'文件数据预览与类型校准',exact:true});
 const upload=(page,buffer,name='bounds.csv')=>page.locator('input[type=file]').first().setInputFiles({name,mimeType:'application/octet-stream',buffer:Buffer.from(buffer)});
 const confirm=async page=>{await expect(preview(page)).toBeVisible();await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();await expect(preview(page)).toHaveCount(0,{timeout:45000});await ready(page);};
-test.beforeEach(async({page})=>{await page.route('https://fonts.googleapis.com/**',route=>route.abort());await page.route('https://fonts.gstatic.com/**',route=>route.abort());});
+test.beforeEach(async({page})=>{await page.emulateMedia({reducedMotion:'reduce'});await page.route('https://fonts.googleapis.com/**',route=>route.abort());await page.route('https://fonts.gstatic.com/**',route=>route.abort());});
 
 for(const width of [360,1440])test(`chart boundary: explicit TopN keeps complete table and scoped exports at ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:1000});
   const cfg={fullConfig:{rows:[{id:'r',field:'Group'}],columns:[],filters:[],values:[{id:'v',field:'Amount',agg:'sum',format:{decimals:0,currency:'',thousands:true}}]}};
   await page.goto('/#share_token='+encodeURIComponent(encodeView(cfg)));
-  await upload(page,'Group,Amount\n'+Array.from({length:250},(_,i)=>`Group${i},${i}`).join('\n'));await confirm(page);
+  await upload(page,'Group,Amount\n'+Array.from({length:2500},(_,i)=>`Group${i},${i}`).join('\n'));await confirm(page);
   await expect(page.getByRole('heading',{name:'图表分组过多',exact:true})).toBeVisible();
   await page.mouse.move(0,0);
-  await expect(page.locator('footer')).toContainText('31.1K');
+  await expect(page.locator('footer')).toContainText('3.12M');
   await expect(page.locator('#pivot-chart-container .recharts-wrapper > svg, #pivot-chart-container svg[data-chart-svg]')).toHaveCount(0);
   let blockedDownloads=0;const recordBlockedDownload=()=>blockedDownloads++;page.on('download',recordBlockedDownload);
   await page.getByRole('button',{name:'.SVG',exact:true}).click();
   await expect(page.locator('[role=status]').filter({hasText:'图表分组过多，请先筛选'})).toBeVisible();
   expect(blockedDownloads).toBe(0);page.off('download',recordBlockedDownload);
   await page.getByRole('button',{name:'关闭通知',exact:true}).click();
-  const blockedAxe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze();
-  expect(blockedAxe.violations.map(issue=>issue.id)).toEqual([]);
+  await expect(page.getByRole('button',{name:'关闭通知',exact:true})).toHaveCount(0);
+  await page.mouse.move(0,0);
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const csvPromise=page.waitForEvent('download');await page.getByRole('button',{name:'.CSV',exact:true}).click();
   const csv=parseCSVRecords(await readFile(await (await csvPromise).path(),'utf8'));
-  expect(csv.length).toBe(252);expect(csv.at(-1).at(-1)).toBe('31,125');
+  expect(csv.length).toBe(2502);expect(csv.at(-1).at(-1)).toBe('3,123,750');
   await page.getByRole('button',{name:'按主指标显示 Top 10',exact:true}).focus();
   await page.keyboard.press('Enter');await ready(page);
   await expect(page.getByRole('button',{name:'图表类型 展开',exact:true})).toBeFocused();
   await expect(page.locator('#pivot-chart-container .recharts-bar-rectangle')).toHaveCount(10);
-  await expect(page.locator('[role=status]').filter({hasText:'10 / 250'})).toBeVisible();
-  const scopedAxe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze();
-  expect(scopedAxe.violations.map(issue=>issue.id)).toEqual([]);
+  await expect(page.locator('[role=status]').filter({hasText:'10 / 2500'})).toBeVisible();
+  await page.locator('#pivot-chart-container').scrollIntoViewIfNeeded();
+  await page.mouse.move(0,0);
   const svgPromise=page.waitForEvent('download');await page.getByRole('button',{name:'.SVG',exact:true}).click();
-  expect(await readFile(await (await svgPromise).path(),'utf8')).toContain('Top 10 / 250; full table &amp; KPIs');
+  expect(await readFile(await (await svgPromise).path(),'utf8')).toContain('Top 10 / 2500; full table &amp; KPIs');
   await page.getByLabel('选择图表类型',{exact:true}).selectOption('heatmap');await ready(page);
   await expect(page.locator('svg[data-chart-svg] [role=button]')).toHaveCount(10);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
@@ -93,4 +94,30 @@ test('heatmap: columns-only TopN and drilldown keep the selected column key',asy
   await cells.first().click();await ready(page);
   await expect(page.locator('[role=status]').filter({hasText:'1 / 250 行'})).toBeVisible();
   await expect(page.locator('svg[data-chart-svg] [role=button]')).toHaveCount(1);
+});
+
+
+test('line: a full daily year stays available without TopN truncation',async({page})=>{
+  const cfg={fullConfig:{rows:[{id:'r',field:'Day',dateGranularity:'day'}],columns:[],filters:[],values:[{id:'v',field:'Amount',agg:'sum'}]},ct:'line'};
+  await page.goto('/#share_token='+encodeURIComponent(encodeView(cfg)));
+  await upload(page,'Day,Amount\n'+Array.from({length:365},(_,i)=>`${new Date(Date.UTC(2026,0,1+i)).toISOString().slice(0,10)},${i+1}`).join('\n'));await confirm(page);
+  await expect(page.locator('#pivot-chart-container .recharts-line-curve')).toBeVisible();
+  await expect(page.locator('#pivot-chart-container .recharts-line circle[data-highlighted]')).toHaveCount(365);
+  await expect(page.getByRole('heading',{name:'图表分组过多',exact:true})).toHaveCount(0);
+});
+
+
+for(const width of [360,1440])test(`accessibility: bounded chart states retain whole-page AA checks at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:1000});
+  const cfg={fullConfig:{rows:[{id:'r',field:'Group'}],columns:[],filters:[],values:[{id:'v',field:'Amount',agg:'sum'}]},ct:'heatmap'};
+  await page.goto('/#share_token='+encodeURIComponent(encodeView(cfg)));
+  await upload(page,'Group,Amount\n'+Array.from({length:250},(_,i)=>`Group${i},${i}`).join('\n'));await confirm(page);
+  await expect(page.getByRole('heading',{name:'图表分组过多',exact:true})).toBeVisible();
+  for(const phase of ['bounded','scoped']) {
+    await page.mouse.move(0,0);
+    const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze();
+    console.log('boundary accessibility',JSON.stringify({width,phase,violations:result.violations.map(issue=>({id:issue.id,targets:issue.nodes.map(node=>node.target)}))}));
+    expect(result.violations.map(issue=>issue.id)).toEqual([]);
+    if(phase==='bounded'){await page.getByRole('button',{name:'按主指标显示 Top 10',exact:true}).click();await ready(page);await expect(page.locator('svg[data-chart-svg] [role=button]')).toHaveCount(10);}
+  }
 });

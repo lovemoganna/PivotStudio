@@ -29,14 +29,14 @@ test('histogram ignores missing/invalid values, retains zero and closes only the
 });
 
 test('large chart groups require explicit scope while full pivot and KPI totals remain',()=>{
-  const data=dataset(250,250);const pivot=calculatePivot(data,config);
+  const data=dataset(2500,2500);const pivot=calculatePivot(data,config);
   const blocked=buildUnifiedChartSpec(data,pivot,'bar',{});
-  assert.equal(blocked.renderLimit.groupCount,250);assert.equal(blocked.items.length,0);assert.equal(blocked.primaryStats.total,31125);
-  assert.equal(pivot.tableRows.length,251);assert.equal(pivot.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v'],31125);
+  assert.equal(blocked.renderLimit.groupCount,2500);assert.equal(blocked.items.length,0);assert.equal(blocked.primaryStats.total,3123750);
+  assert.equal(pivot.tableRows.length,2501);assert.equal(pivot.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v'],3123750);
   for(const type of ['bar','line','pie','heatmap']) {
     const chart=buildUnifiedChartSpec(data,pivot,type,{topN:10,sortMode:'desc'});
     assert.equal(chart.renderLimit,undefined);assert.equal(chart.items.length,10);
-    assert.deepEqual(chart.scope,{shown:10,total:250});assert.equal(chart.items[0].rowKey,'Group249');
+    assert.deepEqual(chart.scope,{shown:10,total:2500});assert.equal(chart.items[0].rowKey,'Group2499');
     assert.deepEqual(chart.kpiCards,blocked.kpiCards);
   }
 });
@@ -56,4 +56,12 @@ test('actual worker transfers no chart raw samples and drills complete histogram
     const drill=await drillPromise;assert.equal(drill.records.length,250);
     assert.ok(drill.records.every(record=>matchesHistogramBin(record,bin)));
   } finally {await worker.terminate();}
+});
+
+
+test('chart limits preserve a 365-day trend and retain compact heatmap bounds',()=>{
+  const data=dataset(365,365);const pivot=calculatePivot(data,config);
+  const line=buildUnifiedChartSpec(data,pivot,'line',{});
+  assert.equal(line.renderLimit,undefined);assert.equal(line.items.length,365);
+  assert.equal(buildUnifiedChartSpec(data,pivot,'heatmap',{}).renderLimit.maximum,200);
 });
