@@ -1,16 +1,21 @@
 import { profileField } from './profileField.js';
 import { calculatePivot } from './calculatePivot.js';
 import { buildUnifiedChartSpec } from './buildChartSpec.js';
+import { matchesHistogramBin } from './histogram.js';
 
 let cachedDataset = null;
 let cachedPivot = null;
+let cachedChartSpec = null;
 let resultId = null;
 self.onmessage = (e) => {
   const { id, payload } = e.data || {};
   if (e.data?.kind === 'drill') {
     const { rowKey, colKey, generation, metadata } = e.data;
     if (generation !== resultId) return;
-    const records = cachedPivot?.cellRecordsMap.get(`${rowKey}@@${colKey}`) || [];
+    const bin = Number.isInteger(e.data.histogramBin) ? cachedChartSpec?.histogramItems?.[e.data.histogramBin] : null;
+    const records = bin
+      ? (cachedPivot?.cellRecordsMap.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || []).filter((record) => matchesHistogramBin(record, bin))
+      : cachedPivot?.cellRecordsMap.get(`${rowKey}@@${colKey}`) || [];
     self.postMessage({ kind: 'drill', generation, metadata, records });
     return;
   }
@@ -26,11 +31,18 @@ self.onmessage = (e) => {
     const pivotResult = calculatePivot(cachedDataset, pivotConfig, (progress) => self.postMessage({ id, progress }));
     cachedPivot = pivotResult; resultId = id;
     const unifiedChartSpec = buildUnifiedChartSpec(cachedDataset, pivotResult, chartType, chartSpecConfig);
+    cachedChartSpec = unifiedChartSpec;
     // cellRecordsMap holds a reference to every raw record bucket and is large for big datasets.
     // Transferring it via postMessage (Structured Clone) dominates message cost for 100k+ rows.
     // Strip it here; the worker retains buckets and returns requested details on demand.
     const { cellRecordsMap: _dropped, ...pivotResultTransferable } = pivotResult;
-    self.postMessage({ id, success: true, pivotResult: pivotResultTransferable, unifiedChartSpec });
+    // Raw samples in chart points duplicate the dataset during structured cloning.
+    // Chart clicks request complete matching records from this worker instead.
+    const chartTransferable = { ...unifiedChartSpec };
+    for (const key of ['items', 'waterfallItems', 'funnelItems', 'scatterPoints', 'histogramItems']) {
+      chartTransferable[key] = (unifiedChartSpec[key] || []).map(({ matchedRows: _records, ...point }) => point);
+    }
+    self.postMessage({ id, success: true, pivotResult: pivotResultTransferable, unifiedChartSpec: chartTransferable });
   } catch (err) {
     self.postMessage({ id, success: false, error: err?.message || String(err) });
   }

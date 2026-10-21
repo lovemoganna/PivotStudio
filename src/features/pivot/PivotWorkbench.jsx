@@ -913,10 +913,10 @@ export default function PivotWorkbench() {
     });
   }, [currentDataset,isWorkerComputing]);
 
-  const requestDrillDown = useCallback((rowKey, colKey = '__GRAND_TOTAL_COL__', metadata = {}) => {
+  const requestDrillDown = useCallback((rowKey, colKey = '__GRAND_TOTAL_COL__', metadata = {}, histogramBin) => {
     if (busyRef.current || !workerRef.current || computeError || !resultIsCurrent) { showToast('请等待本次计算完成后再查看明细', 'error'); return; }
     setDrillSearch(''); setDrillPage(1);
-    workerRef.current.postMessage({ kind: 'drill', generation: reqIdRef.current, rowKey: rowKey.replace('__SUBTOTAL__', ''), colKey, metadata });
+    workerRef.current.postMessage({ kind: 'drill', generation: reqIdRef.current, rowKey: rowKey.replace('__SUBTOTAL__', ''), colKey, metadata, histogramBin });
   }, [showToast,computeError,resultIsCurrent]);
 
   const handleTablePointClick = useCallback((point) => {
@@ -927,6 +927,14 @@ export default function PivotWorkbench() {
     const now = Date.now();
     if (now - lastChartClickRef.current < 90) return;
     lastChartClickRef.current = now;
+    const point = pointData?.payload || pointData;
+    if (Number.isInteger(point?.histogramBin)) {
+      requestDrillDown('__GRAND_TOTAL_ROW__', '__GRAND_TOTAL_COL__', {
+        rowLabel: `区间 ${point.rangeFull}`, colLabel: '直方图频数分箱',
+        valLabel: `${point.count} 笔 (${point.pct}%)`, valueFormatted: `${point.count} 笔`,
+      }, point.histogramBin);
+      return;
+    }
     const rk = pointData?.rowKey || pointData?.payload?.rowKey;
     if (!rk) return;
 
@@ -934,7 +942,7 @@ export default function PivotWorkbench() {
       const activeDim = pivotConfig.rows.length > 0 ? pivotConfig.rows[0] : (pivotConfig.columns.length > 0 ? pivotConfig.columns[0] : null);
       if (!activeDim) return;
 
-      const firstSeg = rk.split('||')[0];
+      const firstSeg = (pivotConfig.rows.length ? rk : point?.colKey || rk).split('||')[0];
       let matchingRawVals;
       try { matchingRawVals = (await requestProfile(activeDim.field, activeDim, firstSeg))?.matchingRawValues; }
       catch(error) { if(error.name!=='AbortError') showToast(`联动筛选失败：${error.message}；请重试`,'error'); return; }
@@ -963,7 +971,7 @@ export default function PivotWorkbench() {
     } else {
       setHighlightedRowKey(rk);
       const onlyColumns = !pivotResult.rowConfigs.length && pivotResult.colConfigs.length;
-      requestDrillDown(onlyColumns ? '__GRAND_TOTAL_ROW__' : rk, onlyColumns ? rk : pointData.colKey || '__GRAND_TOTAL_COL__', {
+      requestDrillDown(onlyColumns ? '__GRAND_TOTAL_ROW__' : rk, onlyColumns ? point?.colKey || rk : pointData.colKey || '__GRAND_TOTAL_COL__', {
         rowLabel: pointData.name || rk, colLabel: pointData.colKey || '总计',
         valLabel: unifiedChartSpec.primarySeriesKey, valueFormatted: pointData.formattedValue || '',
       });
