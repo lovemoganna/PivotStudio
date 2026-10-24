@@ -1,14 +1,22 @@
+import {getMetricCatalogKey} from '../../../utils/metricCatalog.js';
 import { t } from '../../../i18n.js';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  Upload, Globe, Server, Zap, GripVertical, ArrowUp, ArrowDown,
+  GripVertical, ArrowUp, ArrowDown,
   ArrowUpDown, Filter, RotateCcw, Sparkles, Code2, X, ChevronUp, ChevronDown,
-  ChevronLeft, ChevronRight, Search, PanelLeft, Layers, Info
+  ChevronLeft, ChevronRight, Search, PanelLeft, Layers, Info, Calculator, Plus, Trash2, FunctionSquare, Edit3, Lightbulb, BookOpen, Check
 } from 'lucide-react';
-import { FIELD_TYPES, AGG_METHODS, VISUAL_CHART_TYPES, SHOW_AS_MODES } from '../../../constants/pivotConstants';
+import { FIELD_TYPES, AGG_METHODS, VISUAL_CHART_TYPES, CHART_INTENT_GROUPS, SHOW_AS_MODES, buildDefaultPivotConfig } from '../../../constants/pivotConstants';
 import { getDimDisplayLabel } from '../../../utils/formatters';
-import { SmartTemplatesBar } from './SmartTemplatesBar';
+import { isMeasureField } from '../../../utils/fieldSemantics.js';
 import { FieldProfilerModal } from './FieldProfilerModal';
+import { PivotConfigPanel } from './PivotConfigPanel';
+import { MetricCenterPanel } from './MetricCenterPanel';
+import { hasOpenDialog } from '../../../utils/useDialogFocus';
+
+const DEFAULT_SIDEBAR_WIDTH = 440;
+const MIN_SIDEBAR_WIDTH = 280;
+const MAX_SIDEBAR_WIDTH = 680;
 
 export function FieldShelf({
   requestProfile,
@@ -56,24 +64,246 @@ export function FieldShelf({
   showToast,
   toggleFieldRole,
   setCondFormat,
+  isPrintingReport,
 }) {
   const [showMobileSchema, setShowMobileSchema] = useState(false);
-  const [showMobileConfig, setShowMobileConfig] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState('split'); // 'split' | 'fields' | 'zones'
+  const [showInsightsDeck, setShowInsightsDeck] = useState(false);
   const [fieldSearchQuery, setFieldSearchQuery] = useState('');
-  const [fieldCategoryTab, setFieldCategoryTab] = useState('all'); // 'all' | 'dimension' | 'measure'
+  const [fieldCategoryTab, setFieldCategoryTab] = useState('all'); // 'all' | 'dimension' | 'measure' | 'unused'
+  const [showNoviceGuide, setShowNoviceGuide] = useState(false);
+  const searchInputRef = useRef(null);
   const [profilingField, setProfilingField] = useState(null);
 
-  const isFieldMeasure = (f) => (f.role ? f.role === 'measure' : f.type === 'number');
+  // Sidebar vertical split ratio between 可用字段 and 透视结构放置区 (default 50:50 equal split)
+  const [sidebarSplitPct, setSidebarSplitPct] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pivotstudio_sidebar_split_pct');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!Number.isNaN(parsed) && parsed >= 20 && parsed <= 80) {
+
+          return parsed;
+        }
+      }
+    } catch {}
+    return 50;
+  });
+  const [isResizingSidebarSplit, setIsResizingSidebarSplit] = useState(false);
+  const sidebarSplitRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pivotstudio_sidebar_split_pct', String(sidebarSplitPct));
+    } catch {}
+  }, [sidebarSplitPct]);
+
+  useEffect(() => {
+    if (!isResizingSidebarSplit) return;
+    const originalUserSelect = document.body.style.userSelect;
+    const originalCursor = document.body.style.cursor;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'row-resize';
+
+    const handleMouseMove = (e) => {
+      if (!sidebarSplitRef.current) return;
+      const rect = sidebarSplitRef.current.getBoundingClientRect();
+      if (rect.height <= 0) return;
+      const rawPct = ((e.clientY - rect.top) / rect.height) * 100;
+      const clamped = Math.max(20, Math.min(80, Math.round(rawPct)));
+      setSidebarSplitPct(clamped);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebarSplit(false);
+      document.body.style.userSelect = originalUserSelect;
+      document.body.style.cursor = originalCursor;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = originalUserSelect;
+      document.body.style.cursor = originalCursor;
+    };
+  }, [isResizingSidebarSplit]);
+
+  const resetSidebarSplitPct = useCallback(() => {
+    setSidebarSplitPct(50);
+    soundEngine?.playClick?.(480);
+    showToast?.('已恢复可用字段与透视结构放置区默认均分高度 (50:50)');
+  }, [soundEngine, showToast]);
+
+  const handleSidebarSplitKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSidebarSplitPct((p) => Math.max(20, p - 5));
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSidebarSplitPct((p) => Math.min(80, p + 5));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setSidebarSplitPct(20);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setSidebarSplitPct(80);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      resetSidebarSplitPct();
+    }
+  }, [resetSidebarSplitPct]);
+
+  const isFieldMeasure = isMeasureField;
+  const [metricCenterInitialTab, setMetricCenterInitialTab] = useState('studio');
+  const [metricCenterRequest, setMetricCenterRequest] = useState(0);
+  const [editingMetricId, setEditingMetricId] = useState(null);
+
+  // Persistent Custom Metrics Catalog per dataset
+  const [customMetricsByDataset, setCustomMetricsByDataset] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pivotstudio_custom_metrics_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {}
+    return {};
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pivotstudio_custom_metrics_v1', JSON.stringify(customMetricsByDataset));
+    } catch {}
+  }, [customMetricsByDataset]);
+
+  const datasetCatalogKey = getMetricCatalogKey(currentDataset);
+
+  const setCustomMetricsCatalog = useCallback((updater) => {
+    setCustomMetricsByDataset((prev) => {
+      const currentList = Array.isArray(prev[datasetCatalogKey]) ? prev[datasetCatalogKey] : [];
+      const nextList = typeof updater === 'function' ? updater(currentList) : updater;
+      return {
+        ...prev,
+        [datasetCatalogKey]: Array.isArray(nextList) ? nextList : [],
+      };
+    });
+  }, [datasetCatalogKey]);
+
+  // Combine persisted catalog metrics with any active calculated metrics in pivotConfig.values
+  const customMetricsCatalog = useMemo(() => {
+    const savedList = Array.isArray(customMetricsByDataset[datasetCatalogKey])
+      ? customMetricsByDataset[datasetCatalogKey]
+      : [];
+    const activeCalcs = (pivotConfig?.values || []).filter((v) => v.isCalculated);
+    const map = new Map();
+    for (const item of savedList) {
+      if (item && (item.id || item.field)) {
+        map.set(item.id || item.field, item);
+      }
+    }
+    for (const active of activeCalcs) {
+      const key = active.id || active.field;
+      const existing = map.get(key) || [...map.values()].find((m) => m.field === active.field);
+      if (existing) {
+        map.set(existing.id || existing.field, { ...existing, ...active });
+      } else {
+        map.set(key, active);
+      }
+    }
+    return Array.from(map.values());
+  }, [customMetricsByDataset, datasetCatalogKey, pivotConfig?.values]);
+
+  const openMetricCenter = useCallback((tab = 'studio', editId = null) => {
+    setMetricCenterRequest((request) => request + 1);
+    setMetricCenterInitialTab(tab);
+    setEditingMetricId(editId);
+    setShowInsightsDeck(true);
+  }, []);
+
+  const addCustomMetricToPivot = useCallback((metricSpec) => {
+    if (isReadOnly || !metricSpec) return;
+    soundEngine?.playClick?.(560);
+    setPivotConfig?.((prev) => {
+      const exists = (prev.values || []).some(
+        (v) => v.id === metricSpec.id || (v.isCalculated && v.field === metricSpec.field)
+      );
+      if (exists) {
+        showToast?.(`自定义指标「${metricSpec.field}」已在透视表中`);
+        return prev;
+      }
+      const nextVal = {
+        ...metricSpec,
+        id: metricSpec.id || `v_calc_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+        isCalculated: true,
+        agg: 'calc',
+        showAs: metricSpec.showAs || 'normal',
+      };
+      showToast?.(`已添加自定义指标「${metricSpec.field}」到数值指标`);
+      return {
+        ...prev,
+        values: [...(prev.values || []), nextVal],
+      };
+    });
+  }, [isReadOnly, setPivotConfig, showToast, soundEngine]);
+
+  const getFieldUsagePlacements = useCallback((fieldName) => {
+    const placements = [];
+    if ((pivotConfig?.rows || []).some((r) => r.field === fieldName)) {
+      placements.push({ zone: 'rows', label: '行', bg: 'bg-[#F92672]/20 text-ink-pink border-[#F92672]/40' });
+    }
+    if ((pivotConfig?.columns || []).some((c) => c.field === fieldName)) {
+      placements.push({ zone: 'columns', label: '列', bg: 'bg-[#66D9EF]/20 text-ink-cyan border-[#66D9EF]/40' });
+    }
+    if ((pivotConfig?.values || []).some((v) => v.field === fieldName || v.id === fieldName)) {
+      placements.push({ zone: 'values', label: '值', bg: 'bg-[#FD971F]/20 text-ink-orange border-[#FD971F]/40' });
+    }
+    if ((pivotConfig?.filters || []).some((f) => f.field === fieldName)) {
+      placements.push({ zone: 'filters', label: '筛', bg: 'bg-[#A6E22E]/20 text-ink-green border-[#A6E22E]/40' });
+    }
+    return placements;
+  }, [pivotConfig?.rows, pivotConfig?.columns, pivotConfig?.values, pivotConfig?.filters]);
+
+  const isFieldUsed = useCallback((fieldName) => {
+    return (
+      (pivotConfig?.rows || []).some((r) => r.field === fieldName) ||
+      (pivotConfig?.columns || []).some((c) => c.field === fieldName) ||
+      (pivotConfig?.values || []).some((v) => v.field === fieldName || v.id === fieldName) ||
+      (pivotConfig?.filters || []).some((f) => f.field === fieldName)
+    );
+  }, [pivotConfig?.rows, pivotConfig?.columns, pivotConfig?.values, pivotConfig?.filters]);
+
+  const unusedCount = useMemo(() => {
+    const unUsedStd = (currentDataset?.fields || []).filter((f) => !isFieldUsed(f.name)).length;
+    const unUsedCustom = customMetricsCatalog.filter((m) => !isFieldUsed(m.id || m.field)).length;
+    return unUsedStd + unUsedCustom;
+  }, [currentDataset?.fields, customMetricsCatalog, isFieldUsed]);
 
   const dimensionCount = useMemo(
     () => (currentDataset?.fields || []).filter((f) => !isFieldMeasure(f)).length,
     [currentDataset?.fields]
   );
   const measureCount = useMemo(
-    () => (currentDataset?.fields || []).filter((f) => isFieldMeasure(f)).length,
-    [currentDataset?.fields]
+    () => (currentDataset?.fields || []).filter((f) => isFieldMeasure(f)).length + customMetricsCatalog.length,
+    [currentDataset?.fields, customMetricsCatalog.length]
   );
+
+  const filteredCustomMetrics = useMemo(() => {
+    if (fieldCategoryTab === 'dimension') return [];
+    let list = customMetricsCatalog;
+    if (fieldSearchQuery.trim()) {
+      const q = fieldSearchQuery.toLowerCase();
+      list = list.filter(
+        (m) =>
+          (m.field || '').toLowerCase().includes(q) ||
+          (m.formula || '').toLowerCase().includes(q) ||
+          (m.description || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [customMetricsCatalog, fieldCategoryTab, fieldSearchQuery]);
 
   const filteredFields = useMemo(() => {
     let list = currentDataset?.fields || [];
@@ -91,6 +321,7 @@ export function FieldShelf({
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (hasOpenDialog()) return;
       if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B')) {
         const targetTag = e.target?.tagName?.toLowerCase();
         if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select') return;
@@ -98,7 +329,6 @@ export function FieldShelf({
         setIsSidebarCollapsed((prev) => {
           const next = !prev;
           soundEngine?.playClick?.(520);
-          showToast?.(next ? '已折叠左侧侧边栏，为主工作区释放宽度 (⌘B)' : '已展开左侧侧边栏 (⌘B)');
           return next;
         });
       }
@@ -107,16 +337,93 @@ export function FieldShelf({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [soundEngine, showToast]);
 
-  const zoneConfigs = [
-    { key: 'filters', label: '筛选条件', badgeColor: 'text-ink-green', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
-    { key: 'columns', label: '列维度', badgeColor: 'text-ink-cyan', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
-    { key: 'rows', label: '行维度', badgeColor: 'text-ink-pink', borderAccent: 'border-l-2 border-l-[#F92672]' },
-    { key: 'values', label: '数值指标', badgeColor: 'text-ink-orange', borderAccent: 'border-l-2 border-l-[#FD971F]' },
-  ];
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pivotstudio_sidebar_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!Number.isNaN(parsed) && parsed >= MIN_SIDEBAR_WIDTH && parsed <= MAX_SIDEBAR_WIDTH) {
+
+          return parsed;
+        }
+      }
+    } catch {}
+    return DEFAULT_SIDEBAR_WIDTH;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pivotstudio_sidebar_width', String(sidebarWidth));
+    } catch {}
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!isResizingSidebar) return;
+
+    const originalUserSelect = document.body.style.userSelect;
+    const originalCursor = document.body.style.cursor;
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    const handleMouseMove = (e) => {
+      if (!containerRef.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const rawWidth = Math.round(e.clientX - containerRect.left);
+      const maxAllowed = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.floor(containerRect.width * 0.55)));
+      const clamped = Math.max(MIN_SIDEBAR_WIDTH, Math.min(maxAllowed, rawWidth));
+      setSidebarWidth(clamped);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+      document.body.style.userSelect = originalUserSelect;
+      document.body.style.cursor = originalCursor;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = originalUserSelect;
+      document.body.style.cursor = originalCursor;
+    };
+  }, [isResizingSidebar]);
+
+  const resetSidebarWidth = useCallback(() => {
+    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+    soundEngine?.playClick?.(480);
+    showToast?.(`已恢复侧边栏默认宽度 (${DEFAULT_SIDEBAR_WIDTH}px)`);
+  }, [soundEngine, showToast]);
+
+  const handleResizerKeyDown = useCallback((e) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setSidebarWidth((w) => Math.max(MIN_SIDEBAR_WIDTH, w - 16));
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setSidebarWidth((w) => Math.min(MAX_SIDEBAR_WIDTH, w + 16));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setSidebarWidth(MIN_SIDEBAR_WIDTH);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setSidebarWidth(MAX_SIDEBAR_WIDTH);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      resetSidebarWidth();
+    }
+  }, [resetSidebarWidth]);
 
   return (
     <>
-      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative">
+      <div
+        ref={containerRef}
+        style={{ '--sidebar-width': `${sidebarWidth}px` }}
+        className="flex-1 min-h-0 flex flex-col md:flex-row overflow-visible md:overflow-hidden relative"
+      >
         {/* Left Sidebar: Collapsible Schema Palette & Pivot Analysis Config */}
         {!cinemaTheaterMode && (
           isSidebarCollapsed ? (
@@ -128,7 +435,6 @@ export function FieldShelf({
                   onClick={() => {
                     soundEngine?.playClick?.(500);
                     setIsSidebarCollapsed(false);
-                    showToast?.('已展开左侧侧边栏 (⌘B)');
                   }}
                   className="p-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] hover:border-[#66D9EF] text-ink-cyan transition shadow-xs"
                   title={t("展开模型与配置侧栏 (快捷键: ⌘B / Ctrl+B)")}
@@ -137,11 +443,12 @@ export function FieldShelf({
                   <ChevronRight className="w-4 h-4" />
                 </button>
                 <div
-                  className="text-[11px] font-bold text-ink-muted tracking-widest cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2] transition"
-                  style={{ writingMode: 'vertical-rl' }}
+                  className="p-1 rounded-md text-ink-muted hover:text-ink-cyan cursor-pointer transition"
                   onClick={() => setIsSidebarCollapsed(false)}
                   title={t("点击展开侧边栏")}
-                >{' ' + t("数据模型 · 透视结构") + ' '}</div>
+                >
+                  <Layers className="w-4 h-4" />
+                </div>
               </div>
 
               {/* Mini Status Badges */}
@@ -161,139 +468,88 @@ export function FieldShelf({
               </div>
             </aside>
           ) : (
-            /* Expanded Full Sidebar */
-            <aside className="w-full md:w-80 lg:w-84 max-h-[310px] md:max-h-none md:h-full bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-r border-[#D6D4C8] dark:border-[#3E3D32] p-1.5 md:p-3 flex flex-col gap-1 md:gap-2.5 shrink-0 print:hidden overflow-y-auto transition-all duration-200">
-              {/* Header: Title + Collapse Action (Hidden on mobile to keep compact) */}
-              <div className="hidden md:flex items-center justify-between pb-1 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/60">
-                <div className="flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-ink-cyan" />
-                  <span className="text-[11px] font-bold text-ink-muted apple-font-mono tracking-tight">{' ' + t("数据模型与透视配置") + ' '}</span>
+            <>
+              {/* Expanded Full Sidebar */}
+              <aside className={`w-full md:w-[var(--sidebar-width)] md:h-full bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border-b md:border-b-0 md:border-r border-[#D6D4C8] dark:border-[#3E3D32] p-1.5 md:p-2.5 flex flex-col gap-1.5 shrink-0 print:hidden overflow-visible md:overflow-hidden ${isResizingSidebar ? 'select-none pointer-events-none' : 'transition-[width] duration-150'}`}>
+              {/* Header: Title + Segmented View Switcher + Collapse Action */}
+              <div className="hidden md:flex items-center justify-between pb-1.5 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/60 shrink-0 gap-1">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Layers className="w-3.5 h-3.5 text-ink-cyan shrink-0" />
+                  <span className="text-[11px] font-bold text-[#272822] dark:text-[#F8F8F2] apple-font-mono tracking-tight truncate">
+                    {t("数据模型与透视配置")}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-ink-green apple-font-mono">
-                    {(currentDataset?.rows?.length || 0).toLocaleString()}{' ' + t("行") + ' '}</span>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Segmented View Switcher: Split / Fields / Zones */}
+                  <div className="flex items-center rounded p-0.5 bg-[#D6D4C8]/50 dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] text-[9.5px] apple-font-mono">
+                    {[
+                      { id: 'split', label: '分栏' },
+                      { id: 'fields', label: '字段' },
+                      { id: 'zones', label: '配置' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => { soundEngine?.playClick?.(480); setSidebarMode(m.id); }}
+                        aria-pressed={sidebarMode === m.id}
+                        className={`px-1.5 py-0.5 min-h-[24px] rounded text-center font-semibold transition ${
+                          sidebarMode === m.id
+                            ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] shadow-2xs'
+                            : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+                        }`}
+                      >
+                        {t(m.label)}
+                      </button>
+                    ))}
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
                       soundEngine?.playClick?.(500);
                       setIsSidebarCollapsed(true);
-                      showToast?.('已折叠左侧侧边栏，为主工作区释放宽度 (⌘B)');
                     }}
-                    className="hidden md:flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-ink-muted hover:text-[#F92672] hover:bg-black/5 dark:hover:bg-white/5 transition"
+                    className="p-1 min-w-[24px] min-h-[24px] inline-flex items-center justify-center rounded text-ink-muted hover:text-[#F92672] hover:bg-black/5 dark:hover:bg-white/5 transition"
                     title={t("收起左侧模型侧边栏 (快捷键: ⌘B / Ctrl+B)")}
                     aria-label={t("收起侧边栏")}
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
-                    <span>{t("收起")}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Dataset Ingestion & Selection */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5">
+              {/* Compact Dataset Indicator & Quick Switcher */}
+              {datasets && datasets.length > 0 && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-[#FFFDF7]/70 dark:bg-[#1E1F1C]/70 border border-[#D6D4C8]/70 dark:border-[#3E3D32]/70 text-[10.5px] shrink-0">
+                  <span className="text-ink-muted text-[10px] shrink-0 font-medium">{t("当前源:")}</span>
                   <select
                     aria-label={t("选择当前数据集")}
                     value={activeDatasetId || ''}
                     onChange={(e) => {
-                      soundEngine?.playClick(540);
+                      soundEngine?.playClick?.(540);
                       const nextId = e.target.value;
                       if (!nextId) {
-                        if (unloadCurrentDataset) {
-                          unloadCurrentDataset();
-                        } else {
-                          setActiveDatasetId(null);
-                        }
+                        setActiveDatasetId(null);
                         return;
                       }
-                      if (switchDataset) {
-                        switchDataset(nextId);
+                      const found = datasets.find((d) => d.id === nextId);
+                      if (found && switchDataset) {
+                        switchDataset(found.id, found);
                       } else {
                         setActiveDatasetId(nextId);
                       }
                     }}
-                    className="flex-1 min-w-0 px-2 py-1 md:py-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-xs font-medium text-[#272822] dark:text-ink-yellow apple-font-mono focus:outline-none focus:border-[#F92672]"
+                    className="flex-1 min-w-0 bg-transparent text-[10.5px] font-semibold text-[#272822] dark:text-[#F8F8F2] apple-font-mono focus:outline-none cursor-pointer truncate"
                   >
-                    {datasets.length === 0 && (
-                      <option value="">{t("-- 暂无数据集 --")}</option>
-                    )}
-                    {datasets.map((ds) => (
-                      <option key={ds.id} value={ds.id} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">
-                        {ds.name}
+                    <option value="">{t("+ 新建 / 介绍主页")}</option>
+                    {datasets.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({(d.rows?.length || 0).toLocaleString()} {t("行")})
                       </option>
                     ))}
-                    {datasets.length > 0 && (
-                      <option value="">{t("-- 卸载当前视图 (返回介绍页) --")}</option>
-                    )}
                   </select>
-                  {unloadCurrentDataset && currentDataset && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundEngine?.playClick(520);
-                        unloadCurrentDataset();
-                      }}
-                      className="p-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] hover:border-[#F92672] text-ink-muted hover:text-[#F92672] transition shrink-0"
-                      title={t("卸载当前数据集，返回系统介绍主页")}
-                      aria-label={t("卸载当前数据集")}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
-
-                <div className="flex gap-1.5">
-                  <label className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1 md:py-1.5 rounded-lg focus-within:ring-2 focus-within:ring-[#66D9EF] border border-dashed border-[#ACA99A] dark:border-[#75715E] bg-[#FFFDF7]/60 dark:bg-[#1E1F1C]/70 hover:border-[#F92672] dark:hover:border-[#F92672] cursor-pointer text-[10.5px] font-medium transition ${isReadOnly ? 'opacity-40 pointer-events-none' : ''}`}>
-                    <Upload className="w-3.5 h-3.5 text-ink-pink shrink-0" />
-                    <span className="truncate">{t("上传 CSV / Excel")}</span>
-                    <input type="file" accept=".csv,.tsv,.txt,.xls,.xlsx" onChange={handleFileUpload} className="hidden" disabled={isReadOnly} />
-                  </label>
-                  <button
-                    disabled={isReadOnly}
-                    onClick={() => {
-                      soundEngine?.playClick(580);
-                      const sampleCsv = [
-                        '订单日期,销售大区,城市,销售渠道,商品类别,商品名称,客户类型,销售额,销量,成本,毛利润,是否促销',
-                        '2025-04-01,华东,上海,线上旗舰店,智能数码,降噪耳机 Pro,VIP黄金会员,35800,20,21480,14320,true',
-                        '2025-04-05,华南,深圳,企业集采,办公外设,4K高清显示器,企业客户,91200,30,59280,31920,true',
-                        '2025-04-12,华北,北京,抖音电商,潮流服饰,纯棉连帽卫衣,普通会员,36000,72,18000,18000,true',
-                        '2025-04-18,西南,成都,线下自营店,智能家居,意式咖啡机,VIP黄金会员,49000,14,29400,19600,false',
-                        '2025-04-22,华中,武汉,企业集采,办公外设,4K高清显示器,企业客户,66880,22,43472,23408,false',
-                      ].join('\n');
-                      onPasteText?.(sampleCsv);
-                    }}
-                    className="px-2 py-1 md:py-1.5 rounded-lg bg-[#A6E22E]/15 hover:bg-[#A6E22E]/25 border border-[#A6E22E]/35 text-ink-green text-[10px] font-semibold shrink-0 transition disabled:opacity-40 apple-font-mono"
-                    title={t("无需本地文件，一键加载内置零售样例以体验字段类型推断与预览")}
-                  >{' ' + t("样例预览") + ' '}</button>
-                </div>
-
-                {uploadProgress && (
-                  <div className="p-2 rounded-lg bg-[#1E1F1C] border border-[#3E3D32] space-y-1 apple-font-mono">
-                    <div className="flex justify-between text-[9px] text-ink-cyan">
-                      <span>CHUNK {uploadProgress.currentChunk}/{uploadProgress.totalChunks}</span>
-                      <span>{uploadProgress.pct}%</span>
-                    </div>
-                    <div className="w-full h-1 bg-[#272822] rounded-full overflow-hidden">
-                      <div className="h-full bg-[#A6E22E] transition-all" style={{ width: `${uploadProgress.pct}%` }} />
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-3 gap-1 apple-font-mono">
-                  <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('gsheet'); }} className="px-1.5 py-1 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-[9.5px] font-medium flex items-center justify-center gap-1 transition">
-                    <Globe className="w-2.5 h-2.5 text-ink-cyan" />
-                    <span>GSheet</span>
-                  </button>
-                  <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('sql'); }} className="px-1.5 py-1 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] text-[9.5px] font-medium flex items-center justify-center gap-1 transition">
-                    <Server className="w-2.5 h-2.5 text-ink-orange" />
-                    <span>{t("SQL代理")}</span>
-                  </button>
-                  <button onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }} className="px-1.5 py-1 rounded-md bg-[#AE81FF]/15 text-ink-purple border border-[#AE81FF]/35 hover:bg-[#AE81FF]/25 text-[9.5px] font-semibold flex items-center justify-center gap-1 transition">
-                    <Zap className="w-2.5 h-2.5 text-ink-purple" />
-                    <span>{t("100K压测")}</span>
-                  </button>
-                </div>
-              </div>
+              )}
 
               {/* Mobile Accordion Toggle for Field Schema */}
               <div className="md:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-0.5">
@@ -309,401 +565,484 @@ export function FieldShelf({
                 </button>
               </div>
 
-              {/* Middle Section: Schema Field Palette */}
+              {/* Split Container: Equal 50:50 Default Height & Manual Vertical Resizer between 可用字段 & 透视结构放置区 */}
               <div
-                id="pivot-schema-fields"
-                className={`${showMobileSchema ? 'flex' : 'hidden'} md:flex flex-none flex-col min-h-[200px] border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2`}
+                ref={sidebarSplitRef}
+                style={{
+                  '--sidebar-top-pct': `${sidebarSplitPct}%`,
+                  '--sidebar-bottom-pct': `${100 - sidebarSplitPct}%`,
+                }}
+                className={`flex-1 min-h-0 flex flex-col overflow-visible md:overflow-hidden ${isResizingSidebarSplit ? 'select-none' : ''}`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-bold tracking-tight apple-font-mono">{' ' + t("可用字段 (")}{filteredFields.length}/{currentDataset?.fields?.length || 0})
-                  </span>
-                  <span className="text-[9.5px] text-ink-muted apple-font-mono">{t("拖拽或点击")}</span>
-                </div>
-
-                {/* Field Search & Category Filter */}
-                <div className="space-y-1 mb-1.5 shrink-0">
-                  <div className="relative">
-                    <Search className="w-3 h-3 text-ink-muted absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      aria-label={t("搜索可用字段名称")}
-                      value={fieldSearchQuery}
-                      onChange={(e) => setFieldSearchQuery(e.target.value)}
-                      placeholder={t("搜索字段名称...")}
-                      className="w-full pl-6 pr-5 py-1 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] text-[10.5px] placeholder-[#75715E] text-[#272822] dark:text-[#F8F8F2] focus:outline-none focus:border-[#66D9EF] apple-font-mono"
-                    />
-                    {fieldSearchQuery && (
-                      <button
-                        onClick={() => setFieldSearchQuery('')}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-ink-muted hover:text-[#F92672]"
-                        aria-label={t("清空搜索")}
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Tabs: 全部 / 维度 / 度量 */}
-                  <div className="flex rounded-md p-0.5 bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] text-[9.5px] apple-font-mono">
-                    <button
-                      onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('all'); }}
-                      className={`flex-1 py-0.5 rounded text-center font-medium transition ${fieldCategoryTab === 'all' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] shadow-2xs' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
-                    >{' ' + t("全部 (")}{currentDataset?.fields?.length || 0})
-                    </button>
-                    <button
-                      onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('dimension'); }}
-                      className={`flex-1 py-0.5 rounded text-center font-medium transition ${fieldCategoryTab === 'dimension' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-ink-cyan shadow-2xs' : 'text-ink-muted hover:text-[#0088A3] dark:hover:text-[#66D9EF]'}`}
-                    >{' ' + t("维度 (")}{dimensionCount})
-                    </button>
-                    <button
-                      onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('measure'); }}
-                      className={`flex-1 py-0.5 rounded text-center font-medium transition ${fieldCategoryTab === 'measure' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-ink-orange shadow-2xs' : 'text-ink-muted hover:text-[#C86400] dark:hover:text-[#FD971F]'}`}
-                    >{' ' + t("度量 (")}{measureCount})
-                    </button>
-                  </div>
-                </div>
-
-                {/* Draggable Field Items */}
-                <div className="flex-1 overflow-y-auto space-y-1 pr-0.5 min-h-[90px] max-h-[190px] md:max-h-[220px]">
-                  {filteredFields.length === 0 ? (
-                    <div className="py-4 text-center text-xs text-ink-muted apple-font-mono space-y-1">
-                      <p>{t("无匹配字段")}</p>
-                      {fieldSearchQuery && (
-                        <button
-                          onClick={() => setFieldSearchQuery('')}
-                          className="text-[10px] text-ink-cyan hover:underline"
-                        >{' ' + t("清空搜索条件") + ' '}</button>
-                      )}
-                    </div>
-                  ) : (
-                    filteredFields.map((field) => {
-                      const isMeasure = isFieldMeasure(field);
-                      const typeCfg = FIELD_TYPES[field.type] || FIELD_TYPES.text;
-                      const TypeIcon = typeCfg.icon;
-                      return (
-                        <div
-                          key={field.name}
-                          onClick={(e) => {
-                            if (e.target.tagName.toLowerCase() !== 'button') {
-                              soundEngine?.playClick?.(540);
-                              if (isMeasure) {
-                                addFieldToZone('values', field.name);
-                                showToast?.(`已添加「${field.name}」到数值指标`);
-                              } else {
-                                addFieldToZone('rows', field.name);
-                                showToast?.(`已添加「${field.name}」到行维度`);
-                              }
-                            }
-                          }}
-                          className="group p-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#1E1F1C]/90 hover:border-[#F92672]/60 dark:hover:border-[#66D9EF]/60 flex items-center justify-between gap-1 cursor-pointer apple-transition select-none text-[11px]"
-                          title={`点击快速添加至${isMeasure ? '指标' : '行维度'} · 拖拽自由配置`}
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                soundEngine?.playClick?.(620);
-                                toggleFieldRole?.(field.name);
-                              }}
-                              className={`p-1 rounded border ${typeCfg.color} shrink-0 hover:scale-105 transition`}
-                              title={`当前分析角色: ${isMeasure ? '度量 (数值/聚合)' : '维度 (分类/分组)'}，点击快速切换角色`}
-                              aria-label={`切换${field.name}角色`}
-                            >
-                              <TypeIcon className="w-2.5 h-2.5" />
-                            </button>
-                            <span
-                              data-testid={`field-${field.name}`}
-                              draggable={!isReadOnly}
-                              onDragStart={(event) => {
-                                const payload = { source: 'fieldList', field: field.name };
-                                event.dataTransfer.effectAllowed = 'copyMove';
-                                event.dataTransfer.setData('application/x-pivot-field',JSON.stringify(payload));
-                                event.dataTransfer.setData('text/plain',field.name);
-                                setDraggingPayload(payload);
-                              }}
-                              onDragEnd={() => { setDraggingPayload(null); setDragOverZone(null); }}
-                              title={t('拖拽字段名称到配置区')}
-                              className="flex items-center gap-1 font-medium truncate min-w-[36px] max-w-[110px] cursor-grab active:cursor-grabbing"
-                            ><GripVertical className="w-3 h-3 shrink-0 text-ink-muted" /><span className="truncate">{field.name}</span></span>
-                            {field.role && (
-                              <span className="text-[8px] px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 text-ink-muted shrink-0">
-                                {field.role === 'measure' ? t("度量") : t("维度")}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 shrink-0 apple-font-mono text-[8.5px]">
-                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('rows', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-action hover:text-[#F8F8F2] font-semibold transition" title={t("添加到行维度")}>{t("+行")}</button>
-                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('columns', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#66D9EF] hover:text-[#1E1F1C] font-semibold transition" title={t("添加到列维度")}>{t("+列")}</button>
-                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('values', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#FD971F] hover:text-[#1E1F1C] font-semibold transition" title={t("添加到数值指标")}>{t("+值")}</button>
-                            <button onClick={(e) => { e.stopPropagation(); addFieldToZone('filters', field.name); }} className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#A6E22E] hover:text-[#1E1F1C] font-semibold transition" title={t("添加到筛选条件")}>{t("+筛")}</button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Mobile Accordion Toggle for Pivot Analysis Config */}
-              <div className="md:hidden border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-0.5">
-                <button
-                  type="button"
-                  aria-expanded={showMobileConfig}
-                  aria-controls="pivot-analysis-config"
-                  onClick={() => setShowMobileConfig((expanded) => !expanded)}
-                  className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 text-left text-[11px] font-semibold flex items-center justify-between"
-                >
-                  <span>{t("分析配置 · 行 / 列 / 值 / 筛选")}</span>
-                  <span className="text-ink-cyan">{showMobileConfig ? t("收起") : t("展开")}</span>
-                </button>
-              </div>
-
-              {/* Bottom Section: 4 Pivot Placement Drop Zones (Moved to Left Sidebar) */}
-              <section
-                id="pivot-analysis-config"
-                className={`${showMobileConfig ? 'flex' : 'hidden'} md:flex flex-col border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-2 shrink-0`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-bold tracking-tight apple-font-mono text-ink-muted">{' ' + t("透视结构放置区") + ' '}</span>
-                  <button
-                    disabled={isReadOnly}
-                    onClick={transposeRowsAndColumns}
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] hover:text-[#FD971F] text-[9px] font-semibold transition disabled:opacity-40"
-                    title={t("一键互换行维度与列维度 (快捷键: R)")}
+                {/* Top Pane: Schema Field Palette (可用字段) */}
+                {sidebarMode !== 'zones' && (
+                  <div
+                    id="pivot-schema-fields"
+                    className={`${showMobileSchema ? 'flex' : 'hidden'} md:flex flex-col min-h-0 ${
+                      sidebarMode === 'fields'
+                        ? 'flex-1 md:overflow-hidden'
+                        : 'flex-none md:basis-[var(--sidebar-top-pct)] md:flex-1 md:min-h-[100px] md:overflow-hidden'
+                    }`}
                   >
-                    <RotateCcw className="w-2.5 h-2.5 text-ink-orange" />
-                    <span>{t("行列互换")}</span>
-                  </button>
-                </div>
-
-                {/* 2×2 Drop Zones Grid */}
-                <div className="grid grid-cols-2 gap-1.5">
-                  {zoneConfigs.map((z) => {
-                    const items = pivotConfig[z.key] || [];
-                    const isOver = dragOverZone === z.key;
-                    return (
-                      <div
-                        key={z.key}
-                        data-testid={`zone-${z.key}`}
-                        role="group" aria-label={t(z.label)}
-                        onDragOver={(e) => { e.preventDefault(); setDragOverZone(z.key); }}
-                        onDragLeave={() => setDragOverZone(null)}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          setDragOverZone(null);
-                          let payload = draggingPayload;
-                          try { const serialized = e.dataTransfer.getData('application/x-pivot-field'); if (serialized) payload = JSON.parse(serialized); } catch { /* Ignore unrelated external drags. */ }
-                          if (!currentDataset?.fields?.some((field) => field.name === payload?.field)) return;
-                          if (payload?.field) {
-                            if (payload.source && payload.source !== 'fieldList' && payload.source !== z.key && payload.itemId) {
-                              const targetList = pivotConfig[z.key] || [];
-                              const fMeta = currentDataset?.fields?.find((f) => f.name === payload.field);
-                              if (z.key !== 'values' && fMeta?.type !== 'date' && targetList.some((it) => it.field === payload.field)) {
-                                showToast?.(`目标区域已存在「${payload.field}」`, 'error');
-                                setDraggingPayload(null);
-                                return;
-                              }
-                            }
-                            if (payload.source !== z.key) {
-                              addFieldToZone(z.key, payload.field, payload);
-                            }
-                          }
-                          setDraggingPayload(null);
+                    <div className="flex items-center justify-between mb-1 pt-1 md:pt-0 shrink-0">
+                      <span className="text-[11px] font-bold tracking-tight apple-font-mono text-[#272822] dark:text-[#F8F8F2]">
+                        {' ' + t("可用字段 (")}{filteredFields.length + filteredCustomMetrics.length}/{(currentDataset?.fields?.length || 0) + customMetricsCatalog.length})
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isReadOnly}
+                        onClick={() => {
+                          soundEngine?.playClick?.(540);
+                          openMetricCenter('studio', null);
                         }}
-                        className={`min-h-[85px] max-h-[145px] p-1.5 rounded-lg border ${z.borderAccent} apple-specular-card apple-transition flex flex-col gap-1 overflow-hidden ${
-                          isOver
-                            ? 'border-[#F92672] bg-[#F92672]/10 scale-[1.01]'
-                            : 'border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7]/90 dark:bg-[#1E1F1C]/90'
-                        }`}
+                        className="px-1.5 py-0.5 min-h-[24px] rounded bg-[#AE81FF]/15 hover:bg-[#AE81FF]/30 text-ink-purple text-[9px] font-bold apple-font-mono inline-flex items-center gap-0.5 transition disabled:opacity-40"
+                        title={t("打开指标中心新建自定义计算指标")}
                       >
-                        <div className="flex items-center justify-between text-[10px] font-bold apple-font-mono shrink-0">
-                          <span className={z.badgeColor}>{t(z.label)}</span>
-                          <span className="text-ink-muted">[{items.length}]</span>
+                        <FunctionSquare className="w-2.5 h-2.5" />
+                        <span>{t("+ 新建指标")}</span>
+                      </button>
+                    </div>
+
+                    {/* Novice Guide Educational Collapsible Card */}
+                    {showNoviceGuide && (
+                      <div className="mb-2 p-2 rounded-lg bg-[#FFFBEA]/80 dark:bg-[#2A2B20] border border-[#E6DB74]/50 text-[10px] space-y-1.5 shrink-0 animate-apple-modal">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-ink-yellow flex items-center gap-1">
+                            <Lightbulb className="w-3 h-3 text-ink-yellow" />
+                            {t("零基础认知锦囊：维度 vs 度量")}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowNoviceGuide(false)}
+                            className="p-0.5 text-ink-muted hover:text-[#F92672]"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
                         </div>
-
-                        <div className="flex-1 overflow-y-auto space-y-1 pr-0.5">
-                          {items.length === 0 ? (
-                            <span className="text-[9.5px] text-ink-muted italic block py-2 text-center apple-font-mono">{' ' + t("/* 拖拽至此 */") + ' '}</span>
-                          ) : (
-                            items.map((it, itemIdx) => {
-                              const fMeta = currentDataset?.fields?.find((f) => f.name === it.field);
-                              const isFiltered =
-                                z.key === 'filters'
-                                  ? (it.selectedValues && it.selectedValues.length > 0)
-                                  : (it.excludedValues && it.excludedValues.length > 0);
-                              return (
-                                <div
-                                  key={it.id}
-                                  draggable={!isReadOnly}
-                                  onDragStart={(e) => {
-                                    e.stopPropagation();
-                                    const payload = { source: z.key, field: it.field, itemId: it.id, index: itemIdx };
-                                    e.dataTransfer.effectAllowed = 'move';
-                                    e.dataTransfer.setData('application/x-pivot-field',JSON.stringify(payload));
-                                    e.dataTransfer.setData('text/plain',it.field);
-                                    setDraggingPayload(payload);
-                                  }}
-                                  onDragEnd={() => {
-                                    setDraggingPayload(null);
-                                    setDragOverZone(null);
-                                  }}
-                                  className="flex items-center justify-between gap-1 p-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xs text-[9.5px] font-medium cursor-grab active:cursor-grabbing hover:border-[#F92672] transition"
-                                >
-                                  <div className="flex items-center gap-1 min-w-0">
-                                    <GripVertical className="w-2.5 h-2.5 text-ink-muted shrink-0" />
-                                    <span
-                                      className="truncate max-w-[55px] text-[#272822] dark:text-[#F8F8F2]"
-                                      title={z.key === 'rows' || z.key === 'columns' ? getDimDisplayLabel(it) : it.field}
-                                    >
-                                      {z.key === 'rows' || z.key === 'columns' ? getDimDisplayLabel(it) : it.field}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-0.5 shrink-0">
-                                    {z.key === 'filters' && (
-                                      <button
-                                        onClick={() => {
-                                          setHeaderFilterSearch('');
-                                          setActiveHeaderFilterModal({ zone: 'filters', dim: it });
-                                        }}
-                                        className={`px-1 py-0.2 rounded text-[8.5px] font-semibold apple-font-mono transition ${
-                                          isFiltered
-                                            ? 'bg-[#A6E22E]/20 text-ink-green border border-[#A6E22E]/30'
-                                            : 'bg-black/[0.05] dark:bg-[#3E3D32] text-ink-muted hover:text-[#66D9EF]'
-                                        }`}
-                                        title={isFiltered ? `已选${it.selectedValues.length}项` : '全部'}
-                                      >
-                                        {isFiltered ? `${it.selectedValues.length}项` : t("全部")}
-                                      </button>
-                                    )}
-
-                                    {z.key === 'values' && (
-                                      <div className="flex items-center gap-0.5">
-                                        <select
-                                          disabled={isReadOnly}
-                                          value={it.agg}
-                                          onChange={(e) => {
-                                            const nextAgg = e.target.value;
-                                            setPivotConfig((prev) => ({
-                                              ...prev,
-                                              values: prev.values.map((v) => (v.id === it.id ? { ...v, agg: nextAgg } : v)),
-                                            }));
-                                          }}
-                                          className="bg-transparent text-ink-orange apple-font-mono font-bold focus:outline-none cursor-pointer disabled:opacity-40 text-[9px]"
-                                          title={t("切换聚合口径")}
-                                          aria-label={t("切换聚合口径")}
-                                        >
-                                          {AGG_METHODS.map((m) => (
-                                            <option key={m.value} value={m.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t(m.short)}</option>
-                                          ))}
-                                        </select>
-                                        <select
-                                          disabled={isReadOnly}
-                                          value={it.showAs || 'normal'}
-                                          onChange={(e) => {
-                                            const nextShowAs = e.target.value;
-                                            setPivotConfig((prev) => ({
-                                              ...prev,
-                                              values: prev.values.map((v) => (v.id === it.id ? { ...v, showAs: nextShowAs } : v)),
-                                            }));
-                                          }}
-                                          className={`text-[8px] rounded px-0.5 py-0.2 apple-font-mono font-semibold focus:outline-none cursor-pointer disabled:opacity-40 border transition ${
-                                            it.showAs && it.showAs !== 'normal'
-                                              ? 'bg-[#AE81FF]/20 text-ink-purple border-[#AE81FF]/40'
-                                              : 'bg-black/[0.04] dark:bg-white/[0.06] text-ink-muted border-transparent'
-                                          }`}
-                                          title={t("快捷表计算 (普通值 / 占总计% / 占行% / 占列% / 环比差 / 环比增长率 / 累计求和)")}
-                                          aria-label={t("快捷表计算")}
-                                        >
-                                          <option value="normal" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("普通")}</option>
-                                          <option value="pct_grand" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("%总计")}</option>
-                                          <option value="pct_row" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("%行")}</option>
-                                          <option value="pct_col" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("%列")}</option>
-                                          <option value="prev_diff" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("环比差")}</option>
-                                          <option value="pct_prev_diff" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("环比%")}</option>
-                                          <option value="running_total" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("累计Σ")}</option>
-                                        </select>
-                                      </div>
-                                    )}
-
-                                    {(z.key === 'rows' || z.key === 'columns') && (fMeta?.type === 'date' || fMeta?.type === 'number') && (
-                                      <button
-                                        disabled={isReadOnly}
-                                        onClick={() => {
-                                          setBinFormState(it.numberBin || { start: 0, step: 50000 });
-                                          setActiveBinModal({ zone: z.key, item: it, fieldType: fMeta.type });
-                                        }}
-                                        className="px-1 rounded bg-[#66D9EF]/15 text-ink-cyan text-[8.5px] hover:underline disabled:opacity-40 apple-font-mono"
-                                        title={t("分组设置")}
-                                      >{' ' + t("组") + ' '}</button>
-                                    )}
-
-                                    {(z.key === 'rows' || z.key === 'columns') && (
-                                      <button
-                                        onClick={() => toggleDimensionSort(z.key, it.id)}
-                                        className={`hover:text-[#F92672] transition ${it.sort && it.sort !== 'none' ? 'text-ink-pink' : 'text-ink-muted'}`}
-                                        title={`维度排序: ${it.sort === 'asc' ? '升序' : it.sort === 'desc' ? '降序' : '默认'}`}
-                                        aria-label={t("排序")}
-                                      >
-                                        {it.sort === 'asc' ? <ArrowUp className="w-2.5 h-2.5" /> : it.sort === 'desc' ? <ArrowDown className="w-2.5 h-2.5" /> : <ArrowUpDown className="w-2.5 h-2.5" />}
-                                      </button>
-                                    )}
-
-                                    {(z.key === 'rows' || z.key === 'columns' || z.key === 'filters') && (
-                                      <button
-                                        onClick={() => {
-                                          setHeaderFilterSearch('');
-                                          setActiveHeaderFilterModal({ zone: z.key, dim: it });
-                                        }}
-                                        className={`hover:text-[#A6E22E] transition ${isFiltered ? 'text-ink-green' : 'text-ink-muted'}`}
-                                        title={t("勾选筛选值")}
-                                        aria-label={t("筛选值")}
-                                      >
-                                        <Filter className="w-2.5 h-2.5" />
-                                      </button>
-                                    )}
-
-                                    {!isReadOnly && items.length > 1 && (
-                                      <span className="inline-flex items-center text-[8.5px] text-ink-muted">
-                                        {itemIdx > 0 && (
-                                          <button onClick={() => moveZoneItem(z.key, itemIdx, -1)} className="hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("前移")}>←</button>
-                                        )}
-                                        {itemIdx < items.length - 1 && (
-                                          <button onClick={() => moveZoneItem(z.key, itemIdx, 1)} className="hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("后移")}>→</button>
-                                        )}
-                                      </span>
-                                    )}
-
-                                    {!isReadOnly && (
-                                      <button
-                                        onClick={() => removeZoneItem(z.key, it.id)}
-                                        className="text-ink-muted hover:text-[#F92672]"
-                                        title={t("移除字段")}
-                                        aria-label={t("移除字段")}
-                                      >
-                                        <X className="w-2.5 h-2.5" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
+                        <div className="space-y-1 text-ink-muted leading-relaxed">
+                          <p>
+                            <strong className="text-ink-cyan">🏷️ 维度 (Dimension)</strong>：事物分类或属性（如地区、品类、月份）。用来做【行】或【列】的<strong>切片分组与横纵对比</strong>。
+                          </p>
+                          <p>
+                            <strong className="text-ink-orange">🔢 度量 (Measure)</strong>：统计数值与指标（如销售额、利润、数量）。用来放进【值】进行<strong>求和、均值统计或计算</strong>。
+                          </p>
+                          <p className="text-[#272822] dark:text-[#F8F8F2] font-medium pt-0.5 border-t border-[#E6DB74]/30">
+                            💡 <strong>核心分析思路</strong>：“在 [某个维度] 的不同分类下，按 [某个度量] 计算并对比其总量或走势”。
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </section>
+                    )}
+
+                    {/* Field Search & Category Filter */}
+                    <div className="space-y-1 mb-1 shrink-0">
+                      <div className="relative">
+                        <Search className="w-3 h-3 text-ink-muted absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          aria-label={t("搜索可用字段名称")}
+                          value={fieldSearchQuery}
+                          onChange={(e) => setFieldSearchQuery(e.target.value)}
+                          placeholder={t("搜索字段名称...")}
+                          className="w-full pl-6 pr-5 py-0.5 min-h-[24px] rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] text-[10.5px] placeholder-[#75715E] text-[#272822] dark:text-[#F8F8F2] focus:outline-none focus:border-[#66D9EF] apple-font-mono"
+                        />
+                        {fieldSearchQuery && (
+                          <button
+                            onClick={() => setFieldSearchQuery('')}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-ink-muted hover:text-[#F92672]"
+                            aria-label={t("清空搜索")}
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Tabs: 全部 / 维度 / 度量 */}
+                      <div className="flex rounded-md p-0.5 bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] text-[9.5px] apple-font-mono">
+                        <button
+                          onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('all'); }}
+                          className={`flex-1 py-0.5 min-h-[24px] rounded text-center font-medium transition ${fieldCategoryTab === 'all' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] shadow-2xs font-bold' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+                        >{' ' + t("全部 (")}{(currentDataset?.fields?.length || 0) + customMetricsCatalog.length})
+                        </button>
+                        <button
+                          onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('dimension'); }}
+                          className={`flex-1 py-0.5 min-h-[24px] rounded text-center font-medium transition ${fieldCategoryTab === 'dimension' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-ink-cyan shadow-2xs font-bold' : 'text-ink-muted hover:text-[#0088A3] dark:hover:text-[#66D9EF]'}`}
+                        >{' ' + t("维度 (")}{dimensionCount})
+                        </button>
+                        <button
+                          onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('measure'); }}
+                          className={`flex-1 py-0.5 min-h-[24px] rounded text-center font-medium transition ${fieldCategoryTab === 'measure' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-ink-orange shadow-2xs font-bold' : 'text-ink-muted hover:text-[#C86400] dark:hover:text-[#FD971F]'}`}
+                        >{' ' + t("度量 (")}{measureCount})
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Draggable Field Items & Saved Custom Metrics */}
+                    <div className="overflow-y-auto space-y-1 pr-0.5 flex-1 min-h-[96px] md:min-h-0 max-h-[180px] md:max-h-none">
+                    {filteredFields.length === 0 && filteredCustomMetrics.length === 0 ? (
+                      <div className="py-4 text-center text-xs text-ink-muted apple-font-mono space-y-1">
+                        <p>{t("无匹配字段")}</p>
+                        {fieldSearchQuery && (
+                          <button
+                            onClick={() => setFieldSearchQuery('')}
+                            className="text-[10px] text-ink-cyan hover:underline"
+                          >{' ' + t("清空搜索条件") + ' '}</button>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {/* Saved Custom Metrics in Field Shelf */}
+                        {filteredCustomMetrics.map((cm) => {
+                          const isInPivot = (pivotConfig?.values || []).some(
+                            (v) => v.id === cm.id || (v.isCalculated && v.field === cm.field)
+                          );
+                          return (
+                            <div
+                              key={cm.id || cm.field}
+                              draggable={!isReadOnly}
+                              onDragStart={(event) => {
+                                const payload = { source: 'customMetric', metric: cm, field: cm.field, isCalculated: true };
+                                event.dataTransfer.effectAllowed = 'copyMove';
+                                event.dataTransfer.setData('application/x-pivot-field', JSON.stringify(payload));
+                                event.dataTransfer.setData('text/plain', cm.field);
+                                setDraggingPayload?.(payload);
+                              }}
+                              onDragEnd={() => {
+                                setDraggingPayload?.(null);
+                                setDragOverZone?.(null);
+                              }}
+                              onClick={(e) => {
+                                if (e.target.tagName.toLowerCase() !== 'button') {
+                                  addCustomMetricToPivot(cm);
+                                }
+                              }}
+                              className="group p-1.5 rounded-lg border border-[#AE81FF]/45 bg-[#AE81FF]/[0.06] dark:bg-[#1E1F1C]/90 hover:border-[#AE81FF] flex items-center justify-between gap-1.5 cursor-grab active:cursor-grabbing apple-transition select-none text-[11px]"
+                              title={`自定义计算指标: ${cm.formula || `${cm.operandAField} ${cm.op} ${cm.operandBField}`}${cm.description ? ` · ${cm.description}` : ''} (点击或拖拽至数值区)`}
+                            >
+                                                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                <GripVertical className="w-3 h-3 shrink-0 text-ink-purple/60 group-hover:text-ink-purple transition-colors" />
+                                <span className="px-1 py-0.5 rounded bg-[#AE81FF]/20 text-ink-purple text-[8.5px] font-bold apple-font-mono shrink-0">
+                                  FX
+                                </span>
+                                <span className="font-semibold truncate text-[#272822] dark:text-[#F8F8F2]">
+                                  {cm.field}
+                                </span>
+                                {(() => {
+                                  const placements = getFieldUsagePlacements(cm.id || cm.field);
+                                  if (placements.length === 0) return null;
+                                  return (
+                                    <div className="flex items-center gap-0.5 shrink-0 select-none">
+                                      {placements.map((p) => (
+                                        <span
+                                          key={p.zone}
+                                          className={`px-1 py-0.2 rounded text-[8px] font-bold border ${p.bg}`}
+                                          title={`已配置在：${p.label}区域`}
+                                        >
+                                          {p.label}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                              <div className="flex items-center gap-0.5 shrink-0 apple-font-mono text-[8.5px]">
+                                <button
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    soundEngine?.playClick?.(540);
+                                    openMetricCenter('studio', cm.id || cm.field);
+                                  }}
+                                  className="px-1.5 py-0.5 min-h-[24px] rounded bg-[#EFECE1] dark:bg-[#272822] hover:bg-[#AE81FF] hover:text-[#1E1F1C] font-semibold transition inline-flex items-center gap-0.5"
+                                  title={t("在指标中心编辑该自定义指标公式")}
+                                >
+                                  <Edit3 className="w-2.5 h-2.5" />
+                                  <span>{t("公式")}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isReadOnly}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    addCustomMetricToPivot(cm);
+                                  }}
+                                  className={`px-1.5 py-0.5 min-h-[24px] rounded font-semibold transition ${
+                                    isInPivot
+                                      ? 'bg-[#A6E22E]/20 text-ink-green'
+                                      : 'bg-[#FD971F]/20 text-ink-orange hover:bg-[#FD971F] hover:text-[#1E1F1C]'
+                                  }`}
+                                  title={isInPivot ? t("该自定义指标已在数值区") : t("添加该自定义指标到数值区")}
+                                >
+                                  {isInPivot ? t("已上表") : t("+值")}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {filteredFields.map((field) => {
+                        const isMeasure = isFieldMeasure(field);
+                        const typeCfg = FIELD_TYPES[field.type] || FIELD_TYPES.text;
+                        const TypeIcon = typeCfg.icon;
+                        return (
+                          <div
+                            key={field.name}
+                            onClick={(e) => {
+                              if (e.target.tagName.toLowerCase() !== 'button') {
+                                soundEngine?.playClick?.(540);
+                                if (isMeasure) {
+                                  addFieldToZone('values', field.name);
+                                  showToast?.(`已添加「${field.name}」到数值指标`);
+                                } else {
+                                  addFieldToZone('rows', field.name);
+                                  showToast?.(`已添加「${field.name}」到行维度`);
+                                }
+                              }
+                            }}
+                            className="group p-1.5 rounded-lg border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#1E1F1C]/90 hover:border-[#F92672]/60 dark:hover:border-[#66D9EF]/60 flex items-center justify-between gap-1.5 cursor-pointer apple-transition select-none text-[11px]"
+                            title={`点击快速添加至${isMeasure ? '指标' : '行维度'} · 拖拽自由配置`}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  soundEngine?.playClick?.(620);
+                                  toggleFieldRole?.(field.name);
+                                }}
+                                disabled={isReadOnly}
+                                className={`p-1 rounded border ${typeCfg.color} shrink-0 hover:scale-105 transition`}
+                                title={`当前分析角色: ${isMeasure ? '度量 (数值/聚合)' : '维度 (分类/分组)'}，点击快速切换角色`}
+                                aria-label={`切换${field.name}角色`}
+                              >
+                                <TypeIcon className="w-2.5 h-2.5" />
+                              </button>
+                                                            <span
+                                onClick={event => {event.stopPropagation();setProfilingField(field);}}
+                                data-testid={`field-${field.name}`}
+                                draggable={!isReadOnly}
+                                onDragStart={(event) => {
+                                  const payload = { source: 'fieldList', field: field.name };
+                                  event.dataTransfer.effectAllowed = 'copyMove';
+                                  event.dataTransfer.setData('application/x-pivot-field',JSON.stringify(payload));
+                                  event.dataTransfer.setData('text/plain',field.name);
+                                  setDraggingPayload(payload);
+                                }}
+                                onDragEnd={() => { setDraggingPayload(null); setDragOverZone(null); }}
+                                title={t('查看字段分布；也可拖拽到配置区')}
+                                className="flex items-center gap-1 font-medium truncate min-w-[36px] flex-1 cursor-grab active:cursor-grabbing hover:text-ink-cyan transition-colors"
+                              >
+                                <GripVertical className="w-3 h-3 shrink-0 text-ink-muted" />
+                                <span className="truncate">{field.name}</span>
+                              </span>
+                              {(() => {
+                                const placements = getFieldUsagePlacements(field.name);
+                                if (placements.length === 0) return null;
+                                return (
+                                  <div className="flex items-center gap-0.5 shrink-0 select-none">
+                                    {placements.map((p) => (
+                                      <span
+                                        key={p.zone}
+                                        className={`px-1 py-0.2 rounded text-[8px] font-bold border ${p.bg}`}
+                                        title={`已配置在：${p.label}区域`}
+                                      >
+                                        {p.label}
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                              <button
+                                type="button"
+                                aria-label={`${field.name} · ${t('查看字段分布')}`}
+                                title={t('查看字段分布')}
+                                onClick={event=>{event.stopPropagation();setProfilingField(field);}}
+                                className="p-0.5 shrink-0 rounded text-ink-muted opacity-40 group-hover:opacity-100 hover:text-ink-cyan hover:bg-black/5 dark:hover:bg-white/10 transition"
+                              >
+                                <Info className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-0.5 shrink-0 apple-font-mono text-[8.5px]">
+                              <button
+                                type="button"
+                                disabled={isReadOnly}
+                                aria-label={`添加「${field.name}」到行分组`}
+                                onClick={(e) => { e.stopPropagation(); addFieldToZone('rows', field.name); }}
+                                className={`px-1 py-0.5 rounded font-semibold transition ${
+                                  !isMeasure
+                                    ? 'bg-[#F92672]/15 text-ink-pink hover:bg-[#F92672] hover:text-[#FFFDF7]'
+                                    : 'bg-[#EFECE1] dark:bg-[#272822] opacity-75 hover:opacity-100 hover:bg-[#F92672] hover:text-[#FFFDF7]'
+                                }`}
+                                title={t("添加到行维度")}
+                              >
+                                {t("+行")}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isReadOnly}
+                                aria-label={`添加「${field.name}」到列比较`}
+                                onClick={(e) => { e.stopPropagation(); addFieldToZone('columns', field.name); }}
+                                className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] opacity-75 hover:opacity-100 hover:bg-[#66D9EF] hover:text-[#1E1F1C] font-semibold transition"
+                                title={t("添加到列维度")}
+                              >
+                                {t("+列")}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isReadOnly}
+                                aria-label={`添加「${field.name}」到计算指标`}
+                                onClick={(e) => { e.stopPropagation(); addFieldToZone('values', field.name); }}
+                                className={`px-1 py-0.5 rounded font-semibold transition ${
+                                  isMeasure
+                                    ? 'bg-[#FD971F]/15 text-ink-orange hover:bg-[#FD971F] hover:text-[#1E1F1C]'
+                                    : 'bg-[#EFECE1] dark:bg-[#272822] opacity-75 hover:opacity-100 hover:bg-[#FD971F] hover:text-[#1E1F1C]'
+                                }`}
+                                title={t("添加到数值指标")}
+                              >
+                                {t("+值")}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isReadOnly}
+                                aria-label={`添加「${field.name}」到筛选`}
+                                onClick={(e) => { e.stopPropagation(); addFieldToZone('filters', field.name); }}
+                                className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] opacity-75 hover:opacity-100 hover:bg-[#A6E22E] hover:text-[#1E1F1C] font-semibold transition"
+                                title={t("添加到筛选条件")}
+                              >
+                                {t("+筛")}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      </>
+                    )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Horizontal Draggable Resizer Handle between 可用字段 & 透视结构放置区 */}
+                {sidebarMode === 'split' && !isPrintingReport && (
+                  <div
+                    data-testid="sidebar-split-resizer"
+                    role="separator"
+                    tabIndex={0}
+                    aria-orientation="horizontal"
+                    aria-label={t("调节可用字段与透视结构放置区高度")}
+                    aria-valuenow={sidebarSplitPct}
+                    aria-valuemin={20}
+                    aria-valuemax={80}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setIsResizingSidebarSplit(true);
+                    }}
+                    onDoubleClick={resetSidebarSplitPct}
+                    onKeyDown={handleSidebarSplitKeyDown}
+                    className={`hidden md:flex relative items-center justify-center w-full h-2.5 my-0.5 cursor-row-resize z-20 group select-none shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] rounded transition-colors ${
+                      isResizingSidebarSplit ? 'bg-[#66D9EF]/40' : 'hover:bg-[#66D9EF]/25 active:bg-[#66D9EF]/50'
+                    }`}
+                    title={t("上下拖动调节可用字段与放置区高度比例 (双击恢复 50:50 均分)")}
+                  >
+                    <div
+                      className={`h-0.5 w-10 rounded-full transition-colors ${
+                        isResizingSidebarSplit
+                          ? 'bg-[#66D9EF]'
+                          : 'bg-[#D6D4C8] dark:bg-[#49483E] group-hover:bg-[#66D9EF]'
+                      }`}
+                    />
+                    {isResizingSidebarSplit && (
+                      <div className="absolute right-2 -top-5 px-1.5 py-0.5 rounded bg-[#272822] text-[#F8F8F2] text-[9.5px] apple-font-mono font-bold shadow-md z-30 pointer-events-none whitespace-nowrap border border-[#49483E]">
+                        {sidebarSplitPct}% : {100 - sidebarSplitPct}%
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Bottom Pane: Pivot Structure Dropzones (透视结构放置区) */}
+                {sidebarMode !== 'fields' && !isPrintingReport && (
+                  <div
+                    className={`flex flex-col min-h-0 ${
+                      sidebarMode === 'zones'
+                        ? 'flex-1 md:overflow-hidden'
+                        : 'flex-none md:basis-[var(--sidebar-bottom-pct)] md:flex-1 md:min-h-[110px] md:overflow-hidden border-t md:border-t-0 border-[#D6D4C8]/70 dark:border-[#3E3D32]/70 pt-1 md:pt-0'
+                    }`}
+                  >
+                    <PivotConfigPanel
+                      pivotConfig={pivotConfig}
+                      setPivotConfig={setPivotConfig}
+                      currentDataset={currentDataset}
+                      isReadOnly={isReadOnly}
+                      draggingPayload={draggingPayload}
+                      setDraggingPayload={setDraggingPayload}
+                      dragOverZone={dragOverZone}
+                      setDragOverZone={setDragOverZone}
+                      addFieldToZone={addFieldToZone}
+                      removeZoneItem={removeZoneItem}
+                      moveZoneItem={moveZoneItem}
+                      toggleDimensionSort={toggleDimensionSort}
+                      setHeaderFilterSearch={setHeaderFilterSearch}
+                      setActiveHeaderFilterModal={setActiveHeaderFilterModal}
+                      setBinFormState={setBinFormState}
+                      setActiveBinModal={setActiveBinModal}
+                      transposeRowsAndColumns={transposeRowsAndColumns}
+                      onOpenMetricCenter={() => {
+                        soundEngine?.playClick?.(540);
+                        openMetricCenter('studio', null);
+                      }}
+                      onEditCustomMetric={(metricId) => {
+                        soundEngine?.playClick?.(540);
+                        openMetricCenter('studio', metricId);
+                      }}
+                      soundEngine={soundEngine}
+                      showToast={showToast}
+                    />
+                  </div>
+                )}
+              </div>
             </aside>
-          )
-        )}
+
+            {/* Draggable Resizer Handle (Desktop only) */}
+            <div
+              role="separator"
+              tabIndex={0}
+              aria-orientation="vertical"
+              aria-label={t("调节侧边栏宽度")}
+              aria-valuenow={sidebarWidth}
+              aria-valuemin={MIN_SIDEBAR_WIDTH}
+              aria-valuemax={MAX_SIDEBAR_WIDTH}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsResizingSidebar(true);
+              }}
+              onDoubleClick={resetSidebarWidth}
+              onKeyDown={handleResizerKeyDown}
+              className={`hidden md:flex relative items-center justify-center w-2 -ml-1 cursor-col-resize z-20 group select-none shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] transition-colors ${
+                isResizingSidebar ? 'bg-[#66D9EF]/50' : 'hover:bg-[#66D9EF]/30 active:bg-[#66D9EF]'
+              }`}
+              title={t("拖动调节侧边栏宽度 (双击恢复默认 380px)")}
+            >
+              <div
+                className={`w-0.5 h-8 rounded-full transition-colors ${
+                  isResizingSidebar
+                    ? 'bg-[#66D9EF]'
+                    : 'bg-[#D6D4C8] dark:bg-[#49483E] group-hover:bg-[#66D9EF]'
+                }`}
+              />
+              {isResizingSidebar && (
+                <div className="absolute left-3 top-2 px-2 py-0.5 rounded-md bg-[#272822] text-[#F8F8F2] text-[10px] apple-font-mono font-bold shadow-md z-30 pointer-events-none whitespace-nowrap border border-[#49483E]">
+                  {sidebarWidth}px
+                </div>
+              )}
+            </div>
+          </>
+        )
+      )}
 
         {/* Main Work Area: Full width when collapsed, 100% clean vertical space */}
         <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-visible md:overflow-hidden">
-          {/* Top Control Bar: View Mode, Chart Type, Subtotals, Sticky Headers, Insights */}
+          {/* Top Control Bar: View Mode, Chart Type, Display Preferences, Insights Toggle */}
           <div className="bg-[#EFECE1]/75 dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-2 shrink-0 print:hidden">
+            {/* Left Functional Group: View Canvas & Visualization */}
             <div className="flex flex-wrap items-center gap-2">
               {/* Expand Sidebar Quick Button when collapsed */}
               {isSidebarCollapsed && !cinemaTheaterMode && (
@@ -733,6 +1072,7 @@ export function FieldShelf({
                     key={m.id}
                     onClick={() => { soundEngine?.playClick(520); setViewMode(m.id); }}
                     aria-pressed={viewMode === m.id}
+                    title={m.id === 'chart' ? t("透视图 (独立图表与笔记模式)") : undefined}
                     className={`px-3 py-1 rounded-md text-[10px] font-semibold transition ${viewMode === m.id ? 'bg-action text-[#F8F8F2] shadow-sm' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
                   >
                     {t(m.label)}
@@ -747,54 +1087,87 @@ export function FieldShelf({
                 onChange={(e) => { soundEngine?.playClick(560); setChartType(e.target.value); }}
                 className="px-3 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-ink-cyan text-[10px] font-semibold apple-font-mono focus:outline-none focus:border-[#F92672]"
               >
-                {VISUAL_CHART_TYPES.map((type) => (
-                  <option key={type.value} value={type.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t(type.label)}</option>
+                {CHART_INTENT_GROUPS.map((group) => (
+                  <optgroup key={group.id} label={`${t(group.label)} (${t(group.desc)})`}>
+                    {group.types.map((typeVal) => {
+                      const type = VISUAL_CHART_TYPES.find((item) => item.value === typeVal);
+                      if (!type) return null;
+                      return (
+                        <option key={type.value} value={type.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">
+                          {t(type.label)}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
                 ))}
               </select>
-
-              {/* Pivot Aggregation Options */}
-              <label className="inline-flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
-                <input
-                  type="checkbox"
-                  aria-label={t("显示多级小计")}
-                  checked={pivotConfig.showSubtotals}
-                  onChange={(e) => setPivotConfig((p) => ({ ...p, showSubtotals: e.target.checked }))}
-                  className="rounded accent-[#F92672]"
-                />
-                <span>{t("多级小计")}</span>
-              </label>
-
-              <label className="inline-flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
-                <input
-                  type="checkbox"
-                  aria-label={t("冻结行表头")}
-                  checked={chartSpecConfig.stickyRowHeaders}
-                  onChange={(e) => setChartSpecConfig((p) => ({ ...p, stickyRowHeaders: e.target.checked }))}
-                  className="rounded accent-[#F92672]"
-                />
-                <span>{t("冻结行表头")}</span>
-              </label>
-
-              <button
-                disabled={isReadOnly}
-                onClick={transposeRowsAndColumns}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] hover:text-[#F92672] text-[10px] font-medium transition disabled:opacity-40"
-                title={t("一键互换行维度与列维度 (快捷键: R)")}
-              >
-                <RotateCcw className="w-2.5 h-2.5 text-ink-orange" />
-                <span>{t("行列互换")}</span>
-              </button>
-
-              {unifiedChartSpec.executiveInsight && (
-                <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#E6DB74]/15 border border-[#E6DB74]/30 text-ink-yellow text-[10px] font-medium apple-font-mono">
-                  <Sparkles className="w-3 h-3 text-ink-orange shrink-0" />
-                  <span>
-                    TOP_FOCUS: <strong>{unifiedChartSpec.executiveInsight.topName}</strong> ({unifiedChartSpec.executiveInsight.topFormatted} · {unifiedChartSpec.executiveInsight.sharePct}%)
-                  </span>
-                </div>
-              )}
             </div>
 
+            {/* Center Functional Group: Table / Chart Display Options & Insights Deck Trigger */}
+            <div className="flex flex-wrap items-center gap-2">
+              {viewMode === 'chart' ? (
+                <>
+                  <label className="inline-flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
+                    <input
+                      type="checkbox"
+                      aria-label={t("显示数值标签")}
+                      checked={chartSpecConfig.showDataLabels}
+                      onChange={(e) => setChartSpecConfig((p) => ({ ...p, showDataLabels: e.target.checked }))}
+                      className="rounded accent-[#F92672]"
+                    />
+                    <span>{t("数值标签")}</span>
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
+                    <input
+                      type="checkbox"
+                      aria-label={t("显示均值参考线")}
+                      checked={chartSpecConfig.showAvgReferenceLine}
+                      onChange={(e) => setChartSpecConfig((p) => ({ ...p, showAvgReferenceLine: e.target.checked }))}
+                      className="rounded accent-[#FD971F]"
+                    />
+                    <span>{t("均值参考线")}</span>
+                  </label>
+                </>
+              ) : (
+                <label className="inline-flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
+                  <input
+                    type="checkbox"
+                    aria-label={t("冻结行表头")}
+                    checked={chartSpecConfig.stickyRowHeaders}
+                    onChange={(e) => setChartSpecConfig((p) => ({ ...p, stickyRowHeaders: e.target.checked }))}
+                    className="rounded accent-[#F92672]"
+                  />
+                  <span>{t("冻结行表头")}</span>
+                </label>
+              )}
+
+              {/* Metric Center & Insights Toggle (Default Hidden) */}
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine?.playClick?.(500);
+                  setShowInsightsDeck((prev) => !prev);
+                }}
+                aria-expanded={showInsightsDeck}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition ${
+                  showInsightsDeck
+                    ? 'bg-[#AE81FF]/20 border-[#AE81FF]/50 text-ink-purple shadow-2xs'
+                    : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+                }`}
+                title={showInsightsDeck ? t("收起指标中心与洞察面板") : t("展开指标中心（支持新建自定义指标、KPI 卡片与推荐模版）")}
+              >
+                <Calculator className="w-3 h-3 text-ink-purple" />
+                <span>{t("指标中心")}</span>
+                {(pivotConfig?.values?.length || 0) > 0 && (
+                  <span className="px-1 py-0.2 rounded text-[8.5px] bg-black/5 dark:bg-white/10 apple-font-mono font-bold">
+                    {pivotConfig.values.length}
+                  </span>
+                )}
+                {showInsightsDeck ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            </div>
+
+            {/* Right Functional Group: Focus Status & Analytics Engine Tools */}
             <div className="flex items-center gap-2">
               {highlightedRowKey && (
                 <button
@@ -804,16 +1177,55 @@ export function FieldShelf({
                   CLEAR_FOCUS: {highlightedRowKey.replace(/\|\|/g, ' / ')} ×
                 </button>
               )}
+
+              {/* Inline Executive Insight Summary when Deck is Collapsed */}
+              {!showInsightsDeck && unifiedChartSpec?.executiveInsight && (
+                <div className="hidden xl:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#E6DB74]/15 border border-[#E6DB74]/30 text-ink-yellow text-[9.5px] apple-font-mono">
+                  <Sparkles className="w-2.5 h-2.5 text-ink-orange shrink-0" />
+                  <span className="truncate max-w-[200px]">
+                    {unifiedChartSpec.executiveInsight.topName} ({unifiedChartSpec.executiveInsight.topFormatted})
+                  </span>
+                </div>
+              )}
+
               <button
                 onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }}
-                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[9px] text-ink-muted apple-font-mono transition"
+                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[10.5px] text-ink-muted apple-font-mono transition"
                 title={t("查看 DuckDB SQL 模板（当前不执行）")}
               >
                 <Code2 className="w-3 h-3 text-ink-green" />
-                <span>CUBE({pivotResult.rowConfigs.map((r) => r.field).join('×') || 'ALL'})</span>
+                <span>SQL/CUBE</span>
               </button>
             </div>
           </div>
+
+          {/* Metric Center (指标中心): Active KPI Governance, Formula Studio & Custom Metric Catalog */}
+          {showInsightsDeck && currentDataset && (
+            <MetricCenterPanel
+              key={`${datasetCatalogKey}-${metricCenterRequest}`}
+              currentDataset={currentDataset}
+              pivotResult={pivotResult}
+              pivotConfig={pivotConfig}
+              setPivotConfig={setPivotConfig}
+              unifiedChartSpec={unifiedChartSpec}
+              customMetricsCatalog={customMetricsCatalog}
+              setCustomMetricsCatalog={setCustomMetricsCatalog}
+              addFieldToZone={addFieldToZone}
+              removeZoneItem={removeZoneItem}
+              setChartType={setChartType}
+              setCondFormat={setCondFormat}
+              soundEngine={soundEngine}
+              showToast={showToast}
+              isReadOnly={isReadOnly}
+              onClose={() => {
+                setShowInsightsDeck(false);
+                setEditingMetricId(null);
+              }}
+              initialTab={metricCenterInitialTab}
+              editingMetricId={editingMetricId}
+              onClearEditingMetric={() => setEditingMetricId(null)}
+            />
+          )}
 
           {/* Main Work Content Area: Split Container with Table and Chart Studio */}
           {children}

@@ -49,6 +49,11 @@ html, body {
   font-family: inherit;
 }
 
+/* Ensure decorative line dots do not intercept bar clicks in composite charts */
+.recharts-line-dot {
+  pointer-events: none;
+}
+
 /* 2. 表单与交互控件原生字体强制应用 */
 input, select, textarea, button, optgroup, option {
   font-family: inherit;
@@ -92,21 +97,67 @@ svg text {
   background-size: 18px 18px;
 }
 
+/* Ambient glow atmospheric mesh for Awwwards / Webby level studio aesthetic */
+.ambient-glow-mesh {
+  background-image:
+    radial-gradient(circle at 12% 10%, rgba(189, 20, 80, 0.02) 0%, transparent 40%),
+    radial-gradient(circle at 88% 8%, rgba(0, 103, 122, 0.02) 0%, transparent 45%),
+    radial-gradient(rgba(117, 113, 94, 0.12) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 18px 18px;
+}
+
+.dark .ambient-glow-mesh {
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(249, 38, 114, 0.06) 0%, transparent 45%),
+    radial-gradient(circle at 90% 10%, rgba(102, 217, 239, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 50% 95%, rgba(253, 151, 31, 0.035) 0%, transparent 50%),
+    radial-gradient(rgba(117, 113, 94, 0.18) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 18px 18px;
+}
+
+.tactile-btn {
+  transition: transform 140ms var(--apple-ease), box-shadow 140ms var(--apple-ease), background-color 150ms ease, border-color 150ms ease;
+}
+.tactile-btn:active:not(:disabled) {
+  transform: scale(0.975);
+}
+
+.apple-font-mono, .tabular-nums, [data-testid="pivot-value-cell"], [data-testid="overall-summary"] {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+::selection {
+  background-color: rgba(102, 217, 239, 0.28);
+  color: inherit;
+}
+.dark ::selection {
+  background-color: rgba(249, 38, 114, 0.38);
+  color: #F8F8F2;
+}
+
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(39, 40, 34, 0.15);
+  background: rgba(39, 40, 34, 0.05);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(39, 40, 34, 0.25);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(117, 113, 94, 0.45);
+  background: rgba(117, 113, 94, 0.35);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 103, 122, 0.65);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(249, 38, 114, 0.75);
 }
 
@@ -139,7 +190,6 @@ svg text {
 :root { --ps-focus: #0088A3; --ps-control-min: 24px; }
 .dark { --ps-focus: #66D9EF; }
 .apple-transition { transition-property: background-color, border-color, color, opacity, box-shadow, transform; transition-duration: 180ms; transition-timing-function: var(--apple-ease); }
-:where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ps-focus); outline-offset: 2px; }
 :where(button):disabled { cursor: not-allowed; opacity: .5; }
 :where(button, a) { -webkit-tap-highlight-color: transparent; }
 :where(input, textarea, select) { min-width: 0; }
@@ -158,7 +208,7 @@ svg text {
 :where(button, [role="button"], select):not(:disabled) {
   cursor: pointer;
 }
-:where(button, [role="button"], select, input, textarea):focus-visible {
+:where(button, a, [role="button"], select, input, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--ps-focus);
   outline-offset: 3px;
 }
@@ -200,11 +250,11 @@ svg text {
   --ps-ink-muted: #A5A292;
 }
 /* Minimum targets apply to the shared workbench, including dense field actions. */
-[data-testid="pivot-workbench"] :where(button, select, [role="button"]) {
+:is([data-testid="pivot-workbench"], [data-ui-controls]) :where(button, select, [role="button"]) {
   min-width: var(--ps-control-min);
   min-height: var(--ps-control-min);
 }
-[data-testid="pivot-workbench"] label:has(input[type="checkbox"]) {
+:is([data-testid="pivot-workbench"], [data-ui-controls]) label:has(input[type="checkbox"]) {
   min-height: var(--ps-control-min);
 }
 @media (pointer: coarse) {

@@ -1,49 +1,59 @@
 import { formatDimensionValue } from '../../../utils/formatters.js';
+import { encodeGroupSegment } from '../../../utils/groupKeys.js';
+import { parseFormulaAST, evaluateFormulaAST } from './formulaEngine.js';
 
 export function computeAggregation(records, fieldName, aggMethod) {
-  if (!records?.length) return 0;
+  return aggregateWithSamples(records, fieldName, aggMethod).value;
+}
+
+export function aggregateWithSamples(records = [], fieldName, aggMethod) {
+  records = records || [];
+  const total = records.length;
+  const finish = (value, valid, missing = total - valid, invalid = 0) => ({ value, total, valid, missing, invalid });
   const isVirtualCount = fieldName === '__COUNT__' || !fieldName;
   if (isVirtualCount) {
-    if (aggMethod === 'count' || !aggMethod) return records.length;
+    if (aggMethod === 'count' || !aggMethod) return finish(total, total);
   }
   const meaningful = (v) => v !== null && v !== undefined && !(typeof v === 'string' && v.trim() === '');
   if (aggMethod === 'count') {
-    if (isVirtualCount) return records.length;
-    return records.filter((r) => meaningful(r[fieldName])).length;
+    const count = records.filter((r) => meaningful(r[fieldName])).length;
+    return finish(count, count);
   }
   if (aggMethod === 'count_distinct') {
-    if (isVirtualCount) return records.length > 0 ? 1 : 0;
-    return new Set(records.map((r) => r[fieldName]).filter(meaningful).map(String)).size;
+    if (isVirtualCount) return finish(total > 0 ? 1 : 0, total);
+    const values = records.map(r => r[fieldName]).filter(meaningful);
+    return finish(new Set(values.map(String)).size, values.length);
   }
-  let sum = 0, count = 0, min = Infinity, max = -Infinity;
+  let sum = 0, count = 0, missing = 0, invalid = 0, min = Infinity, max = -Infinity;
   const numList = (aggMethod === 'median' || aggMethod === 'stddev') ? [] : null;
   for (const row of records) {
     const raw = row[fieldName];
-    if (!meaningful(raw)) continue;
+    if (!meaningful(raw)) { missing++; continue; }
     const value = typeof raw === 'number' ? raw : Number(String(raw).replace(/,/g, ''));
-    if (!Number.isFinite(value)) continue;
+    if (!Number.isFinite(value)) { invalid++; continue; }
     sum += value;
     count++;
     min = Math.min(min, value);
     max = Math.max(max, value);
     if (numList) numList.push(value);
   }
-  if (!count) return 0;
-  if (aggMethod === 'avg') return sum / count;
-  if (aggMethod === 'min') return min;
-  if (aggMethod === 'max') return max;
+  const result = value => finish(Number.isFinite(value) ? value : null, count, missing, invalid);
+  if (!count) return result(null);
+  if (aggMethod === 'avg') return result(sum / count);
+  if (aggMethod === 'min') return result(min);
+  if (aggMethod === 'max') return result(max);
   if (aggMethod === 'median') {
     numList.sort((a, b) => a - b);
     const mid = Math.floor(count / 2);
-    return count % 2 !== 0 ? numList[mid] : (numList[mid - 1] + numList[mid]) / 2;
+    return result(count % 2 !== 0 ? numList[mid] : (numList[mid - 1] + numList[mid]) / 2);
   }
   if (aggMethod === 'stddev') {
-    if (count <= 1) return 0;
+    if (count <= 1) return result(null);
     const mean = sum / count;
     const sqDiffSum = numList.reduce((acc, val) => acc + (val - mean) ** 2, 0);
-    return Math.sqrt(sqDiffSum / (count - 1));
+    return result(Math.sqrt(sqDiffSum / (count - 1)));
   }
-  return sum;
+  return result(sum);
 }
 
 export function calculatePivot(dataset, pivotConfig, onProgress) {
@@ -114,6 +124,12 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
         operandA: v.operandA,
         op: v.op,
         operandB: v.operandB,
+        operandAField: v.operandAField,
+        operandAAgg: v.operandAAgg,
+        operandBField: v.operandBField,
+        operandBAgg: v.operandBAgg,
+        formula: v.formula || '',
+        description: v.description || '',
       });
     } else {
       ignoredVals.push(v.field);
@@ -129,6 +145,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
     if (index % 10000 === 0) onProgress?.(5 + Math.round(index / Math.max(1, allRows.length) * 20));
     for (let i = 0; i < filters.length; i++) {
       const f = filters[i];
+      if (f.excludeAll) return false;
       if (f.selectedValues && f.selectedValues.length > 0) {
         const rawStr = String(record[f.field] ?? '');
         if (!f.selectedValues.includes(rawStr)) return false;
@@ -180,7 +197,8 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
     for (let rIdx = 0; rIdx < rowConfigs.length; rIdx++) {
       const rc = rowConfigs[rIdx];
       const seg = formatDimensionValue(rec[rc.field], rc, fieldMap.get(rc.field));
-      const nextKey = rIdx === 0 ? seg : `${curRowNode.key}||${seg}`;
+      const keySegment = encodeGroupSegment(seg);
+      const nextKey = rIdx === 0 ? keySegment : `${curRowNode.key}||${keySegment}`;
       let child = curRowNode.childrenMap.get(seg);
       if (!child) {
         guardGroupCount();
@@ -204,7 +222,8 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
     for (let cIdx = 0; cIdx < colConfigs.length; cIdx++) {
       const cc = colConfigs[cIdx];
       const seg = formatDimensionValue(rec[cc.field], cc, fieldMap.get(cc.field));
-      const nextKey = cIdx === 0 ? seg : `${curColNode.key}||${seg}`;
+      const keySegment = encodeGroupSegment(seg);
+      const nextKey = cIdx === 0 ? keySegment : `${curColNode.key}||${keySegment}`;
       let child = curColNode.childrenMap.get(seg);
       if (!child) {
         guardGroupCount();
@@ -321,11 +340,44 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
     if (isValueSortValid) {
       const dir = valueSort.direction === 'asc' ? 1 : -1;
       const targetValCfg = valConfigs.find((v) => v.id === valueSort.valueId) || valConfigs[0];
+      let targetFormulaAST = null;
+      if (targetValCfg?.isCalculated && targetValCfg?.formula) {
+        try {
+          targetFormulaAST = parseFormulaAST(targetValCfg.formula, dataset.fields);
+        } catch {}
+      }
       node.children.sort((a, b) => {
         const recsA = cellRecordsMap.get(`${a.key}@@${valueSort.colKey}`) || [];
         const recsB = cellRecordsMap.get(`${b.key}@@${valueSort.colKey}`) || [];
-        const valA = computeAggregation(recsA, targetValCfg.field, targetValCfg.agg);
-        const valB = computeAggregation(recsB, targetValCfg.field, targetValCfg.agg);
+        const evalVal = (recs) => {
+          if (targetValCfg.isCalculated) {
+            if (targetFormulaAST) {
+              return evaluateFormulaAST(targetFormulaAST, recs);
+            }
+            const valAConfig = valConfigs.find((v) => v.id === targetValCfg.operandA || v.field === targetValCfg.operandA);
+            const valBConfig = valConfigs.find((v) => v.id === targetValCfg.operandB || v.field === targetValCfg.operandB);
+            const fieldA = targetValCfg.operandAField || valAConfig?.field || (!targetValCfg.operandA?.startsWith('v_') ? targetValCfg.operandA : null);
+            const aggA = targetValCfg.operandAAgg || valAConfig?.agg || 'sum';
+            const fieldB = targetValCfg.operandBField || valBConfig?.field || (!targetValCfg.operandB?.startsWith('v_') ? targetValCfg.operandB : null);
+            const aggB = targetValCfg.operandBAgg || valBConfig?.agg || 'sum';
+            const valA = fieldA ? computeAggregation(recs, fieldA, aggA) : null;
+            const valB = fieldB ? computeAggregation(recs, fieldB, aggB) : null;
+            if (valA === null || valB === null) return null;
+            if (targetValCfg.op === '+') return valA + valB;
+            if (targetValCfg.op === '-') return valA - valB;
+            if (targetValCfg.op === '*') return valA * valB;
+            if (targetValCfg.op === '/') return valB !== 0 ? valA / valB : null;
+            return null;
+          }
+          return computeAggregation(recs, targetValCfg.field, targetValCfg.agg);
+        };
+        const valA = evalVal(recsA);
+        const valB = evalVal(recsB);
+        const aValid = valA !== null && valA !== undefined && Number.isFinite(valA);
+        const bValid = valB !== null && valB !== undefined && Number.isFinite(valB);
+        if (!aValid && !bValid) return 0;
+        if (!aValid) return 1;
+        if (!bValid) return -1;
         return dir * (valA - valB);
       });
     } else if (dimCfg && dimCfg.sort && dimCfg.sort !== 'none') {
@@ -438,6 +490,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
     throw new Error('透视结果超过 500,000 个单元格，可能内存不足；请减少列维度、指标或筛选数据后重试');
   }
   const rawValueMatrix = {};
+  const sampleStatsByValId = {};
   const displayMatrix = {};
   const statsByValId = {};
 
@@ -455,8 +508,9 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
       for (let vIdx = 0; vIdx < valConfigs.length; vIdx++) {
         const vc = valConfigs[vIdx];
         if (!vc.isCalculated) {
-          const rawVal = computeAggregation(recs, vc.field, vc.agg);
-          rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = rawVal;
+          const summary = aggregateWithSamples(recs, vc.field, vc.agg);
+          rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = summary.value;
+          if (r.isTotal && cg.isTotal) sampleStatsByValId[vc.id] = summary;
         }
       }
     }
@@ -464,20 +518,50 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
 
   // 对计算字段 (Calculated Measures) 执行跨指标聚合运算
   valConfigs.filter((vc) => vc.isCalculated).forEach((vc) => {
-    const valAConfig = valConfigs.find((v) => v.id === vc.operandA || v.field === vc.operandA);
-    const valBConfig = valConfigs.find((v) => v.id === vc.operandB || v.field === vc.operandB);
+    let formulaAST = null;
+    if (vc.formula) {
+      try {
+        formulaAST = parseFormulaAST(vc.formula, dataset.fields);
+      } catch {}
+    }
+    const targetFieldA = vc.operandAField || (!vc.operandA?.startsWith('v_') ? vc.operandA : null);
+    const targetAggA = vc.operandAAgg || 'sum';
+    const targetFieldB = vc.operandBField || (!vc.operandB?.startsWith('v_') ? vc.operandB : null);
+    const targetAggB = vc.operandBAgg || 'sum';
+    const valAConfig = valConfigs.find((v) => v.id === vc.operandA || (!v.isCalculated && v.field === targetFieldA && v.agg === targetAggA));
+    const valBConfig = valConfigs.find((v) => v.id === vc.operandB || (!v.isCalculated && v.field === targetFieldB && v.agg === targetAggB));
     for (let rIdx = 0; rIdx < tableRows.length; rIdx++) {
       const r = tableRows[rIdx];
+      const lookupRowKey = r.isSubtotal ? r.rowKey.replace('__SUBTOTAL__', '') : r.rowKey;
       for (let cIdx = 0; cIdx < allColGroups.length; cIdx++) {
         const cg = allColGroups[cIdx];
-        const valA = valAConfig ? (rawValueMatrix[`${r.rowKey}@@${cg.key}@@${valAConfig.id}`] ?? 0) : 0;
-        const valB = valBConfig ? (rawValueMatrix[`${r.rowKey}@@${cg.key}@@${valBConfig.id}`] ?? 0) : 0;
-        let calcVal = 0;
-        if (vc.op === '+') calcVal = valA + valB;
-        else if (vc.op === '-') calcVal = valA - valB;
-        else if (vc.op === '*') calcVal = valA * valB;
-        else if (vc.op === '/') calcVal = valB !== 0 ? (valA / valB) : 0;
-        rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = calcVal;
+        const recs = cellRecordsMap.get(`${lookupRowKey}@@${cg.key}`) || [];
+        let calcVal = null;
+        if (formulaAST) {
+          calcVal = evaluateFormulaAST(formulaAST, recs, (fName, fAgg) => {
+            const matchCfg = valConfigs.find((v) => !v.isCalculated && v.field === fName && v.agg === fAgg);
+            if (matchCfg) {
+              const cached = rawValueMatrix[`${r.rowKey}@@${cg.key}@@${matchCfg.id}`];
+              if (cached !== undefined) return cached;
+            }
+            return undefined;
+          });
+        } else {
+          let valA = valAConfig ? rawValueMatrix[`${r.rowKey}@@${cg.key}@@${valAConfig.id}`] : null;
+          let valB = valBConfig ? rawValueMatrix[`${r.rowKey}@@${cg.key}@@${valBConfig.id}`] : null;
+          if (valA === null || valA === undefined) {
+            if (targetFieldA) valA = computeAggregation(recs, targetFieldA, targetAggA);
+          }
+          if (valB === null || valB === undefined) {
+            if (targetFieldB) valB = computeAggregation(recs, targetFieldB, targetAggB);
+          }
+          if (valA === null || valA === undefined || valB === null || valB === undefined) calcVal = null;
+          else if (vc.op === '+') calcVal = valA + valB;
+          else if (vc.op === '-') calcVal = valA - valB;
+          else if (vc.op === '*') calcVal = valA * valB;
+          else if (vc.op === '/') calcVal = valB !== 0 ? (valA / valB) : null;
+        }
+        rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = Number.isFinite(calcVal) ? calcVal : null;
       }
     }
   });
@@ -492,7 +576,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
       for (let vIdx = 0; vIdx < valConfigs.length; vIdx++) {
         const vc = valConfigs[vIdx];
         const mKey = `${r.rowKey}@@${cg.key}@@${vc.id}`;
-        const rawVal = rawValueMatrix[mKey] ?? 0;
+        const rawVal = rawValueMatrix[mKey] ?? null;
         const grandVal = rawValueMatrix[`__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${vc.id}`] || 0;
         const rowTotVal = rawValueMatrix[`${r.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`] || 0;
         const colTotVal = rawValueMatrix[`__GRAND_TOTAL_ROW__@@${cg.key}@@${vc.id}`] || 0;
@@ -501,11 +585,11 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
         let isBaseline = false;
 
         if (vc.showAs === 'pct_grand') {
-          displayVal = grandVal !== 0 ? (rawVal / grandVal) * 100 : 0;
+          displayVal = grandVal !== 0 ? (rawVal / grandVal) * 100 : null;
         } else if (vc.showAs === 'pct_row') {
-          displayVal = rowTotVal !== 0 ? (rawVal / rowTotVal) * 100 : 0;
+          displayVal = rowTotVal !== 0 ? (rawVal / rowTotVal) * 100 : null;
         } else if (vc.showAs === 'pct_col') {
-          displayVal = colTotVal !== 0 ? (rawVal / colTotVal) * 100 : 0;
+          displayVal = colTotVal !== 0 ? (rawVal / colTotVal) * 100 : null;
         } else if (vc.showAs === 'prev_diff') {
           if (r.isTotal || r.isSubtotal) {
             isBaseline = true;
@@ -517,8 +601,8 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
               displayVal = 0;
             } else {
               const prevRow = nonTotalRows[idxInNonTotal - 1];
-              const prevVal = rawValueMatrix[`${prevRow.rowKey}@@${cg.key}@@${vc.id}`] ?? 0;
-              displayVal = rawVal - prevVal;
+              const prevVal = rawValueMatrix[`${prevRow.rowKey}@@${cg.key}@@${vc.id}`];
+              displayVal = prevVal === null || prevVal === undefined ? null : rawVal - prevVal;
             }
           }
         } else if (vc.showAs === 'pct_prev_diff') {
@@ -532,8 +616,8 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
               displayVal = 0;
             } else {
               const prevRow = nonTotalRows[idxInNonTotal - 1];
-              const prevVal = rawValueMatrix[`${prevRow.rowKey}@@${cg.key}@@${vc.id}`] ?? 0;
-              displayVal = prevVal !== 0 ? ((rawVal - prevVal) / Math.abs(prevVal)) * 100 : 0;
+              const prevVal = rawValueMatrix[`${prevRow.rowKey}@@${cg.key}@@${vc.id}`];
+              displayVal = prevVal !== null && prevVal !== undefined && prevVal !== 0 ? ((rawVal - prevVal) / Math.abs(prevVal)) * 100 : null;
             }
           }
         } else if (vc.showAs === 'running_total') {
@@ -548,16 +632,17 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
           }
         }
 
+        if (rawVal === null) displayVal = null;
         displayMatrix[mKey] = {
           raw: rawVal,
           display: displayVal,
           isBaseline,
-          pctGrand: grandVal !== 0 ? ((rawVal / grandVal) * 100).toFixed(1) : '0.0',
+          pctGrand: rawVal !== null && grandVal !== 0 ? ((rawVal / grandVal) * 100).toFixed(1) : null,
           pctRow: rowTotVal !== 0 ? ((rawVal / rowTotVal) * 100).toFixed(1) : '0.0',
           pctCol: colTotVal !== 0 ? ((rawVal / colTotVal) * 100).toFixed(1) : '0.0',
         };
 
-        if (!r.isTotal && !r.isSubtotal && !cg.isTotal && !isBaseline) {
+        if (displayVal !== null && !r.isTotal && !r.isSubtotal && !cg.isTotal && !isBaseline) {
           const st = statsByValId[vc.id];
           if (displayVal < st.min) st.min = displayVal;
           if (displayVal > st.max) st.max = displayVal;
@@ -582,6 +667,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
     colHeaderRows: colHeaderRows.filter((row) => row.length > 0),
     tableRows,
     rawValueMatrix,
+    sampleStatsByValId,
     displayMatrix,
     cellRecordsMap,
     statsByValId,

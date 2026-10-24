@@ -25,12 +25,12 @@ export function BinModal({
         ref={dialogRef}
         role="dialog" aria-modal="true" aria-label={t("字段分组设置")} tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-hidden animate-apple-modal"
+        className="w-full max-w-md max-h-[85dvh] rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl overflow-y-auto animate-apple-modal"
       >
-        <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between">
-          <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2]">{' ' + t("GROUPING // 字段分组设置 (")}{activeBinModal.item.field})
+        <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-start justify-between gap-2">
+          <h3 className="min-w-0 [overflow-wrap:anywhere] text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2]">{' ' + t("GROUPING // 字段分组设置 (")}{activeBinModal.item.field})
           </h3>
-          <button onClick={onClose} aria-label={t("关闭字段分组设置")} className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-ink-muted hover:text-[#F92672]">
+          <button onClick={onClose} aria-label={t("关闭字段分组设置")} className="shrink-0 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-ink-muted hover:text-[#F92672]">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -65,18 +65,20 @@ export function BinModal({
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] text-ink-muted mb-1 apple-font-mono">{t("起始值 (Start):")}</label>
+                <label htmlFor="bin-start" className="block text-[11px] text-ink-muted mb-1 apple-font-mono">{t("起始值 (Start):")}</label>
                 <input
                   type="number"
+                  id="bin-start"
                   value={binFormState.start}
                   onChange={(e) => setBinFormState((p) => ({ ...p, start: e.target.value }))}
                   className="w-full px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] apple-font-mono"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-ink-muted mb-1 apple-font-mono">{t("区间步长 (Step > 0):")}</label>
+                <label htmlFor="bin-step" className="block text-[11px] text-ink-muted mb-1 apple-font-mono">{t("区间步长 (Step > 0):")}</label>
                 <input
                   type="number"
+                  id="bin-step"
                   value={binFormState.step}
                   onChange={(e) => setBinFormState((p) => ({ ...p, step: e.target.value }))}
                   className="w-full px-3 py-1.5 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] apple-font-mono"

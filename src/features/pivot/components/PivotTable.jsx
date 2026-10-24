@@ -3,9 +3,10 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import {
   ArrowUp, ArrowDown, ArrowUpDown, Sparkles, StretchHorizontal,
   RotateCcw, Columns, Rows, AlignCenter, AlignLeft, AlignRight, Copy, Check,
-  Maximize2, Minimize2, Filter, Palette
+  Maximize2, Minimize2, Filter, Palette, GripVertical, X, Info
 } from 'lucide-react';
-import { AGG_METHODS } from '../../../constants/pivotConstants';
+import { AGG_METHODS, SHOW_AS_MODES, buildDefaultPivotConfig } from '../../../constants/pivotConstants';
+import { decodeGroupPath } from '../../../utils/groupKeys.js';
 import { getColorScaleStyle, formatCellNumber, getDimDisplayLabel } from '../../../utils/formatters';
 import { calculateAutoFitColumnWidths, calculateSingleColumnAutoFit } from '../../../utils/tableAutoFit';
 
@@ -43,10 +44,25 @@ export function PivotTable({
   setViewMode,
   copyTextToClipboard,
   showToast,
+  onAddRecordCount,
+  isReadOnly,
+  draggingPayload,
+  setDraggingPayload,
+  dragOverZone,
+  setDragOverZone,
+  addFieldToZone,
+  removeZoneItem,
+  moveZoneItem,
+  setHeaderFilterSearch,
+  setActiveHeaderFilterModal,
+  setBinFormState,
+  setActiveBinModal,
+  transposeRowsAndColumns,
 }) {
   // Local fallback if tableSettings not passed as props
   const [localTableSettings, setLocalTableSettings] = useState({
-    density: 'normal', // 'compact' | 'normal' | 'relaxed' | 'auto'
+    density: 'compact', // 'compact' | 'normal' | 'relaxed' | 'auto'
+    colWidthMode: 'equal', // 'equal' | 'autofit' | 'custom'
     dataAlignment: 'center', // 'center' | 'left' | 'right' (Default: Centered)
     showZebra: true,
     wrapText: false,
@@ -60,6 +76,7 @@ export function PivotTable({
   // Dragging state for column resizing & full-height ghost guideline
   const [showMobileDisplaySettings, setShowMobileDisplaySettings] = useState(false);
   const [resizingCol, setResizingCol] = useState(null); // { colKey, startX, startWidth }
+
   const [dragClientX, setDragClientX] = useState(null);
   const [copiedCellKey, setCopiedCellKey] = useState(null);
 
@@ -69,10 +86,12 @@ export function PivotTable({
 
   // Horizontal scroll state for dynamic shadow masks
   const [scrollState, setScrollState] = useState({ hasLeft: false, hasRight: false });
+  const [tableViewportWidth, setTableViewportWidth] = useState(0);
 
   const updateScrollState = useCallback(() => {
     const el = tableContainerRef?.current;
     if (!el) return;
+    setTableViewportWidth(width => width === el.clientWidth ? width : el.clientWidth);
     const hasLeft = el.scrollLeft > 4;
     const hasRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 6;
     setScrollState((prev) => {
@@ -123,10 +142,9 @@ export function PivotTable({
   },[activeSlicerField,requestProfile,showToast]);
 
   // Current selected slicer values
-  const currentSlicerSelected = useMemo(() => {
-    const fObj = (pivotConfig?.filters || []).find((f) => f.field === activeSlicerField);
-    return fObj?.selectedValues || [];
-  }, [pivotConfig?.filters, activeSlicerField]);
+  const currentSlicerFilter = useMemo(() => (pivotConfig?.filters || []).find((f) => f.field === activeSlicerField), [pivotConfig?.filters, activeSlicerField]);
+  const currentSlicerSelected = currentSlicerFilter?.selectedValues || [];
+  const slicerSelectsAll = !currentSlicerFilter?.excludeAll && currentSlicerSelected.length === 0;
 
   const handleSlicerToggle = useCallback((val) => {
     soundEngine?.playClick?.(540);
@@ -141,13 +159,13 @@ export function PivotTable({
       }
       const fObj = existingFilters[fIdx] || { field: activeSlicerField, selectedValues: [] };
       const curSelected = fObj.selectedValues || [];
-      const nextSelected = curSelected.includes(val) ? [] : [val];
+      const nextSelected = !fObj.excludeAll && curSelected.length === 1 && curSelected[0] === val ? [] : [val];
       const nextFilters = [...existingFilters];
       if (fIdx >= 0) {
         if (nextSelected.length === 0) {
           nextFilters.splice(fIdx, 1);
         } else {
-          nextFilters[fIdx] = { ...fObj, selectedValues: nextSelected };
+          nextFilters[fIdx] = { ...fObj, excludeAll: false, selectedValues: nextSelected };
         }
       } else if (nextSelected.length > 0) {
         nextFilters.push({ field: activeSlicerField, selectedValues: nextSelected });
@@ -233,6 +251,7 @@ export function PivotTable({
       const nextWidth = Math.max(64, Math.min(600, resizingCol.startWidth + delta));
       setTableSettings((prev) => ({
         ...prev,
+        colWidthMode: 'custom',
         customColWidths: {
           ...(prev.customColWidths || {}),
           [resizingCol.colKey]: nextWidth,
@@ -288,10 +307,30 @@ export function PivotTable({
     return pivotResult.rowConfigs.reduce((sum, _, idx) => sum + getRowColWidth(idx), 0);
   }, [pivotResult.rowConfigs, tableSettings.customColWidths]);
 
+  const currentColWidthMode = tableSettings.colWidthMode || 'equal';
+  const equalValColWidth = useMemo(() => {
+    const containerW = tableViewportWidth || tableContainerRef?.current?.clientWidth || 900;
+    const availableW = Math.max(120, containerW - totalRowHeaderWidth - 24);
+    const totalValCols = (pivotResult.allColGroups?.length || 0) * Math.max(1, pivotResult.valConfigs?.length || 1);
+    if (totalValCols === 0) return defaultValColWidth;
+    return Math.max(88, Math.min(260, Math.floor(availableW / totalValCols)));
+  }, [tableViewportWidth, tableContainerRef, totalRowHeaderWidth, pivotResult.allColGroups?.length, pivotResult.valConfigs?.length]);
+
   const getValColWidth = (cGroupKey, valId) => {
     const colKey = `${cGroupKey}_${valId}`;
-    return tableSettings.customColWidths?.[colKey] || defaultValColWidth;
+    if (tableSettings.customColWidths?.[colKey]) {
+      return tableSettings.customColWidths[colKey];
+    }
+    if (currentColWidthMode === 'equal') {
+      return equalValColWidth;
+    }
+    return defaultValColWidth;
   };
+  const narrowTable = tableViewportWidth > 0 && tableViewportWidth < 640;
+  const tableWidth = totalRowHeaderWidth + pivotResult.allColGroups.reduce((sum,group) => sum + pivotResult.valConfigs.reduce((valueSum,metric) => valueSum + getValColWidth(group.key,metric.id),0),0);
+  const freezeAllRowHeaders = !tableViewportWidth || totalRowHeaderWidth < tableViewportWidth * 0.7;
+  const freezeRowHeaders = chartSpecConfig.stickyRowHeaders && freezeAllRowHeaders;
+  const freezeRowSpan = (index,span=1) => chartSpecConfig.stickyRowHeaders && (freezeAllRowHeaders || (index===0 && span===1 && getRowColWidth(0)<tableViewportWidth*0.7));
 
   // Grand Total Row separation: pinned to sticky tfoot
   const grandTotalRow = useMemo(() => {
@@ -352,6 +391,7 @@ export function PivotTable({
     const newWidths = calculateAutoFitColumnWidths(pivotResult, tableSettings.customColWidths);
     setTableSettings((prev) => ({
       ...prev,
+      colWidthMode: 'autofit',
       customColWidths: newWidths,
     }));
     setTimeout(updateScrollState, 50);
@@ -364,6 +404,7 @@ export function PivotTable({
     const fitWidth = calculateSingleColumnAutoFit(colKey, pivotResult);
     setTableSettings((prev) => ({
       ...prev,
+      colWidthMode: 'custom',
       customColWidths: {
         ...(prev.customColWidths || {}),
         [colKey]: fitWidth,
@@ -385,11 +426,12 @@ export function PivotTable({
     const nextWidths = { ...(tableSettings.customColWidths || {}) };
     for (const cGroup of pivotResult.allColGroups) {
       for (const vCfg of pivotResult.valConfigs) {
-        nextWidths[`${cGroup.key}_${vCfg.id}`] = equalW;
+        delete nextWidths[`${cGroup.key}_${vCfg.id}`];
       }
     }
     setTableSettings((prev) => ({
       ...prev,
+      colWidthMode: 'equal',
       customColWidths: nextWidths,
     }));
     setTimeout(updateScrollState, 50);
@@ -401,6 +443,7 @@ export function PivotTable({
     soundEngine?.playClick?.(480);
     setTableSettings((prev) => ({
       ...prev,
+      colWidthMode: 'equal',
       customColWidths: {},
     }));
     setTimeout(updateScrollState, 50);
@@ -422,12 +465,13 @@ export function PivotTable({
   };
 
   // Density & Alignment CSS classes
+  const currentDensity = tableSettings.density || 'compact';
   const densityCellPadding = {
     compact: 'px-2.5 py-1 text-[10.5px]',
     normal: 'px-3.5 py-2 text-[11px]',
     relaxed: 'px-4 py-3 text-xs',
     auto: 'px-3.5 py-2.5 text-[11px]',
-  }[tableSettings.density || 'normal'];
+  }[currentDensity];
 
   const isWrapMode = tableSettings.density === 'auto' || tableSettings.wrapText;
   const cellWrapCls = isWrapMode ? 'whitespace-normal break-words leading-snug' : 'whitespace-nowrap';
@@ -448,14 +492,20 @@ export function PivotTable({
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden select-text relative">
-      {/* 0 matching records alert */}
+      {pivotConfig?.values?.length === 0 && (
+        <div data-testid="analysis-start" className="px-4 py-3 border-b border-[#D6D4C8] dark:border-[#3E3D32] text-sm leading-6 shrink-0">
+          <p className="font-semibold">{t('还没有数值指标')}</p>
+          <p>{t('从字段列表点击 +值，或先统计记录数。添加行维度后，可查看每个类别有多少条记录。')}</p>
+          <button type="button" disabled={isReadOnly} onClick={onAddRecordCount} className="mt-2 px-3 py-1.5 rounded bg-action text-white font-semibold disabled:opacity-40">{t('统计记录数')}</button>
+        </div>
+      )}
       {pivotResult.filteredCount === 0 && (
         <div className="bg-[#FD971F]/15 border-b border-[#FD971F]/30 px-4 py-2 flex items-center justify-between text-xs shrink-0">
           <span className="text-ink-orange apple-font-mono">{t("当前筛选条件下匹配 0 条记录")}</span>
           <button
             onClick={() => setPivotConfig((prev) => ({
               ...prev,
-              filters: prev.filters.map((f) => ({ ...f, selectedValues: [] })),
+              filters: prev.filters.map((f) => ({ ...f, excludeAll: false, selectedValues: [] })),
               rows: prev.rows.map((r) => ({ ...r, excludedValues: [] })),
               columns: prev.columns.map((c) => ({ ...c, excludedValues: [] })),
             }))}
@@ -464,17 +514,9 @@ export function PivotTable({
         </div>
       )}
 
-      {/* Horizontal scroll helper note */}
-      {pivotResult.allColGroups.length > 35 && (
-        <div className="bg-[#66D9EF]/10 border-b border-[#66D9EF]/25 px-4 py-1.5 flex items-center justify-between text-[10px] apple-font-mono text-ink-cyan shrink-0">
-          <span>{t("提示：当前生成了") + ' '}{pivotResult.allColGroups.length}{' ' + t("组交叉列头，已启用水平滚动视图")}</span>
-          <span className="hidden sm:inline">{t("按住 Shift + 鼠标滚轮可快速横向浏览")}</span>
-        </div>
-      )}
-
       {/* Universal Slicer Pills Bar (通用快捷切片器胶囊条) */}
       {slicerFields.length > 0 && slicerValuePills.length > 0 && (
-        <div className="bg-[#FAF8F1] dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1.5 flex items-center gap-2 overflow-x-auto text-[10px] apple-font-mono shrink-0 select-none">
+        <div className="bg-[#FAF8F1] dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1 flex items-center gap-2 overflow-x-auto text-[10px] apple-font-mono shrink-0 select-none">
           <div className="flex items-center gap-1.5 shrink-0 text-ink-muted font-bold">
             <Filter className="w-3 h-3 text-ink-green" />
             <span className="hidden sm:inline">{t("切片器:")}</span>
@@ -496,8 +538,9 @@ export function PivotTable({
           <div className="flex items-center gap-1 overflow-x-auto min-w-0 pr-1">
             <button
               onClick={() => handleSlicerToggle(null)}
+              aria-pressed={slicerSelectsAll}
               className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-semibold transition shrink-0 ${
-                currentSlicerSelected.length === 0
+                slicerSelectsAll
                   ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
                   : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
               }`}
@@ -508,6 +551,7 @@ export function PivotTable({
                 <button
                   key={p.label}
                   onClick={() => handleSlicerToggle(p.label)}
+                  aria-pressed={isSelected}
                   className={`px-2 py-0.5 rounded-full text-[9.5px] font-medium transition shrink-0 flex items-center gap-1 ${
                     isSelected
                       ? 'bg-[#66D9EF] text-[#1E1F1C] font-bold shadow-xs'
@@ -529,12 +573,12 @@ export function PivotTable({
         aria-expanded={showMobileDisplaySettings}
         aria-controls="pivot-table-display-settings"
         onClick={() => setShowMobileDisplaySettings(open => !open)}
-        className="md:hidden shrink-0 flex items-center justify-between px-3 py-2 border-b border-[#D6D4C8] dark:border-[#3E3D32] text-ink-cyan font-semibold"
+        className="md:hidden shrink-0 flex items-center justify-between px-3 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] text-ink-cyan font-semibold text-xs"
       >
         <span>{t('表格显示设置')}</span>
         <span>{showMobileDisplaySettings ? t('收起') : t('展开')}</span>
       </button>
-      <div id="pivot-table-display-settings" className={`${showMobileDisplaySettings ? 'flex' : 'hidden'} md:flex bg-[#EFECE1]/90 dark:bg-[#1E1F1C]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] apple-font-mono shrink-0 select-none`}>
+      <div id="pivot-table-display-settings" className={`${showMobileDisplaySettings ? 'flex' : 'hidden'} md:flex bg-[#EFECE1]/90 dark:bg-[#1E1F1C]/90 border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1 flex flex-wrap items-center justify-between gap-1.5 text-[10.5px] apple-font-mono shrink-0 select-none`}>
         {/* Left: Column Width & Row Height & Alignment */}
         <div className="flex flex-wrap items-center gap-2">
           {/* 列宽控制组 */}
@@ -545,16 +589,26 @@ export function PivotTable({
             </span>
             <button
               onClick={handleAutoFitAll}
+              aria-pressed={currentColWidthMode === 'autofit'}
               title={t("根据当前数据和表头内容，一键自动优化所有列宽")}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#66D9EF]/15 text-ink-cyan hover:bg-[#66D9EF]/25 active:scale-95 transition"
+              className={`flex items-center gap-1 px-2 py-0.5 min-h-[24px] rounded-md text-[10px] font-semibold active:scale-95 transition ${
+                currentColWidthMode === 'autofit'
+                  ? 'bg-[#66D9EF] text-[#1E1F1C] shadow-xs'
+                  : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
             >
               <Sparkles className="w-2.5 h-2.5" />
               <span>{t("自适应列宽")}</span>
             </button>
             <button
               onClick={handleEqualizeColumns}
+              aria-pressed={currentColWidthMode === 'equal'}
               title={t("在可视窗口内均分指标列宽")}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-black/5 dark:hover:bg-white/5 transition"
+              className={`flex items-center gap-1 px-1.5 py-0.5 min-h-[24px] rounded-md text-[10px] font-semibold active:scale-95 transition ${
+                currentColWidthMode === 'equal'
+                  ? 'bg-[#66D9EF] text-[#1E1F1C] shadow-xs'
+                  : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-black/5 dark:hover:bg-white/5'
+              }`}
             >
               <StretchHorizontal className="w-2.5 h-2.5" />
               <span>{t("均分")}</span>
@@ -562,7 +616,7 @@ export function PivotTable({
             <button
               onClick={handleResetColWidths}
               title={t("恢复默认列宽")}
-              className="px-1.5 py-0.5 rounded-md text-[10px] text-ink-muted hover:text-[#F92672] hover:bg-black/5 dark:hover:bg-white/5 transition"
+              className="px-1.5 py-0.5 min-w-[24px] min-h-[24px] inline-flex items-center justify-center rounded-md text-[10px] text-ink-muted hover:text-[#F92672] hover:bg-black/5 dark:hover:bg-white/5 transition"
             >
               <RotateCcw className="w-2.5 h-2.5" />
             </button>
@@ -582,6 +636,7 @@ export function PivotTable({
             ].map((d) => (
               <button
                 key={d.id}
+                aria-pressed={currentDensity === d.id}
                 onClick={() => {
                   soundEngine?.playClick?.(520);
                   setTableSettings((p) => ({
@@ -591,8 +646,8 @@ export function PivotTable({
                   }));
                   showToast?.(`行高已设为: ${d.label}`);
                 }}
-                className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold transition ${
-                  tableSettings.density === d.id
+                className={`px-1.5 py-0.5 min-h-[24px] inline-flex items-center justify-center rounded-md text-[10px] font-semibold transition ${
+                  currentDensity === d.id
                     ? 'bg-[#FD971F] text-[#1E1F1C] shadow-xs'
                     : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
                 }`}
@@ -612,7 +667,7 @@ export function PivotTable({
                 showToast?.('数据已设置为居中对齐');
               }}
               title={t("数据居中对齐 (当前默认推荐)")}
-              className={`px-1.5 py-0.5 rounded-md flex items-center gap-1 text-[10px] font-semibold transition ${
+              className={`px-1.5 py-0.5 min-h-[24px] rounded-md flex items-center gap-1 text-[10px] font-semibold transition ${
                 currentAlignment === 'center'
                   ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
                   : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
@@ -628,7 +683,7 @@ export function PivotTable({
                 showToast?.('数据已设置为靠左对齐');
               }}
               title={t("数据靠左对齐")}
-              className={`p-1 rounded-md transition ${
+              className={`p-1 min-w-[24px] min-h-[24px] inline-flex items-center justify-center rounded-md transition ${
                 currentAlignment === 'left'
                   ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
                   : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
@@ -643,7 +698,7 @@ export function PivotTable({
                 showToast?.('数据已设置为靠右对齐');
               }}
               title={t("数据靠右对齐")}
-              className={`p-1 rounded-md transition ${
+              className={`p-1 min-w-[24px] min-h-[24px] inline-flex items-center justify-center rounded-md transition ${
                 currentAlignment === 'right'
                   ? 'bg-[#A6E22E] text-[#1E1F1C] shadow-xs'
                   : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
@@ -654,23 +709,24 @@ export function PivotTable({
           </div>
         </div>
 
-        {/* Reserve selection badge space to keep pointer targets stable. */}
+        {/* Selection badge and table toggles */}
         <div className="flex flex-wrap max-w-full items-center gap-2">
-            <div aria-hidden={!selectionRange} className={`w-[170px] shrink-0 ${selectionRange ? '' : 'invisible pointer-events-none'} flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-ink-cyan text-[10px] font-semibold`}>
+          {selectionRange && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-ink-cyan text-[10px] font-semibold animate-fadeIn">
               <span className="truncate">{' ' + t("选区:") + ' '}{Math.abs((selectionRange?.endRow || 0) - (selectionRange?.startRow || 0)) + 1}{t("行 ×") + ' '}{Math.abs((selectionRange?.endCol || 0) - (selectionRange?.startCol || 0)) + 1}{t("列") + ' '}</span>
-              <kbd className="px-1 py-0.2 rounded bg-black/10 dark:bg-white/10 text-[9px]">{t("⌘C 复制")}</kbd>
+              <kbd className="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 text-[9px]">{t("⌘C 复制")}</kbd>
               <button
                 onClick={() => setSelectionRange(null)}
-                className="hover:text-[#F92672] px-1 text-xs font-bold leading-none"
+                className="hover:text-[#F92672] min-w-[24px] min-h-[24px] inline-flex items-center justify-center text-xs font-bold leading-none rounded"
                 title={t("清除选区 (Esc)")}
                 aria-label={t("清除选区")}
               >
                 ×
               </button>
             </div>
+          )}
 
-
-          <label className="inline-flex items-center gap-1 text-[10px] text-ink-muted cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("开启或隐藏行分组多级小计 (Subtotals)")}>
+          <label className="inline-flex items-center gap-1 text-[10px] text-ink-muted cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2] min-h-[24px]" title={t("开启或隐藏行分组多级小计 (Subtotals)")}>
             <input
               type="checkbox"
               aria-label={t("显示行分组多级小计")}
@@ -686,7 +742,7 @@ export function PivotTable({
             <span>{t("分组小计")}</span>
           </label>
 
-          <label className="inline-flex items-center gap-1 text-[10px] text-ink-muted cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("标注每列最高值(●)与负数语义色")}>
+          <label className="inline-flex items-center gap-1 text-[10px] text-ink-muted cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2] min-h-[24px]" title={t("标注每列最高值(●)与负数语义色")}>
             <input
               type="checkbox"
               aria-label={t("标注每列最高值与极值锚点")}
@@ -697,7 +753,7 @@ export function PivotTable({
             <span>{t("极值锚点")}</span>
           </label>
 
-          <label className="inline-flex items-center gap-1 text-[10px] text-ink-muted cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2]" title={t("开启或隐藏隔行斑马纹背景")}>
+          <label className="inline-flex items-center gap-1 text-[10px] text-ink-muted cursor-pointer hover:text-[#272822] dark:hover:text-[#F8F8F2] min-h-[24px]" title={t("开启或隐藏隔行斑马纹背景")}>
             <input
               type="checkbox"
               aria-label={t("启用表格隔行斑马纹背景")}
@@ -719,7 +775,7 @@ export function PivotTable({
                   return { ...p, colorScale: nextScale };
                 });
               }}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border transition ${
+              className={`inline-flex items-center gap-1 px-2 py-0.5 min-h-[24px] rounded-md text-[10px] font-semibold border transition ${
                 condFormat?.colorScale && condFormat.colorScale !== 'none'
                   ? 'bg-[#FD971F]/20 text-ink-orange border-[#FD971F]/50 shadow-xs'
                   : 'bg-[#FFFDF7] dark:bg-[#272822] border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
@@ -735,7 +791,7 @@ export function PivotTable({
           {setViewMode && (
             <button
               onClick={handleToggleTableFocus}
-              className={`p-1 rounded-md border text-[10px] font-semibold transition ${
+              className={`p-1 min-w-[24px] min-h-[24px] inline-flex items-center justify-center rounded-md border text-[10px] font-semibold transition ${
                 viewMode === 'table'
                   ? 'bg-action text-[#F8F8F2] border-[#F92672]'
                   : 'bg-[#FFFDF7] dark:bg-[#272822] border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
@@ -754,6 +810,9 @@ export function PivotTable({
       {/* Main Table Container with Horizontal Scroll Tracking */}
       <div
         ref={tableContainerRef}
+        tabIndex={0}
+        role="region"
+        aria-label={t('透视表结果，可横向滚动')}
         onScroll={(e) => {
           setScrollTop?.(e.currentTarget.scrollTop);
           updateScrollState();
@@ -761,7 +820,7 @@ export function PivotTable({
         className="flex-1 h-full min-h-0 overflow-auto relative"
       >
         {/* Horizontal Scroll Shadow Masks */}
-        {scrollState.hasLeft && chartSpecConfig.stickyRowHeaders && (
+        {scrollState.hasLeft && freezeRowHeaders && (
           <div
             style={{ left: `${totalRowHeaderWidth}px` }}
             className="absolute top-0 bottom-0 w-4 pointer-events-none z-25 bg-gradient-to-r from-black/20 dark:from-black/45 to-transparent transition-opacity"
@@ -783,7 +842,11 @@ export function PivotTable({
           />
         )}
 
-        <table id="pivot-main-html-table" role="table" className="border-separate border-spacing-0 text-[11px] select-text tabular-nums min-w-full">
+        <table id="pivot-main-html-table" role="table" style={narrowTable ? {tableLayout:'fixed',width:tableWidth} : undefined} className="border-separate border-spacing-0 text-[11px] select-text tabular-nums min-w-full">
+          {narrowTable && <colgroup>
+            {Array.from({length:Math.max(1,pivotResult.rowConfigs.length)},(_,index)=><col key={`row-${index}`} style={{width:getRowColWidth(index)}} />)}
+            {pivotResult.allColGroups.flatMap(group=>pivotResult.valConfigs.map(metric=><col key={`${group.key}-${metric.id}`} style={{width:getValColWidth(group.key,metric.id)}} />))}
+          </colgroup>}
           <thead role="rowgroup" className="sticky top-0 z-20 bg-[#EFECE1]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-md text-[#272822] dark:text-[#F8F8F2] shadow-sm">
             {/* Top-level Column Group Headers */}
             {pivotResult.colConfigs.length > 0 && pivotResult.colHeaderRows.length > 0 && (
@@ -797,10 +860,10 @@ export function PivotTable({
                       style={{
                         width: `${totalRowHeaderWidth}px`,
                         minWidth: `${totalRowHeaderWidth}px`,
-                        left: chartSpecConfig.stickyRowHeaders ? 0 : undefined,
+                        left: freezeRowHeaders ? 0 : undefined,
                       }}
                       className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-ink-muted apple-font-mono ${
-                        chartSpecConfig.stickyRowHeaders
+                        freezeRowHeaders
                           ? 'sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]'
                           : ''
                       }`}
@@ -863,6 +926,7 @@ export function PivotTable({
                   const rowColKey = `row_${rDim.id}`;
                   const colW = getRowColWidth(rIdx);
                   const stickyL = getRowColStickyLeft(rIdx);
+                  const freezeRowHeaders = freezeRowSpan(rIdx);
 
                   return (
                     <th
@@ -881,10 +945,10 @@ export function PivotTable({
                       style={{
                         width: `${colW}px`,
                         minWidth: `${colW}px`,
-                        left: chartSpecConfig.stickyRowHeaders ? `${stickyL}px` : undefined,
+                        left: freezeRowHeaders ? `${stickyL}px` : undefined,
                       }}
                       className={`relative group border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] ${densityCellPadding} font-semibold text-ink-pink apple-font-mono ${cellWrapCls} cursor-pointer hover:bg-black/[0.04] dark:hover:bg-[#2D2E27] transition ${
-                        chartSpecConfig.stickyRowHeaders
+                        freezeRowHeaders
                           ? `sticky z-30 ${isLastRowDim ? 'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]' : ''}`
                           : ''
                       }`}
@@ -923,10 +987,10 @@ export function PivotTable({
                   style={{
                     width: `${tableSettings.customColWidths?.['row_summary'] || defaultRowColWidth}px`,
                     minWidth: `${tableSettings.customColWidths?.['row_summary'] || defaultRowColWidth}px`,
-                    left: chartSpecConfig.stickyRowHeaders ? 0 : undefined,
+                    left: freezeRowHeaders ? 0 : undefined,
                   }}
                   className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] px-3.5 py-2 font-semibold text-ink-pink ${
-                    chartSpecConfig.stickyRowHeaders ? 'sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]' : ''
+                    freezeRowHeaders ? 'sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]' : ''
                   }`}
                 >{' ' + t("汇总维度") + ' '}</th>
               )}
@@ -968,7 +1032,7 @@ export function PivotTable({
                       }`}
                     >
                       <span className={`inline-flex items-center gap-1 ${dataFlexAlignCls} w-full`}>
-                        <span className="truncate">{vCfg.field} ({aggShort})</span>
+                        <span className="truncate">{vCfg.field === '__COUNT__' ? t('记录数') : vCfg.field} ({aggShort})</span>
                         {isSortedCol && (
                           pivotConfig.valueSort.direction === 'asc' ? (
                             <ArrowUp className="w-3 h-3 text-ink-green shrink-0" />
@@ -1003,6 +1067,74 @@ export function PivotTable({
             {visibleRowWindow.topPadding > 0 && (
               <tr style={{ height: visibleRowWindow.topPadding }}><td colSpan={999} /></tr>
             )}
+            {bodyRows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={Math.max(1, pivotResult?.rowConfigs?.length || 1) + Math.max(1, (pivotResult?.allColGroups?.length || 1) * Math.max(1, pivotResult?.valConfigs?.length || 1))}
+                  className="py-12 px-6 text-center text-xs text-ink-muted bg-[#FFFDF7]/60 dark:bg-[#1E1F1C]/60"
+                >
+                  {pivotResult?.filteredRowCount === 0 && (pivotResult?.totalRowCount || 0) > 0 ? (
+                    <div className="space-y-2 max-w-md mx-auto">
+                      <p className="font-semibold text-ink-orange">
+                        {t('当前筛选条件排除了全部记录（0 条匹配）')}
+                      </p>
+                      <p className="text-[11px] text-ink-muted leading-relaxed">
+                        {t('请在左侧【筛选条件】或表头筛选中取消勾选排除项，或点击下方重置筛选。')}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPivotConfig?.((prev) => ({
+                            ...prev,
+                            filters: [],
+                            rows: (prev.rows || []).map((r) => ({ ...r, excludedValues: [] })),
+                            columns: (prev.columns || []).map((c) => ({ ...c, excludedValues: [] })),
+                          }));
+                          showToast?.('已清空全部筛选条件');
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-[#A6E22E] bg-[#A6E22E]/15 text-ink-green font-semibold text-xs apple-font-mono hover:scale-105 transition"
+                      >
+                        {t('清空全部筛选条件')}
+                      </button>
+                    </div>
+                  ) : (pivotResult?.rowConfigs?.length || 0) === 0 && (pivotResult?.valConfigs?.length || 0) === 0 ? (
+                    <div className="space-y-2 max-w-md mx-auto">
+                      <p className="font-semibold text-[#272822] dark:text-[#F8F8F2]">
+                        {t('透视表未配置分组维度与数值指标')}
+                      </p>
+                      <p className="text-[11px] text-ink-muted leading-relaxed">
+                        {t('点击左侧字段旁的【+行】添加分组，或点击【+值】添加统计指标；也可点击左上方「智能透视推荐」一键生成分析。')}
+                      </p>
+                      <div className="flex items-center justify-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (currentDataset?.fields?.length) {
+                              setPivotConfig?.(buildDefaultPivotConfig(currentDataset));
+                              showToast?.('已应用推荐透视结构');
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg border border-[#66D9EF] bg-[#66D9EF]/15 text-ink-cyan font-semibold text-xs apple-font-mono hover:scale-105 transition"
+                        >
+                          {t('一键应用推荐透视')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onAddRecordCount}
+                          className="px-3 py-1.5 rounded-lg border border-[#FD971F] bg-[#FD971F]/15 text-ink-orange font-semibold text-xs apple-font-mono hover:scale-105 transition"
+                        >
+                          {t('+ 添加记录数指标')}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-ink-muted">
+                      {t('当前视图无行维度分组数据。可在左侧为行区域添加维度以展开明细。')}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            )}
             {bodyRows.map((row, rowIdx) => {
               const isHighlighted = highlightedRowKey === row.rowKey;
               const isRowCrosshair = hoveredCellTelemetry?.rowKey === row.rowKey;
@@ -1031,6 +1163,7 @@ export function PivotTable({
                       const isStickyEdge = (hCell.level + hCell.colSpan) >= Math.max(1, pivotResult.rowConfigs.length);
                       const colW = getRowColSpanWidth(hCell.level, hCell.colSpan);
                       const stickyL = getRowColStickyLeft(hCell.level);
+                      const freezeRowHeaders = freezeRowSpan(hCell.level,hCell.colSpan);
 
                       return (
                         <td
@@ -1047,12 +1180,12 @@ export function PivotTable({
                           style={{
                             width: `${colW}px`,
                             minWidth: `${colW}px`,
-                            left: chartSpecConfig.stickyRowHeaders ? `${stickyL}px` : undefined,
+                            left: freezeRowHeaders ? `${stickyL}px` : undefined,
                           }}
                           className={`border border-[#D6D4C8] dark:border-[#3E3D32] ${densityCellPadding} align-middle ${cellWrapCls} cursor-pointer font-medium transition-colors ${
                             isHeaderCellCrosshair ? 'text-ink-pink font-semibold' : ''
                           } ${
-                            chartSpecConfig.stickyRowHeaders
+                            freezeRowHeaders
                               ? `sticky z-10 ${
                                   row.isSubtotal
                                     ? 'bg-[#EDF8FA] dark:bg-[#202728]'
@@ -1086,12 +1219,13 @@ export function PivotTable({
                   ) : (
                     (() => {
                       const totalRowDimCols = Math.max(1, pivotResult.rowConfigs.length);
-                      const segs = row.rowKey.replace('__SUBTOTAL__', '').split('||');
+                      const segs = decodeGroupPath(row.rowKey);
                       return segs.map((seg, sIdx) => {
                         const isEdge = sIdx === segs.length - 1;
                         const cSpan = isEdge ? totalRowDimCols - segs.length + 1 : 1;
                         const colW = getRowColSpanWidth(sIdx, cSpan);
                         const stickyL = getRowColStickyLeft(sIdx);
+                        const freezeRowHeaders = freezeRowSpan(sIdx,cSpan);
 
                         return (
                           <td
@@ -1101,10 +1235,10 @@ export function PivotTable({
                             style={{
                               width: `${colW}px`,
                               minWidth: `${colW}px`,
-                              left: chartSpecConfig.stickyRowHeaders ? `${stickyL}px` : undefined,
+                              left: freezeRowHeaders ? `${stickyL}px` : undefined,
                             }}
                             className={`border border-[#D6D4C8] dark:border-[#3E3D32] ${densityCellPadding} ${cellWrapCls} ${
-                              chartSpecConfig.stickyRowHeaders
+                              freezeRowHeaders
                                 ? `sticky z-10 ${
                                     isZebraRow
                                       ? 'bg-[#FAF8F1] dark:bg-[#252620]'
@@ -1217,7 +1351,8 @@ export function PivotTable({
                               colLabel: cGroup.pathLabels.join(' / '),
                               valLabel: `${vCfg.field}(${vCfg.agg})`,
                               formatted: formattedText,
-                              pctGrand: cellObj?.pctGrand || '0.0',
+                              hasAdditiveShares: Number.isFinite(cellObj?.raw) && cellObj?.pctGrand !== null && ['sum', 'count'].includes(vCfg.agg) && (!vCfg.showAs || vCfg.showAs === 'normal'),
+                              pctGrand: cellObj?.pctGrand ?? null,
                               pctRow: cellObj?.pctRow || '0.0',
                               pctCol: cellObj?.pctCol || '0.0',
                             });
@@ -1244,7 +1379,7 @@ export function PivotTable({
                           } ${
                             isSubtotalCell ? 'font-semibold bg-[#66D9EF]/10 text-ink-cyan' : ''
                           } ${
-                            isNegative ? 'text-ink-pink dark:text-[#FF5C8A] font-medium' : ''
+                            isNegative ? 'text-ink-pink dark:text-[#FF8CAF] font-medium' : ''
                           } ${
                             isColCrosshair && !isSubtotalCell && !isCellSelected ? 'bg-[#66D9EF]/[0.05] dark:bg-[#66D9EF]/[0.07]' : ''
                           } ${
@@ -1301,10 +1436,10 @@ export function PivotTable({
                   style={{
                     width: `${totalRowHeaderWidth}px`,
                     minWidth: `${totalRowHeaderWidth}px`,
-                    left: chartSpecConfig.stickyRowHeaders ? 0 : undefined,
+                    left: freezeRowHeaders ? 0 : undefined,
                   }}
                   className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] ${densityCellPadding} ${
-                    chartSpecConfig.stickyRowHeaders
+                    freezeRowHeaders
                       ? 'sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.18)] dark:shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)]'
                       : ''
                   }`}
@@ -1321,15 +1456,27 @@ export function PivotTable({
                     const colW = getValColWidth(cGroup.key, vCfg.id);
                     const formattedText = formatCellNumber(cellObj, vCfg);
 
+                    const openGrandTotalDetail = () => {
+                      soundEngine?.playTransitionChord();
+                      requestDrillDown?.(grandTotalRow.rowKey, cGroup.key, {
+                        rowLabel: t('总计 (Grand Total)'),
+                        colLabel: cGroup.isTotal ? t('总计') : (cGroup.pathLabels?.join(' / ') || t('全量')),
+                        valLabel: `${vCfg.field} (${vCfg.agg})`,
+                        valueFormatted: formattedText,
+                      });
+                    };
+
                     return (
                       <td
                         role="cell"
                         key={`foot_${cellKey}`}
+                        onDoubleClick={openGrandTotalDetail}
+                        title={t("双击查看此总计项对应的原始交易明细")}
                         style={{
                           width: `${colW}px`,
                           minWidth: `${colW}px`,
                         }}
-                        className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] ${densityCellPadding} ${dataTextAlignCls} apple-font-mono font-bold text-ink-purple`}
+                        className={`border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1] dark:bg-[#1E1F1C] ${densityCellPadding} ${dataTextAlignCls} apple-font-mono font-bold text-ink-purple cursor-pointer hover:bg-[#66D9EF]/20 transition-colors`}
                       >
                         <span className={`block w-full ${dataTextAlignCls} truncate`}>
                           {formattedText}

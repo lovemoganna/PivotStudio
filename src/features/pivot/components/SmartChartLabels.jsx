@@ -58,9 +58,26 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false) {
   const { x, y, width, height, value } = props;
   if (value === null || value === undefined || value === '' || value === '0' || value === '¥0') return null;
   const textStr = String(value);
+  const isNeg = textStr.startsWith('-');
 
   if (isHorizontal) {
     if (Math.abs(height) < 12) return null;
+    if (isNeg) {
+      return (
+        <text
+          x={x + width / 2}
+          y={y + height / 2}
+          fill="#1E1F1C"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={9}
+          fontWeight={700}
+          className="apple-font-mono"
+        >
+          {textStr}
+        </text>
+      );
+    }
     const placeInside = width > 68;
     const tx = placeInside ? x + width - 6 : x + Math.max(0, width) + 6;
     return (
@@ -80,10 +97,10 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false) {
   }
 
   if (Math.abs(width) < 18) return null;
-  const isNeg = textStr.startsWith('-');
+  if (isNeg && Math.abs(height) < 18) return null;
   const nearTopEdge = y < 18;
-  const ty = isNeg ? y + Math.abs(height) + 11 : nearTopEdge ? y + 12 : y - 6;
-  const fillCol = nearTopEdge && !isNeg ? '#1E1F1C' : (darkMode ? '#F8F8F2' : '#272822');
+  const ty = isNeg ? Math.max(y, y + height) - 9 : nearTopEdge ? y + 12 : y - 6;
+  const fillCol = isNeg || nearTopEdge ? '#1E1F1C' : (darkMode ? '#F8F8F2' : '#272822');
 
   return (
     <text

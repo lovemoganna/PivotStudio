@@ -1,5 +1,8 @@
 import { AGG_METHODS, CHART_COLORS } from '../../../constants/pivotConstants.js';
 import { UnifiedFormatter, getDimDisplayLabel } from '../../../utils/formatters.js';
+import { isMissingValue } from '../../../utils/normalizeScalar.js';
+import { getMeasureDefaults, isMeasureField } from '../../../utils/fieldSemantics.js';
+import { computeAggregation } from './calculatePivot.js';
 
 export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpecConfig) {
   const valConfigs = pivotResult?.valConfigs || [];
@@ -16,14 +19,13 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   // If only 1 metric is configured, search dataset for a distinct 2nd numeric field for scatter/dual-axis correlation
   let secondaryValCfg = valConfigs.find((v) => v.id === chartSpecConfig?.secondaryValueId) || valConfigs[1];
   if (!secondaryValCfg) {
-    const candidateField = dataset?.fields?.find((f) => f.type === 'number' && f.name !== primaryValCfg.field);
+    const candidateField = dataset?.fields?.find((f) => isMeasureField(f) && f.name !== primaryValCfg.field);
     if (candidateField) {
       secondaryValCfg = {
         id: `v_auto_second_${candidateField.name}`,
         field: candidateField.name,
-        agg: 'sum',
         showAs: 'normal',
-        format: { thousands: true, decimals: 0, currency: candidateField.name.includes('额') || candidateField.name.includes('利') ? '¥' : '', isPercent: false },
+        ...getMeasureDefaults(candidateField),
       };
     } else {
       secondaryValCfg = primaryValCfg;
@@ -37,7 +39,8 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       : '汇总维度';
 
   const dataRows = (pivotResult?.tableRows || []).filter((r) => !r.isTotal && !r.isSubtotal);
-  const grandTotalRecords = (pivotResult?.cellRecordsMap?.get?.('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || []).slice(0, 50);
+  const grandTotalBucket = pivotResult?.cellRecordsMap?.get?.('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || [];
+  const grandTotalRecords = grandTotalBucket.slice(0, 50);
 
   // If no value metrics are configured, return graceful empty spec immediately
   if (!hasValues) {
@@ -70,16 +73,16 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
 
   // 1. Build KPI Cards + Mini Sparkline Points
   const kpiCards = valConfigs.slice(0, 4).map((vc, kIdx) => {
-    const grandVal = pivotResult.displayMatrix[`__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? 0;
-    const aggLabel = AGG_METHODS.find((m) => m.value === vc.agg)?.short || vc.agg;
+    const grandVal = pivotResult.displayMatrix[`__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? null;
+    const aggLabel = vc.isCalculated ? '公式' : (AGG_METHODS.find((m) => m.value === vc.agg)?.short || vc.agg);
     const unit = UnifiedFormatter.inferUnit(vc);
     let comparison = null;
     if (dataRows.length >= 2) {
       const firstRow = dataRows[0];
       const secondRow = dataRows[1];
-      const v0 = pivotResult.displayMatrix[`${firstRow.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? 0;
-      const v1 = pivotResult.displayMatrix[`${secondRow.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? 0;
-      if (v1 !== 0) {
+      const v0 = pivotResult.displayMatrix[`${firstRow.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display;
+      const v1 = pivotResult.displayMatrix[`${secondRow.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display;
+      if (Number.isFinite(v0) && Number.isFinite(v1) && v1 !== 0) {
         const diffPct = ((v0 - v1) / Math.abs(v1)) * 100;
         comparison = {
           isPositive: diffPct >= 0,
@@ -88,10 +91,10 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
         };
       }
     }
-    const sparkValues = dataRows.slice(0, 12).map((r) => pivotResult.displayMatrix[`${r.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? 0);
+    const sparkValues = dataRows.slice(0, 12).map((r) => pivotResult.displayMatrix[`${r.rowKey}@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? null);
     return {
       id: vc.id,
-      title: `${vc.field} (${aggLabel})`,
+      title: `${vc.field === '__COUNT__' ? '记录数' : vc.field} (${aggLabel})`,
       unit,
       color: CHART_COLORS[kIdx % CHART_COLORS.length],
       formattedCurrent: UnifiedFormatter.formatValue(grandVal, vc, { compact: false }),
@@ -118,7 +121,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   } else {
     valConfigs.forEach((vc, idx) => {
       const aggShort = AGG_METHODS.find((m) => m.value === vc.agg)?.short || vc.agg;
-      const sKey = `${vc.field}(${aggShort})`;
+      const sKey = `${vc.field === '__COUNT__' ? '记录数' : vc.field}(${aggShort})`;
       seriesMetaList.push({
         key: sKey,
         colKey: '__GRAND_TOTAL_COL__',
@@ -142,9 +145,9 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   }
 
   const primarySeriesKey = seriesMetaList[0].key;
-  const secondarySeriesKey = seriesMetaList[1]?.key || primarySeriesKey;
+  const secondarySeriesKey = seriesMetaList[1]?.key || (chartType === 'scatter' && secondaryValCfg.field !== primaryValCfg.field ? `${secondaryValCfg.field}(${AGG_METHODS.find(m=>m.value===secondaryValCfg.agg)?.short || secondaryValCfg.agg})` : primarySeriesKey);
   const isPercentMode = chartType === 'pct_stacked_bar' || chartType === 'pct_area';
-  const missingMode = chartSpecConfig?.missingValueMode || 'zero';
+  const missingMode = chartSpecConfig?.missingValueMode || 'connect';
 
   const lastSeenBySeries = {};
   let processedItems = [];
@@ -158,11 +161,10 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
         matchedRows: (pivotResult?.cellRecordsMap?.get?.(`${r.rowKey}@@__GRAND_TOTAL_COL__`) || []).slice(0, 50),
       };
       let stackSum = 0;
-      let absSum = 0;
       seriesMetaList.forEach((sm) => {
         const bucketRecs = pivotResult?.cellRecordsMap?.get?.(`${r.rowKey}@@${sm.colKey}`) || [];
         const cKey = `${r.rowKey}@@${sm.colKey}@@${sm.valCfg.id}`;
-        let val = pivotResult.displayMatrix[cKey]?.display ?? 0;
+        let val = pivotResult.displayMatrix[cKey]?.display ?? null;
 
         if (bucketRecs.length === 0) {
           if (missingMode === 'connect') {
@@ -176,17 +178,11 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
           lastSeenBySeries[sm.key] = val;
         }
 
-        const numVal = val === null ? 0 : Number(val);
+        const numVal = val === null ? null : Number(val);
         item._rawSeriesValues[sm.key] = numVal;
         item[sm.key] = val;
         stackSum += numVal;
-        absSum += Math.abs(numVal);
       });
-      if (isPercentMode && absSum > 0) {
-        seriesMetaList.forEach((sm) => {
-          item[sm.key] = Number(((Math.abs(item._rawSeriesValues[sm.key]) / absSum) * 100).toFixed(2));
-        });
-      }
       item._stackSum = stackSum;
       return item;
     });
@@ -200,15 +196,13 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
         matchedRows: (pivotResult?.cellRecordsMap?.get?.(`__GRAND_TOTAL_ROW__@@${cg.key}`) || []).slice(0, 50),
       };
       let stackSum = 0;
-      let absSum = 0;
       seriesMetaList.forEach((sm) => {
         const cKey = `__GRAND_TOTAL_ROW__@@${cg.key}@@${sm.valCfg.id}`;
-        const val = pivotResult.displayMatrix[cKey]?.display ?? 0;
-        const numVal = Number(val);
+        const val = pivotResult.displayMatrix[cKey]?.display ?? null;
+        const numVal = val === null ? null : Number(val);
         item._rawSeriesValues[sm.key] = numVal;
         item[sm.key] = val;
         stackSum += numVal;
-        absSum += Math.abs(numVal);
       });
       item._stackSum = stackSum;
       return item;
@@ -223,19 +217,45 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     };
     seriesMetaList.forEach((sm) => {
       const cKey = `__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${sm.valCfg.id}`;
-      const val = pivotResult.displayMatrix[cKey]?.display ?? 0;
-      item._rawSeriesValues[sm.key] = Number(val);
+      const val = pivotResult.displayMatrix[cKey]?.display ?? null;
+      item._rawSeriesValues[sm.key] = val === null ? null : Number(val);
       item[sm.key] = val;
     });
     processedItems = [item];
   }
 
+  // Composition charts require additive, nonnegative values. Never turn losses into gains.
+  const isAdditive = metric => !metric.isCalculated && ['sum', 'count'].includes(metric.agg) && (!metric.showAs || metric.showAs === 'normal') && (metric.agg === 'count' || !metric.format?.isPercent);
+  const compositionMetricValid = seriesMetaList.every(sm => isAdditive(sm.valCfg));
+  const compositionUnitsMatch = seriesMetaList.every(sm => UnifiedFormatter.inferUnit(sm.valCfg) === UnifiedFormatter.inferUnit(seriesMetaList[0].valCfg));
+  const hasNegative = processedItems.some(item => seriesMetaList.some(sm => item._rawSeriesValues[sm.key] < 0));
+  const primaryHasNegative = processedItems.some(item => item._rawSeriesValues[primarySeriesKey] < 0);
+  let chartIssue = null;
+  if (isPercentMode && (!compositionMetricValid || hasNegative)) {
+    chartIssue = hasNegative ? '数据包含负数，不能解释为非负部分的占比。请切换柱图查看正负变化。' : '平均值、去重计数、比率或计算指标不能直接相加为整体。请切换柱图比较数值。';
+  }
+  if (isPercentMode && !chartIssue && !compositionUnitsMatch) chartIssue = '指标单位不同，不能合并成 100%。请切换柱图，或选择单位一致的指标。';
+  if (['pie', 'donut'].includes(chartType) && (!isAdditive(primaryValCfg) || primaryHasNegative)) {
+    chartIssue = primaryHasNegative ? '数据包含负数，不能解释为非负部分的占比。请切换柱图查看正负变化。' : '平均值、去重计数、比率或计算指标不能直接相加为整体。请切换柱图比较数值。';
+  }
+  if (chartType === 'funnel' && primaryHasNegative) chartIssue = '数据包含负数，无法用漏斗宽度表达。请切换柱图查看正负变化。';
+  if (chartType === 'scatter' && secondarySeriesKey === primarySeriesKey && secondaryValCfg.field === primaryValCfg.field) {
+    chartIssue = '散点图需要两个不同的指标。请再添加一个数值字段，或切换柱图比较当前指标。';
+  }
+  if (isPercentMode && !chartIssue) processedItems.forEach(item => {
+    const total = seriesMetaList.reduce((sum, sm) => sum + (item._rawSeriesValues[sm.key] ?? 0), 0);
+    seriesMetaList.forEach(sm => {
+      const value = item._rawSeriesValues[sm.key];
+      item[sm.key] = value === null || total === 0 ? null : value / total * 100;
+    });
+  });
+  if (isPercentMode && !chartIssue && processedItems.some(item => seriesMetaList.some(sm => Number.isFinite(item._rawSeriesValues[sm.key]))) && !processedItems.some(item => seriesMetaList.some(sm => item[sm.key] !== null))) chartIssue = '当前数值合计为 0，没有可解释的占比。请切换柱图查看各组数值。';
   processedItems.forEach((item) => {
     item._stackTotal = item._stackSum ?? 0;
     item._stackTotalFormatted = UnifiedFormatter.formatValue(item._stackTotal, primaryValCfg, { compact: false });
     item._compactPrimaryLabel = isPercentMode
       ? `${Number(item[primarySeriesKey] ?? 0).toFixed(1)}%`
-      : UnifiedFormatter.formatValue(item._rawSeriesValues[primarySeriesKey] ?? 0, primaryValCfg, { compact: true });
+      : UnifiedFormatter.formatValue(item._rawSeriesValues[primarySeriesKey], primaryValCfg, { compact: true });
   });
 
   if (chartSpecConfig?.sortMode === 'asc') {
@@ -243,6 +263,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   } else if (chartSpecConfig?.sortMode === 'desc') {
     processedItems.sort((a, b) => (b._rawSeriesValues[primarySeriesKey] ?? 0) - (a._rawSeriesValues[primarySeriesKey] ?? 0));
   }
+  const availableGroupCount = processedItems.length;
   if (chartSpecConfig?.topN && chartSpecConfig.topN > 0) {
     processedItems = processedItems.slice(0, chartSpecConfig.topN);
   }
@@ -256,20 +277,22 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     if (derivedMode === 'mom_pct') derivedSeriesKey = `${primarySeriesKey}·环比(%)`;
 
     processedItems.forEach((it, idx) => {
-      const cur = Number(it._rawSeriesValues[primarySeriesKey] ?? 0);
+      const cur = it._rawSeriesValues[primarySeriesKey];
+      if (!Number.isFinite(cur)) { it[derivedSeriesKey] = null; return; }
       if (derivedMode === 'cumulative') {
         runningCum += cur;
         it[derivedSeriesKey] = runningCum;
       } else if (derivedMode === 'ma3') {
         const slice = processedItems.slice(Math.max(0, idx - 2), idx + 1);
+        if (slice.some(x => !Number.isFinite(x._rawSeriesValues[primarySeriesKey]))) {it[derivedSeriesKey] = null;return;}
         const avg = slice.reduce((s, x) => s + Number(x._rawSeriesValues[primarySeriesKey] ?? 0), 0) / slice.length;
         it[derivedSeriesKey] = Number(avg.toFixed(1));
       } else if (derivedMode === 'mom_pct') {
         if (idx === 0) {
-          it[derivedSeriesKey] = 0;
+          it[derivedSeriesKey] = null;
         } else {
-          const prev = Number(processedItems[idx - 1]._rawSeriesValues[primarySeriesKey] ?? 0);
-          it[derivedSeriesKey] = prev !== 0 ? Number((((cur - prev) / Math.abs(prev)) * 100).toFixed(1)) : 0;
+          const prev = processedItems[idx - 1]._rawSeriesValues[primarySeriesKey];
+          it[derivedSeriesKey] = Number.isFinite(prev) && prev !== 0 ? Number((((cur - prev) / Math.abs(prev)) * 100).toFixed(1)) : null;
         }
       }
     });
@@ -277,26 +300,75 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
 
   // Executive Insight Synthesis
   let executiveInsight = null;
-  if (processedItems.length > 0) {
-    const sortedByPrimary = [...processedItems].sort(
+  const validItems = processedItems.filter(it => Number.isFinite(it._rawSeriesValues[primarySeriesKey]));
+  if (validItems.length > 0) {
+    const sortedByPrimary = [...validItems].sort(
       (a, b) => (b._rawSeriesValues[primarySeriesKey] ?? 0) - (a._rawSeriesValues[primarySeriesKey] ?? 0)
     );
     const topItem = sortedByPrimary[0];
-    const totalSum = sortedByPrimary.reduce((acc, it) => acc + Math.max(0, Number(it._rawSeriesValues[primarySeriesKey] ?? 0)), 0);
+    const bottomItem = sortedByPrimary[sortedByPrimary.length - 1];
+    const totalSum = sortedByPrimary.reduce((acc, it) => acc + it._rawSeriesValues[primarySeriesKey], 0);
     const topVal = Number(topItem?._rawSeriesValues[primarySeriesKey] ?? 0);
-    const sharePct = totalSum > 0 ? ((Math.max(0, topVal) / totalSum) * 100).toFixed(1) : '0.0';
+    const bottomVal = Number(bottomItem?._rawSeriesValues[primarySeriesKey] ?? 0);
+    const sharePct = isAdditive(primaryValCfg) && !primaryHasNegative && totalSum > 0 ? ((topVal / totalSum) * 100).toFixed(1) : null;
+
+    // Top 3 cumulative share
+    const top3Items = sortedByPrimary.slice(0, 3);
+    const top3Sum = top3Items.reduce((acc, it) => acc + (it._rawSeriesValues[primarySeriesKey] ?? 0), 0);
+    const top3SharePct = isAdditive(primaryValCfg) && !primaryHasNegative && totalSum > 0 ? ((top3Sum / totalSum) * 100).toFixed(1) : null;
+
+    // Extreme ratio (top vs bottom)
+    let extremeRatio = null;
+    if (bottomVal > 0 && topVal >= bottomVal && sortedByPrimary.length > 1) {
+      extremeRatio = (topVal / bottomVal).toFixed(1);
+    }
+
+    // Benchmark count (above mean)
+    const meanVal = totalSum / sortedByPrimary.length;
+    const aboveMeanCount = sortedByPrimary.filter(it => (it._rawSeriesValues[primarySeriesKey] ?? 0) >= meanVal).length;
+    const meanFormatted = UnifiedFormatter.formatValue(meanVal, primaryValCfg, { compact: false });
+
+    // Statistical Z-Score outlier detection across primary series (|z| > 1.8σ)
+    if (validItems.length >= 4 && !isPercentMode) {
+      const variance = validItems.reduce((acc, it) => {
+        const diff = (it._rawSeriesValues[primarySeriesKey] ?? 0) - meanVal;
+        return acc + diff * diff;
+      }, 0) / validItems.length;
+      const stdDev = Math.sqrt(variance);
+      if (stdDev > 1e-9) {
+        validItems.forEach((it) => {
+          const z = Math.abs(((it._rawSeriesValues[primarySeriesKey] ?? 0) - meanVal) / stdDev);
+          if (z > 1.8) {
+            it.isOutlier = true;
+            it.zScore = z.toFixed(2);
+          }
+        });
+      }
+    }
+
     executiveInsight = {
       topName: topItem.name,
+      topRowKey: topItem.rowKey,
       topFormatted: UnifiedFormatter.formatValue(topVal, primaryValCfg, { compact: false }),
+      bottomName: bottomItem.name,
+      bottomRowKey: bottomItem.rowKey,
+      bottomFormatted: UnifiedFormatter.formatValue(bottomVal, primaryValCfg, { compact: false }),
       sharePct,
+      topSharePct: sharePct,
+      top3SharePct,
+      top3Names: top3Items.map(it => it.name).join('、'),
+      extremeRatio,
+      aboveMeanCount,
+      meanFormatted,
       groupCount: processedItems.length,
     };
   }
 
   // 3. Pie / Donut Items
-  const pieTotal = processedItems.reduce((acc, it) => acc + Math.max(0, Number(it._rawSeriesValues[primarySeriesKey] ?? 0)), 0);
-  const pieItems = processedItems.map((it, idx) => {
-    const rawV = Math.max(0, Number(it._rawSeriesValues[primarySeriesKey] ?? 0));
+  const pieTotal = validItems.reduce((acc, it) => acc + it._rawSeriesValues[primarySeriesKey], 0);
+  if (['pie', 'donut', 'funnel'].includes(chartType) && !chartIssue && pieTotal <= 0 && validItems.length) chartIssue = '当前数值合计为 0，没有可解释的占比。请切换柱图查看各组数值。';
+  const pieItems = (isAdditive(primaryValCfg) && !primaryHasNegative && pieTotal > 0 ? validItems : []).map((it, idx) => {
+    const rawV = it._rawSeriesValues[primarySeriesKey];
     return {
       name: it.name,
       rowKey: it.rowKey,
@@ -309,7 +381,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   // 4. Waterfall Items
   const waterfallItems = [];
   let wfRunning = 0;
-  processedItems.forEach((it, idx) => {
+  validItems.forEach((it, idx) => {
     const delta = Number(it._rawSeriesValues?.[primarySeriesKey] ?? it[primarySeriesKey] ?? 0);
     const startVal = wfRunning;
     wfRunning += delta;
@@ -350,21 +422,20 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   }
 
   // 5. Funnel Items
-  const funnelSorted = [...processedItems].sort(
-    (a, b) => (b._rawSeriesValues[primarySeriesKey] ?? 0) - (a._rawSeriesValues[primarySeriesKey] ?? 0)
-  );
-  const funnelMax = Math.max(1, Number(funnelSorted[0]?._rawSeriesValues[primarySeriesKey] ?? 1));
+  // Preserve the user's category order; category totals alone do not establish conversion.
+  const funnelSorted = !primaryHasNegative ? validItems : [];
+  const funnelMax = funnelSorted.reduce((max, item) => Math.max(max, item._rawSeriesValues[primarySeriesKey]), 0);
   const funnelItems = funnelSorted.map((it, idx) => {
     const val = Math.max(0, Number(it._rawSeriesValues[primarySeriesKey] ?? 0));
     const prevVal = idx > 0 ? Math.max(0, Number(funnelSorted[idx - 1]._rawSeriesValues[primarySeriesKey] ?? 0)) : val;
-    const convPct = idx === 0 ? 100 : prevVal > 0 ? (val / prevVal) * 100 : 0;
+    const convPct = prevVal > 0 ? (val / prevVal) * 100 : null;
     return {
       name: it.name,
       rowKey: it.rowKey,
       value: val,
       formattedValue: UnifiedFormatter.formatValue(val, primaryValCfg, { compact: false }),
-      widthPct: Math.max(20, Math.round((val / funnelMax) * 100)),
-      conversionFormatted: idx === 0 ? '基准阶段 (100%)' : `转化率 ${convPct.toFixed(1)}%`,
+      widthPct: funnelMax > 0 ? val / funnelMax * 100 : 0,
+      conversionFormatted: idx === 0 ? '首项' : convPct === null ? '上项为 0，无法比较' : `相对上项 ${convPct.toFixed(1)}%`,
       fill: CHART_COLORS[idx % CHART_COLORS.length],
       matchedRows: it.matchedRows,
     };
@@ -372,17 +443,18 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
 
   // 6. Scatter Items with OLS Linear Regression & Z-Score Outlier Detection
   const isSelfCorrelation = secondarySeriesKey === primarySeriesKey;
-  const scatterPoints = processedItems.map((it, idx) => {
+  const scatterPoints = (chartType === 'scatter' ? validItems : []).map((it, idx) => {
     const xVal = Number(it._rawSeriesValues[primarySeriesKey] ?? idx + 1);
-    let yVal = Number(it._rawSeriesValues[secondarySeriesKey]);
-    if (Number.isNaN(yVal) || yVal === undefined || isSelfCorrelation) {
+    let yVal = it._rawSeriesValues[secondarySeriesKey];
+    if (yVal === undefined || isSelfCorrelation) {
       if (secondaryValCfg?.field && secondaryValCfg.field !== primaryValCfg.field) {
-        const matched = it.matchedRows || [];
-        yVal = matched.reduce((acc, r) => acc + (Number(r[secondaryValCfg.field]) || 0), 0);
+        const bucketKey = dataRows.length ? `${it.rowKey}@@__GRAND_TOTAL_COL__` : hasColGroups ? `__GRAND_TOTAL_ROW__@@${it.rowKey}` : '__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__';
+        yVal = computeAggregation(pivotResult.cellRecordsMap?.get(bucketKey) || [], secondaryValCfg.field, secondaryValCfg.agg);
       } else {
         yVal = Number(it._rawSeriesValues[primarySeriesKey] ?? idx + 1);
       }
     }
+    if (!Number.isFinite(yVal)) return null;
     return {
       name: it.name,
       rowKey: it.rowKey,
@@ -395,7 +467,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       expectedY: yVal.toFixed(1),
       matchedRows: it.matchedRows,
     };
-  });
+  }).filter(Boolean);
   let scatterRegressionSegment = null;
   let scatterMeanX = 0;
   let scatterMeanY = 0;
@@ -436,26 +508,33 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   const histField = (primaryValCfg.field && primaryValCfg.field !== '__COUNT__')
     ? primaryValCfg.field
     : (dataset?.fields?.find((f) => f.type === 'number')?.name || '');
-  const rawNums = grandTotalRecords
+  const rawNums = (chartType === 'histogram' ? grandTotalBucket : [])
+    .filter(r => !isMissingValue(r[histField]))
     .map((r) => ({ val: Number(r[histField]), rec: r }))
-    .filter((x) => !Number.isNaN(x.val));
+    .filter((x) => Number.isFinite(x.val));
+  const histogramSummary = { field: histField, total: grandTotalBucket.length, valid: rawNums.length, missing: chartType === 'histogram' ? grandTotalBucket.filter(r => isMissingValue(r[histField])).length : 0 };
   const histogramItems = [];
   if (rawNums.length > 0) {
-    const minV = Math.min(...rawNums.map((x) => x.val));
-    const maxV = Math.max(...rawNums.map((x) => x.val));
-    const binCount = chartSpecConfig?.histogramBins > 0
-      ? chartSpecConfig.histogramBins
+    const minV = rawNums.reduce((min,x) => Math.min(min,x.val),Infinity);
+    const maxV = rawNums.reduce((max,x) => Math.max(max,x.val),-Infinity);
+    const binCount = maxV === minV ? 1 : chartSpecConfig?.histogramBins > 0
+      ? Math.min(100, Math.max(1, Math.floor(chartSpecConfig.histogramBins)))
       : Math.max(4, Math.min(10, Math.ceil(1 + 3.322 * Math.log10(rawNums.length))));
-    const step = Math.max(1, Math.ceil((maxV - minV + 1) / binCount));
+    const step = (maxV - minV) / binCount || Math.max(1,Math.abs(minV)*0.1);
+    const sourceField = dataset?.fields?.find(f => f.name === histField);
+    const histogramFormat = getMeasureDefaults(sourceField);
+    const decimals = Math.min(8,Math.max(histogramFormat.format.decimals, Math.ceil(-Math.log10(step*(histogramFormat.format.isPercent?100:1)))+1));
+    const boundaryConfig = {field:histField,agg:'sum',format:{...histogramFormat.format,decimals}};
     for (let b = 0; b < binCount; b++) {
       const low = minV + b * step;
-      const high = low + step;
+      const high = b === binCount - 1 && maxV !== minV ? maxV : minV + (b + 1) * step;
       const matched = rawNums
         .filter((x) => (b === binCount - 1 ? x.val >= low && x.val <= high : x.val >= low && x.val < high))
         .map((x) => x.rec);
       histogramItems.push({
-        name: `${UnifiedFormatter.formatValue(low, primaryValCfg, { compact: true })}~${UnifiedFormatter.formatValue(high, primaryValCfg, { compact: true })}`,
-        rangeFull: `[${low.toLocaleString()}, ${high.toLocaleString()})`,
+        name: `${UnifiedFormatter.formatValue(low, boundaryConfig)}~${UnifiedFormatter.formatValue(high, boundaryConfig)}`,
+        rangeFull: `[${low}, ${high}${b === binCount - 1 ? ']' : ')'}`,
+        histogramRange: {field:histField,low,high,includeHigh:b===binCount-1},
         count: matched.length,
         pct: ((matched.length / rawNums.length) * 100).toFixed(1),
         matchedRows: matched.slice(0, 50),
@@ -464,9 +543,10 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   }
 
   // 8. Primary Series Telemetry Stats
-  const primaryValues = processedItems.map((it) => Number(it._rawSeriesValues[primarySeriesKey] ?? 0));
+  const primaryValues = validItems.map((it) => it._rawSeriesValues[primarySeriesKey]);
   const primaryTotal = primaryValues.reduce((a, b) => a + b, 0);
   const primaryStats = {
+    validCount: primaryValues.length,
     total: primaryTotal,
     mean: primaryValues.length > 0 ? primaryTotal / primaryValues.length : 0,
     max: primaryValues.length > 0 ? Math.max(...primaryValues) : 0,
@@ -475,11 +555,13 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
 
   const canStack = hasColGroups || (valConfigs.length > 1 && valConfigs.every((v) => UnifiedFormatter.inferUnit(v) === UnifiedFormatter.inferUnit(valConfigs[0])));
   const hasDualAxis = !hasColGroups && valConfigs.length > 1;
+  const isPrimaryAdditive = isAdditive(primaryValCfg) && !primaryHasNegative;
 
   return {
     chartType,
     hasValues: true,
     isPercentMode,
+    isPrimaryAdditive,
     canStack,
     hasDualAxis,
     xDimensionLabel,
@@ -500,7 +582,10 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     scatterMeanX,
     scatterMeanY,
     histogramItems,
+    histogramSummary,
     primaryStats,
     executiveInsight,
+    chartIssue,
+    availableGroupCount,
   };
 }

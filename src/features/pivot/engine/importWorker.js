@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { parseCSVTextToSheet, decodeCSVBuffer } from '../../../utils/csvParser.js';
+import { normalizeScalar } from '../../../utils/normalizeScalar.js';
 
 self.onmessage = async ({ data: { file, text, sheets, normalize, options = {} } }) => {
   const progress = (pct) => self.postMessage({ progress: pct });
@@ -11,11 +12,7 @@ self.onmessage = async ({ data: { file, text, sheets, normalize, options = {} } 
         if (index % 10000 === 0) progress(Math.round(index / Math.max(1, sheet.rows.length) * 95));
         const next = { ...row };
         for (const field of sheet.fields) {
-          if (field.type === 'number') {
-            const raw = String(row[field.name] ?? '').trim();
-            const number = raw ? Number(raw.replace(/,/g, '')) : null;
-            next[field.name] = number === null || Number.isFinite(number) ? number : null;
-          } else if (field.type === 'boolean') next[field.name] = /^(true|1|是|yes)$/i.test(String(row[field.name] ?? '').trim());
+          if (field.type === 'number' || field.type === 'boolean') next[field.name] = normalizeScalar(row[field.name], field.type);
         }
         return next;
       });

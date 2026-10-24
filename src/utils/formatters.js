@@ -2,6 +2,7 @@ export const UnifiedFormatter = {
   inferUnit(valCfg) {
     if (!valCfg) return '';
     if (valCfg.showAs && valCfg.showAs.startsWith('pct_')) return '%';
+    if (valCfg.agg === 'count' || valCfg.agg === 'count_distinct' || valCfg.field === '__COUNT__') return '笔';
     if (valCfg.format?.isPercent) return '%';
     if (valCfg.format?.currency) return valCfg.format.currency;
     if (valCfg.format?.unit) return valCfg.format.unit;
@@ -36,10 +37,10 @@ export const UnifiedFormatter = {
     if (val === null || val === undefined || Number.isNaN(Number(val))) return '-';
     const num = Number(val);
     const isPctShowAs = valCfg?.showAs && valCfg.showAs.startsWith('pct_');
-    const isPercent = isPctShowAs || valCfg?.format?.isPercent;
-    const decimals = isPctShowAs ? 1 : (valCfg?.format?.decimals ?? (isPercent ? 1 : 0));
-    const useThousands = valCfg?.format?.thousands !== false;
     const isCountAgg = valCfg?.agg === 'count' || valCfg?.agg === 'count_distinct';
+    const isPercent = isPctShowAs || (!isCountAgg && valCfg?.format?.isPercent);
+    const decimals = isPctShowAs ? 1 : isCountAgg ? 0 : (valCfg?.format?.decimals ?? (isPercent ? 1 : 0));
+    const useThousands = valCfg?.format?.thousands !== false;
 
     const unit = this.inferUnit(valCfg);
     const isPrefixCurrency = /^[\$¥€£元]/.test(unit);
@@ -91,7 +92,8 @@ export function formatDimensionValue(rawVal, dimCfg, fieldMeta) {
     // Calendar-only dates are local dates, not UTC midnight.
     const calendar = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
     const d = calendar ? new Date(+calendar[1], +calendar[2] - 1, +calendar[3]) : new Date(str);
-    if (!Number.isNaN(d.getTime())) {
+    const validCalendar = !calendar || (d.getFullYear() === +calendar[1] && d.getMonth() === +calendar[2] - 1 && d.getDate() === +calendar[3]);
+    if (!Number.isNaN(d.getTime()) && validCalendar) {
       const yr = d.getFullYear();
       const mo = d.getMonth() + 1;
       const day = d.getDate();
@@ -106,8 +108,8 @@ export function formatDimensionValue(rawVal, dimCfg, fieldMeta) {
         return `${yr}-W${String(weekNo).padStart(2, '0')}`;
       }
       if (dimCfg.dateGranularity === 'day') return `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      if (dimCfg.dateGranularity === 'hour') return `${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hr).padStart(2, '0')}:00`;
-      if (dimCfg.dateGranularity === 'minute') return `${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+      if (dimCfg.dateGranularity === 'hour') return `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hr).padStart(2, '0')}:00`;
+      if (dimCfg.dateGranularity === 'minute') return `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
       if (dimCfg.dateGranularity === 'day_of_week') {
         const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
         return weekdays[d.getDay()] || '未知';
@@ -128,7 +130,10 @@ export function formatDimensionValue(rawVal, dimCfg, fieldMeta) {
   }
 
   if (fType === 'boolean') {
-    return rawVal === true || String(rawVal).toLowerCase() === 'true' ? '是 (True)' : '否 (False)';
+    const text = String(rawVal).trim();
+    if (/^(true|1|是|yes)$/i.test(text)) return '是 (True)';
+    if (/^(false|0|否|no)$/i.test(text)) return '否 (False)';
+    return text;
   }
 
   return String(rawVal);

@@ -1,6 +1,7 @@
 import { profileField } from './profileField.js';
 import { calculatePivot } from './calculatePivot.js';
 import { buildUnifiedChartSpec } from './buildChartSpec.js';
+import { isMissingValue } from '../../../utils/normalizeScalar.js';
 
 let cachedDataset = null;
 let cachedPivot = null;
@@ -10,7 +11,13 @@ self.onmessage = (e) => {
   if (e.data?.kind === 'drill') {
     const { rowKey, colKey, generation, metadata } = e.data;
     if (generation !== resultId) return;
-    const records = cachedPivot?.cellRecordsMap.get(`${rowKey}@@${colKey}`) || [];
+    let records = cachedPivot?.cellRecordsMap.get(`${rowKey}@@${colKey}`) || [];
+    const range = metadata?.histogramRange;
+    if (range) records = records.filter(record => {
+      if (isMissingValue(record[range.field])) return false;
+      const value = Number(record[range.field]);
+      return Number.isFinite(value) && value >= range.low && (range.includeHigh ? value <= range.high : value < range.high);
+    });
     self.postMessage({ kind: 'drill', generation, metadata, records });
     return;
   }

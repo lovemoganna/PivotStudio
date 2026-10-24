@@ -1,5 +1,6 @@
 import { getDimDisplayLabel, formatCellNumber } from './formatters.js';
 import { AGG_METHODS } from '../constants/pivotConstants.js';
+import { decodeGroupPath } from './groupKeys.js';
 
 /**
  * Calculates string visual length estimating CJK characters at ~13px and ASCII at ~7.5px.
@@ -51,7 +52,7 @@ export function calculateAutoFitColumnWidths(pivotResult, existingWidths = {}) {
         if (row.isTotal) {
           valStr = '总计';
         } else {
-          const segs = String(row.rowKey || '').replace('__SUBTOTAL__', '').split('||');
+          const segs = decodeGroupPath(row.rowKey || '');
           valStr = segs[rIdx] || '';
         }
         // Account for tree indent/collapse button on hierarchical rows

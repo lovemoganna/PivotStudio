@@ -176,6 +176,12 @@ test('R6 filtered sorted formatted CSV/XLSX and real PNG/SVG downloads',async({p
   expect(XLSX.utils.sheet_to_json(sheet,{header:1,raw:false}).slice(1,-1).map(row=>row[1])).toEqual(csv.slice(1,-1).map(row=>row[1]));
   for(const kind of ['bar','line','pie','heatmap','funnel']) {
     await page.getByLabel('选择图表类型',{exact:true}).selectOption(kind); await ready(page);
+    if (kind === 'pie') {
+      // Negative source values must never be silently clipped to make an exportable pie.
+      await expect(page.getByTestId('chart-issue')).toContainText('负数');
+      await page.getByRole('button',{name:'华东 (1)',exact:true}).click();await ready(page);
+      await expect(page.getByTestId('chart-issue')).toHaveCount(0);
+    }
     // Recharts animations are visual only; wait for the final geometry before image export.
     await page.waitForTimeout(1600);
     for(const format of ['SVG','PNG']) {
@@ -325,8 +331,14 @@ test('review: rejected cross-zone move preserves source and configuration histor
 });
 
 test('review: saving recovers malformed local workspace storage across reload',async({page})=>{
-  await page.goto('/');
-  await page.evaluate(()=>localStorage.setItem('pivotstudio_workspaces_v1','{broken'));
+  // Seed corruption before React's initial persistence effect can overwrite it.
+  // The session marker keeps the later reload pointed at the newly saved view.
+  await page.addInitScript(()=>{
+    if (!sessionStorage.getItem('workspace_corruption_injected')) {
+      localStorage.setItem('pivotstudio_workspaces_v1','{broken');
+      sessionStorage.setItem('workspace_corruption_injected','1');
+    }
+  });
   await page.goto('/?demo=retail'); await ready(page);
   await expect(page.locator('[role=status]').filter({hasText:'本机视图无法读取'})).toBeVisible();
   await page.getByRole('button',{name:/工作区 ·/}).click();

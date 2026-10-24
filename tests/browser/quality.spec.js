@@ -162,7 +162,7 @@ test('quality: clipboard denial has an accessible paste fallback and real parsin
   await page.setViewportSize({width:640,height:450});
   await page.goto('/');
   const entry=page.getByRole('button',{name:/粘贴剪贴板数据/});
-  await entry.click();
+  await entry.press('Enter');
   const dialog=page.getByRole('dialog',{name:'快速粘贴表格数据',exact:true});
   expect(await dialog.evaluate(el=>el.contains(document.activeElement))).toBe(true);
   await page.keyboard.press('Escape');
@@ -185,4 +185,32 @@ test.describe('touch controls',()=>{
     expect(small).toEqual([]);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   });
+});
+
+test('quality: sidebar equal height split resizer and Metric Center studio workflows',async({page})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.goto('/?demo=retail'); await ready(page);
+  // 1. Calculation basis removed & 50:50 default split between field list and config panel
+  await expect(page.getByTestId('calculation-basis')).toHaveCount(0);
+  await expect(page.getByTestId('sidebar-split-resizer')).toBeVisible();
+  const splitBoxes=await page.evaluate(()=>{
+    const top=document.querySelector('#pivot-schema-fields').getBoundingClientRect();
+    const bottom=document.querySelector('#pivot-analysis-config').getBoundingClientRect();
+    return {topH:top.height,bottomH:bottom.height};
+  });
+  expect(Math.abs(splitBoxes.topH-splitBoxes.bottomH)).toBeLessThanOrEqual(4);
+  // 2. Metric Center hidden by default, opens directly on studio tab via + 新建指标
+  await expect(page.getByTestId('metric-center')).toHaveCount(0);
+  await page.getByRole('button',{name:'+ 新建指标',exact:true}).click();
+  const metricCenter=page.getByTestId('metric-center');
+  await expect(metricCenter).toBeVisible();
+  await expect(page.getByTestId('metric-live-preview')).toContainText('实时全表试算:');
+  // 3. Switch to compound margin mode, submit, and verify in table, zone-values, and schema fields
+  await metricCenter.getByRole('button',{name:'复合净率 ((A - B) ÷ A)',exact:true}).click();
+  await page.getByTestId('metric-center-submit').click(); await ready(page);
+  await expect(page.getByTestId('zone-values')).toContainText('FX 公式');
+  await expect(page.locator('#pivot-schema-fields')).toContainText('FX');
+  // 4. Click FX 公式 in zone-values to jump directly to editing the custom metric
+  await page.getByTestId('zone-values').getByRole('button',{name:'FX 公式',exact:true}).first().click();
+  await expect(page.getByTestId('metric-center-submit')).toContainText('保存修改并更新透视表');
 });

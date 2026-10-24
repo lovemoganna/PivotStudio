@@ -1,7 +1,6 @@
 import { t } from '../../../i18n.js';
 import React from 'react';
 import { Crosshair } from 'lucide-react';
-import { UnifiedFormatter } from '../../../utils/formatters';
 
 export function StatusBar({
   hoveredCellTelemetry,
@@ -26,16 +25,13 @@ export function StatusBar({
             <span className="text-ink-cyan font-bold">
               {hoveredCellTelemetry.valLabel}: {hoveredCellTelemetry.formatted}
             </span>
-            <span className="text-ink-muted hidden md:inline">{' ' + t("(占总计") + ' '}<strong className="text-ink-green">{hoveredCellTelemetry.pctGrand}%</strong>{' ' + t("· 占行") + ' '}<strong className="text-ink-purple">{hoveredCellTelemetry.pctRow}%</strong>{' ' + t("· 占列") + ' '}<strong className="text-ink-orange">{hoveredCellTelemetry.pctCol}%</strong>)
-            </span>
+            {hoveredCellTelemetry.hasAdditiveShares && <span className="text-ink-muted hidden md:inline">{' ' + t("(占总计") + ' '}<strong className="text-ink-green">{hoveredCellTelemetry.pctGrand}%</strong>{' ' + t("· 占行") + ' '}<strong className="text-ink-purple">{hoveredCellTelemetry.pctRow}%</strong>{' ' + t("· 占列") + ' '}<strong className="text-ink-orange">{hoveredCellTelemetry.pctCol}%</strong>)
+            </span>}
           </div>
         ) : (
           <div className="flex items-center gap-3 text-ink-muted truncate">
-            <span>{' ' + t("总和:") + ' '}<strong className="text-[#272822] dark:text-[#F8F8F2]">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.total, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
-            </span>
-            <span>{' ' + t("均值:") + ' '}<strong className="text-ink-orange">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
-            </span>
-            <span className="hidden sm:inline">{' ' + t("最大:") + ' '}<strong className="text-ink-green">{UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.max, unifiedChartSpec.primaryValCfg, { compact: true })}</strong>
+            <span className="truncate" data-testid="overall-summary">
+              {unifiedChartSpec.kpiCards?.[0] ? <>{t('总体结果：')}{unifiedChartSpec.kpiCards[0].title}{' '}<strong className="text-[#272822] dark:text-[#F8F8F2]">{unifiedChartSpec.kpiCards[0].formattedCurrent}</strong></> : t('添加指标后显示总体结果')}
             </span>
             <span className="hidden md:inline">{' ' + t("分栏:") + ' '}<strong className="text-ink-cyan">{splitRatioPct}:{100 - splitRatioPct}</strong>
             </span>

@@ -10,6 +10,9 @@ import {
 import { soundEngine } from '../../services/soundEngine';
 import { decodeView, projectView } from '../../utils/viewConfig';
 import { startImportTask } from '../../utils/workerTask';
+import { getMeasureDefaults, isMeasureField } from '../../utils/fieldSemantics.js';
+import { decodeGroupPath } from '../../utils/groupKeys.js';
+import { hasOpenDialog } from '../../utils/useDialogFocus.js';
 import {
   exportToCSV as doExportCSV,
   exportToExcelMerged as doExportExcel,
@@ -26,6 +29,7 @@ import { HeaderBar } from './components/HeaderBar';
 import { FieldShelf } from './components/FieldShelf';
 import { PivotTable } from './components/PivotTable';
 import { ChartStudio } from './components/ChartStudio';
+import { ChartFrame } from './components/ChartFrame';
 import { StatusBar } from './components/StatusBar';
 import { MiniSparkline } from './components/MiniSparkline';
 import { IntroScreen } from './components/IntroScreen';
@@ -40,9 +44,9 @@ import { BinModal } from './components/modals/BinModal';
 import { FilterModal } from './components/modals/FilterModal';
 import { FormatModal } from './components/modals/FormatModal';
 import { DataSourceModal } from './components/modals/DataSourceModal';
-import { TestSuiteModal } from './components/modals/TestSuiteModal';
 import { WorkspaceModal } from './components/modals/WorkspaceModal';
 import { CommandPaletteModal } from './components/modals/CommandPaletteModal';
+import { KeyboardShortcutsModal } from './components/modals/KeyboardShortcutsModal';
 
 export default function PivotWorkbench() {
   const [locale, setLocaleState] = useState(getLocale);
@@ -58,6 +62,7 @@ export default function PivotWorkbench() {
     const query = window.matchMedia('(prefers-color-scheme: dark)');
     const update = (event) => setSystemDark(event.matches);
     query.addEventListener('change',update);
+    update(query);
     return () => query.removeEventListener('change',update);
   }, []);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -76,6 +81,7 @@ export default function PivotWorkbench() {
   const [commandQuery, setCommandQuery] = useState('');
   const [showChartStudioPopover, setShowChartStudioPopover] = useState(false);
   const [showSpecModal, setShowSpecModal] = useState(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const [datasets, setDatasets] = useState(() => {
     try {
@@ -93,18 +99,29 @@ export default function PivotWorkbench() {
   const [activeDatasetId, setActiveDatasetId] = useState(() => (datasets.length > 0 ? datasets[0].id : null));
 
   const currentDataset = useMemo(
-    () => (activeDatasetId ? datasets.find((d) => d.id === activeDatasetId) : null) || datasets[0] || null,
+    () => (activeDatasetId ? datasets.find((d) => d.id === activeDatasetId) : null) || null,
     [datasets, activeDatasetId]
   );
 
   const [configHistory, setConfigHistory] = useState(() => [buildDefaultPivotConfig(datasets[0] || null)]);
+  const readOnlyRef = useRef(false);
   const [historyIndex, setHistoryIndex] = useState(0);
   const historyIndexRef = useRef(0);
   historyIndexRef.current = historyIndex;
 
   const pivotConfig = configHistory[historyIndex] || configHistory[0];
+  const datasetHistoriesRef = useRef(new Map());
+  useEffect(() => {
+    if (currentDataset) datasetHistoriesRef.current.set(currentDataset.id, {history:configHistory,index:historyIndex});
+  }, [currentDataset,configHistory,historyIndex]);
+  const replacePivotConfig = useCallback(config => {
+    historyIndexRef.current = 0;
+    setHistoryIndex(0);
+    setConfigHistory([config]);
+  }, []);
 
   const setPivotConfig = useCallback((updater) => {
+    if (readOnlyRef.current) return;
     setConfigHistory((prevHistory) => {
       const curIdx = historyIndexRef.current;
       const currentConfig = prevHistory[curIdx] || prevHistory[prevHistory.length - 1];
@@ -135,7 +152,7 @@ export default function PivotWorkbench() {
     secondaryValueId: '',
     sortMode: 'none',
     topN: 0,
-    missingValueMode: 'zero',
+    missingValueMode: 'connect',
     lineDerivedMetric: 'none',
     showDataLabels: true,
     showAvgReferenceLine: true,
@@ -154,10 +171,12 @@ export default function PivotWorkbench() {
   });
 
   const [tableSettings, setTableSettings] = useState({
-    density: 'normal', // 'compact' (28px) | 'normal' (36px) | 'relaxed' (44px) | 'auto' (auto row height & wrap)
+    density: 'compact', // 'compact' (28px, default) | 'normal' (36px) | 'relaxed' (44px) | 'auto' (auto row height & wrap)
+    colWidthMode: 'equal', // 'equal' (均分, default) | 'autofit' (自适应列宽) | 'custom'
     dataAlignment: 'center', // 'center' (default) | 'left' | 'right'
     showZebra: true,
     wrapText: false,
+    showExtremes: true,
     customColWidths: {},
   });
 
@@ -178,7 +197,6 @@ export default function PivotWorkbench() {
   const [activeDataSourceModal, setActiveDataSourceModal] = useState(null);
   const [gsheetUrlInput, setGsheetUrlInput] = useState('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit#gid=0');
   const [duckdbThreshold] = useState(50000);
-  const [showTestSuiteModal, setShowTestSuiteModal] = useState(false);
 
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
   const [currentUser, setCurrentUser] = useState({ id: 'usr_analyst_01', name: '张工 (BI分析师)', role: 'Admin' });
@@ -209,6 +227,7 @@ export default function PivotWorkbench() {
   const [scrollTop, setScrollTop] = useState(0);
 
   const isReadOnly = currentUser.role === 'Viewer';
+  readOnlyRef.current = isReadOnly;
 
   useEffect(() => {
     soundEngine.enabled = soundEnabled;
@@ -240,10 +259,11 @@ export default function PivotWorkbench() {
 
   useEffect(() => { try { localStorage.setItem('pivotstudio_theme',theme); } catch { showToast('无法保存主题偏好，当前标签页内仍有效；请检查浏览器存储权限','error'); } }, [theme,showToast]);
 
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < configHistory.length - 1;
+  const canUndo = !isReadOnly && historyIndex > 0;
+  const canRedo = !isReadOnly && historyIndex < configHistory.length - 1;
 
   const undo = useCallback(() => {
+    if (readOnlyRef.current) return;
     if (historyIndexRef.current > 0) {
       const nextIdx = historyIndexRef.current - 1;
       historyIndexRef.current = nextIdx;
@@ -254,6 +274,7 @@ export default function PivotWorkbench() {
   }, [soundEngine, showToast]);
 
   const redo = useCallback(() => {
+    if (readOnlyRef.current) return;
     if (historyIndexRef.current < configHistory.length - 1) {
       const nextIdx = historyIndexRef.current + 1;
       historyIndexRef.current = nextIdx;
@@ -265,6 +286,7 @@ export default function PivotWorkbench() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (hasOpenDialog()) return;
       const tag = e.target?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) {
         return;
@@ -332,20 +354,66 @@ export default function PivotWorkbench() {
     };
   }, [isResizingSplit]);
 
+  const switchDataset = useCallback((nextId, targetDataset = null) => {
+    const nextDs = targetDataset || datasets.find((d) => d.id === nextId);
+    if (!nextDs) return;
+    setActiveDatasetId(nextId);
+    setHighlightedRowKey(null);
+    setHoveredCellTelemetry(null);
+    setKeynoteShotIdx(0);
+
+    const saved = datasetHistoriesRef.current.get(nextDs.id);
+    if (saved) {
+      historyIndexRef.current = saved.index;
+      setHistoryIndex(saved.index);
+      setConfigHistory(saved.history);
+    } else replacePivotConfig(buildDefaultPivotConfig(nextDs));
+
+    setChartSpecConfig((prev) => ({
+      ...prev,
+      primaryValueId: '',
+      secondaryValueId: '',
+    }));
+  }, [datasets, replacePivotConfig]);
+
+  const loadRetailDataset = useCallback(() => {
+    setDatasets((prev) => {
+      const exists = prev.find((d) => d.id === RETAIL_TEST_DATASET.id);
+      if (exists) return prev;
+      return [RETAIL_TEST_DATASET, ...prev];
+    });
+    switchDataset(RETAIL_TEST_DATASET.id, RETAIL_TEST_DATASET);
+    soundEngine?.playTransitionChord();
+    showToast('已加载全渠道零售经营测试集 (33行)');
+  }, [switchDataset, showToast]);
+
   const currentStoryShots = useMemo(
     () => generateDynamicKeynoteShots(currentDataset),
     [currentDataset]
   );
 
-  const applyKeynoteShot = useCallback((shotIdx) => {
-    const shots = currentStoryShots.length > 0 ? currentStoryShots : KEYNOTE_STORYBOARD_SHOTS;
+  const [customStoryShotsByDataset, setCustomStoryShotsByDataset] = useState({});
+
+  const effectiveStoryShots = useMemo(() => {
+    if (activeDatasetId && customStoryShotsByDataset[activeDatasetId]) {
+      return customStoryShotsByDataset[activeDatasetId];
+    }
+    return currentStoryShots;
+  }, [activeDatasetId, customStoryShotsByDataset, currentStoryShots]);
+
+  const applyKeynoteShot = useCallback((shotIdx, shotList = effectiveStoryShots) => {
+    if (readOnlyRef.current) return;
+    if (!currentDataset) {
+      loadRetailDataset();
+    }
+    const shots = shotList.length > 0 ? shotList : KEYNOTE_STORYBOARD_SHOTS;
     const normalizedIdx = (shotIdx + shots.length) % shots.length;
     const shot = shots[normalizedIdx];
     if (!shot) return;
     soundEngine.playTransitionChord();
     setKeynoteShotIdx(normalizedIdx);
     setShotProgressPct(0);
-    setViewMode(shot.viewMode);
+    setViewMode((prevMode) => (prevMode === 'chart' ? 'chart' : shot.viewMode));
     setChartType(shot.chartType);
 
     setPivotConfig((prev) => ({
@@ -356,15 +424,16 @@ export default function PivotWorkbench() {
       collapsedRowKeys: {},
       collapsedColKeys: {},
     }));
-  }, [currentStoryShots]);
+  }, [effectiveStoryShots, currentDataset, loadRetailDataset]);
 
   const toggleFieldRole = useCallback((fieldName) => {
+    if (isReadOnly) return;
     setDatasets((prevDatasets) =>
       prevDatasets.map((ds) => {
         if (ds.id !== activeDatasetId) return ds;
         const nextFields = (ds.fields || []).map((f) => {
           if (f.name !== fieldName) return f;
-          const currentIsMeasure = f.role ? f.role === 'measure' : f.type === 'number';
+          const currentIsMeasure = isMeasureField(f);
           const nextRole = currentIsMeasure ? 'dimension' : 'measure';
           showToast(`已将字段「${f.name}」分析角色切换为: ${nextRole === 'dimension' ? '维度 (分类/分组)' : '度量 (数值/聚合)'}`);
           return { ...f, role: nextRole };
@@ -372,81 +441,7 @@ export default function PivotWorkbench() {
         return { ...ds, fields: nextFields };
       })
     );
-  }, [activeDatasetId, showToast]);
-
-  const switchDataset = useCallback((nextId, targetDataset = null) => {
-    const nextDs = targetDataset || datasets.find((d) => d.id === nextId);
-    if (!nextDs) return;
-    setActiveDatasetId(nextId);
-    setHighlightedRowKey(null);
-    setHoveredCellTelemetry(null);
-
-    const validFieldNames = new Set((nextDs.fields || []).map((f) => f.name));
-    validFieldNames.add('__COUNT__');
-    setPivotConfig((prev) => {
-      const keepValid = (arr) => (arr || []).filter((it) => validFieldNames.has(it.field));
-      let nextRows = keepValid(prev.rows);
-      let nextCols = keepValid(prev.columns);
-      let nextVals = keepValid(prev.values);
-      let nextFilters = keepValid(prev.filters);
-
-      if (nextRows.length === 0 && nextCols.length === 0) {
-        const firstDim = nextDs.fields?.find((f) => f.role === 'dimension' || (!f.role && f.type !== 'number')) || nextDs.fields?.[0];
-        if (firstDim) {
-          nextRows = [{ id: `r_auto_${Date.now()}`, field: firstDim.name, sort: 'none', dateGranularity: 'raw', excludedValues: [] }];
-        }
-      }
-
-      if (nextVals.length === 0) {
-        const firstNum = nextDs.fields?.find((f) => f.role === 'measure' || (!f.role && f.type === 'number'));
-        if (firstNum) {
-          const isAvg = /rate|ratio|pct|score|age|temp|lat|cpu|率|比|分|度|龄/i.test(firstNum.name);
-          nextVals = [{
-            id: `v_auto_${Date.now()}`,
-            field: firstNum.name,
-            agg: isAvg ? 'avg' : 'sum',
-            showAs: 'normal',
-            format: {
-              thousands: true,
-              decimals: isAvg ? 1 : 0,
-              currency: '',
-              isPercent: /rate|ratio|pct|percent|率|比/i.test(firstNum.name),
-            }
-          }];
-        } else {
-          // 纯文本/问卷数据自适应注入通用计数
-          nextVals = [{
-            id: `v_auto_count_${Date.now()}`,
-            field: '__COUNT__',
-            agg: 'count',
-            showAs: 'normal',
-            format: { thousands: true, decimals: 0, currency: '', isPercent: false }
-          }];
-        }
-      }
-
-      return {
-        ...prev,
-        filters: nextFilters,
-        rows: nextRows,
-        columns: nextCols,
-        values: nextVals,
-        valueSort: {
-          colKey: '__GRAND_TOTAL_COL__',
-          valueId: nextVals[0]?.id || '',
-          direction: 'none'
-        },
-        collapsedRowKeys: {},
-        collapsedColKeys: {},
-      };
-    });
-
-    setChartSpecConfig((prev) => ({
-      ...prev,
-      primaryValueId: '',
-      secondaryValueId: '',
-    }));
-  }, [datasets]);
+  }, [activeDatasetId, showToast, isReadOnly]);
 
   const transposeRowsAndColumns = useCallback(() => {
     if (isReadOnly) {
@@ -467,6 +462,7 @@ export default function PivotWorkbench() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (hasOpenDialog()) return;
       const tag = document.activeElement?.tagName?.toLowerCase();
       const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select';
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -497,17 +493,23 @@ export default function PivotWorkbench() {
         applyKeynoteShot(keynoteShotIdx + 1);
         return;
       }
+      if (!isTyping && !e.metaKey && !e.ctrlKey && (e.key === '?' || (e.shiftKey && e.key === '/'))) {
+        e.preventDefault();
+        soundEngine?.playPop?.();
+        setShowShortcutsModal((prev) => !prev);
+        return;
+      }
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
         setShowChartStudioPopover(false);
         setShowSpecModal(false);
+        setShowShortcutsModal(false);
         setDrillDownModal(null);
         setUploadPreviewModal(null);
         setActiveHeaderFilterModal(null);
         setActiveBinModal(null);
         setActiveFormatModal(false);
         setActiveDataSourceModal(null);
-        setShowTestSuiteModal(false);
         setShowWorkspaceModal(false);
       }
     };
@@ -528,7 +530,7 @@ export default function PivotWorkbench() {
     }, 100);
     const shotInterval = setInterval(() => {
       setKeynoteShotIdx((prev) => {
-        const shots = currentStoryShots.length > 0 ? currentStoryShots : KEYNOTE_STORYBOARD_SHOTS;
+        const shots = effectiveStoryShots.length > 0 ? effectiveStoryShots : KEYNOTE_STORYBOARD_SHOTS;
         const next = (prev + 1) % shots.length;
         applyKeynoteShot(next);
         return next;
@@ -539,7 +541,7 @@ export default function PivotWorkbench() {
       clearInterval(progressTimer);
       clearInterval(shotInterval);
     };
-  }, [keynotePlaying, applyKeynoteShot]);
+  }, [keynotePlaying, applyKeynoteShot, effectiveStoryShots]);
 
   const workerRef = useRef(null);
   const profileRequestsRef = useRef(new Map());
@@ -618,7 +620,19 @@ export default function PivotWorkbench() {
     }
   }, [currentDataset, pivotConfig, chartType, chartSpecConfig, showToast, stopCalculation, computeAttempt]);
 
-  useEffect(() => () => { workerRef.current?.terminate(); importTaskRef.current?.cancel(); }, []);
+  const resourceLifecycleRef = useRef(0);
+  useEffect(() => {
+    const lifecycle = ++resourceLifecycleRef.current;
+    return () => {
+      // StrictMode can replay mount effects after a fast file selection. Only
+      // release resources if no replacement setup ran in this same turn.
+      queueMicrotask(() => {
+        if (resourceLifecycleRef.current !== lifecycle) return;
+        workerRef.current?.terminate();
+        importTaskRef.current?.cancel();
+      });
+    };
+  }, []);
 
   const runImport = useCallback(async (payload, fileName) => {
     importTaskRef.current?.cancel();
@@ -635,120 +649,94 @@ export default function PivotWorkbench() {
   const pivotResult = activeResults.pivotResult;
   const unifiedChartSpec = activeResults.unifiedChartSpec;
 
-  const liveEngineTestResults = useMemo(() => {
-    const scenarios = [
-      {
-        id: 't1',
-        name: '场景 1：单行字段分组求和 (按销售大区汇总销售额)',
-        expectedSummary: '华东 ¥388,300 · 华南 ¥378,000 · 华北 ¥366,950 · 西南 ¥257,880 · 华中 ¥232,380 · 总计 ¥1,623,510',
-        cfg: {
-          filters: [],
-          rows: [{ id: 'r1', field: '销售大区', sort: 'desc', dateGranularity: 'raw', excludedValues: [] }],
-          columns: [],
-          values: [{ id: 'v1', field: '销售额', agg: 'sum', showAs: 'normal', format: { thousands: true, decimals: 0, currency: '¥', isPercent: false } }],
-        },
-        verify: (res) => {
-          const grand = res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v1'];
-          const east = res.rawValueMatrix['华东@@__GRAND_TOTAL_COL__@@v1'];
-          const south = res.rawValueMatrix['华南@@__GRAND_TOTAL_COL__@@v1'];
-          return {
-            passed: grand === 1623510 && east === 388300 && south === 378000 && res.tableRows.length === 6,
-            actualSummary: `华东 ¥${(east || 0).toLocaleString()} · 华南 ¥${(south || 0).toLocaleString()} · 总计 ¥${(grand || 0).toLocaleString()} (${res.elapsedMs}ms)`,
-          };
-        },
-      },
-      {
-        id: 't2',
-        name: '场景 2：两个行字段嵌套分组 (销售大区 × 商品类别，验证首列合并单元格)',
-        expectedSummary: '5个大区 × 多类别组合 = 21条明细行 + 1条总计行 = 22行，首列自动行合并',
-        cfg: {
-          filters: [],
-          rows: [
-            { id: 'r1', field: '销售大区', sort: 'none', dateGranularity: 'raw', excludedValues: [] },
-            { id: 'r2', field: '商品类别', sort: 'none', dateGranularity: 'raw', excludedValues: [] },
-          ],
-          columns: [],
-          values: [{ id: 'v1', field: '销售额', agg: 'sum', showAs: 'normal', format: { thousands: true, decimals: 0, currency: '¥', isPercent: false } }],
-        },
-        verify: (res) => {
-          const firstRowSpan = res.tableRows[0]?.headerCells?.[0]?.rowSpan;
-          return {
-            passed: res.tableRows.length === 22 && firstRowSpan > 1,
-            actualSummary: `总行数 ${res.tableRows.length} 行 · 首列合并跨度 rowSpan=${firstRowSpan} (${res.elapsedMs}ms)`,
-          };
-        },
-      },
-      {
-        id: 't3',
-        name: '场景 3：行字段与列字段交叉透视 (销售大区 × 订单日期年度交叉表)',
-        expectedSummary: '生成 2024年、2025年 及 行总计 交叉列头，总计 ¥1,623,510',
-        cfg: {
-          filters: [],
-          rows: [{ id: 'r1', field: '销售大区', sort: 'none', dateGranularity: 'raw', excludedValues: [] }],
-          columns: [{ id: 'c1', field: '订单日期', sort: 'asc', dateGranularity: 'year', excludedValues: [] }],
-          values: [{ id: 'v1', field: '销售额', agg: 'sum', showAs: 'normal', format: { thousands: true, decimals: 0, currency: '¥', isPercent: false } }],
-        },
-        verify: (res) => {
-          const colLabels = res.leafColGroups.map((c) => c.label).join(', ');
-          const grand = res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v1'];
-          return {
-            passed: res.leafColGroups.length === 2 && grand === 1623510,
-            actualSummary: `交叉列: [${colLabels}] + 行总计 · 总计 ¥${(grand || 0).toLocaleString()} (${res.elapsedMs}ms)`,
-          };
-        },
-      },
-      {
-        id: 't4',
-        name: '场景 4：多个值字段同时计算 (销售额 SUM + 销量 SUM + 毛利润 SUM + 城市 DISTINCT)',
-        expectedSummary: '总额 ¥1,623,510 · 销量 1,172 件 · 毛利 ¥649,235 · 覆盖 12 个去重城市',
-        cfg: {
-          filters: [],
-          rows: [{ id: 'r1', field: '销售大区', sort: 'none', dateGranularity: 'raw', excludedValues: [] }],
-          columns: [],
-          values: [
-            { id: 'v1', field: '销售额', agg: 'sum', showAs: 'normal', format: { thousands: true, decimals: 0, currency: '¥', isPercent: false } },
-            { id: 'v2', field: '销量', agg: 'sum', showAs: 'normal', format: { thousands: true, decimals: 0, currency: '', isPercent: false } },
-            { id: 'v3', field: '毛利润', agg: 'sum', showAs: 'normal', format: { thousands: true, decimals: 0, currency: '¥', isPercent: false } },
-            { id: 'v4', field: '城市', agg: 'count_distinct', showAs: 'normal', format: { thousands: true, decimals: 0, currency: '', isPercent: false } },
-          ],
-        },
-        verify: (res) => {
-          const sumV = res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v1'];
-          const qtyV = res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v2'];
-          const profV = res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v3'];
-          const distV = res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v4'];
-          return {
-            passed: sumV === 1623510 && qtyV === 1172 && profV === 649235 && distV === 12,
-            actualSummary: `SUM=¥${(sumV || 0).toLocaleString()} · 销量=${qtyV} · 毛利=¥${(profV || 0).toLocaleString()} · DISTINCT=${distV}城 (${res.elapsedMs}ms)`,
-          };
-        },
-      },
-      {
-        id: 't5',
-        name: '场景 5：带筛选条件的透视计算 (仅筛选 华东 + 华南)',
-        expectedSummary: '过滤后有效记录 15 行，合计销售额 ¥766,300',
-        cfg: {
-          filters: [{ id: 'f1', field: '销售大区', selectedValues: ['华东', '华南'] }],
-          rows: [{ id: 'r1', field: '销售大区', sort: 'none', dateGranularity: 'raw', excludedValues: [] }],
-          columns: [{ id: 'c1', field: '商品类别', sort: 'none', dateGranularity: 'raw', excludedValues: [] }],
-          values: [{ id: 'v1', field: '销售额', agg: 'sum', showAs: 'normal', format: { thousands: true, decimals: 0, currency: '¥', isPercent: false } }],
-        },
-        verify: (res) => {
-          const grand = res.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v1'];
-          return {
-            passed: res.filteredCount === 15 && grand === 766300,
-            actualSummary: `有效行数 ${res.filteredCount}/33 行 · 筛选合计 ¥${(grand || 0).toLocaleString()} (${res.elapsedMs}ms)`,
-          };
-        },
-      },
-    ];
+  const saveCurrentViewAsShot = useCallback((title, subtitle) => {
+    if (!currentDataset) {
+      showToast('当前未加载数据集，无法保存分镜', 'error');
+      return;
+    }
+    soundEngine?.playClick?.(620);
+    const targetId = activeDatasetId;
+    const shots = effectiveStoryShots;
+    const nextNumber = String(shots.length + 1).padStart(2, '0');
+    const insight = unifiedChartSpec?.executiveInsight;
+    const defaultSubtitle = insight
+      ? `最高：${insight.topName} (${insight.topFormatted}) · 样本总计 ${insight.groupCount} 组`
+      : '自定义分析分镜快照';
+    const newShot = {
+      id: `custom_shot_${Date.now()}`,
+      number: nextNumber,
+      title: title || `自定义分镜 ${shots.length + 1}`,
+      shortLabel: (title || `分镜${shots.length + 1}`).slice(0, 6),
+      subtitle: subtitle || defaultSubtitle,
+      cameraNote: 'Custom Analytical Lens · User Defined',
+      viewMode,
+      chartType,
+      pivotOverride: JSON.parse(JSON.stringify(pivotConfig)),
+    };
+    const nextShots = [...shots, newShot];
+    setCustomStoryShotsByDataset((prev) => ({
+      ...prev,
+      [targetId]: nextShots,
+    }));
+    setKeynoteShotIdx(nextShots.length - 1);
+    showToast(`已成功保存当前视图为分镜 [${nextNumber}]`);
+  }, [currentDataset, activeDatasetId, effectiveStoryShots, unifiedChartSpec, viewMode, chartType, pivotConfig, showToast, soundEngine]);
 
-    return scenarios.map((sc) => {
-      const res = calculatePivot(RETAIL_TEST_DATASET, sc.cfg);
-      const v = sc.verify(res);
-      return { ...sc, ...v };
+  const updateStoryShot = useCallback((shotIdx, updatedData) => {
+    if (!activeDatasetId) return;
+    soundEngine?.playClick?.(580);
+    const shots = [...effectiveStoryShots];
+    if (!shots[shotIdx]) return;
+    shots[shotIdx] = {
+      ...shots[shotIdx],
+      ...updatedData,
+      shortLabel: updatedData.title ? updatedData.title.slice(0, 6) : shots[shotIdx].shortLabel,
+    };
+    setCustomStoryShotsByDataset((prev) => ({
+      ...prev,
+      [activeDatasetId]: shots,
+    }));
+    showToast(`已更新分镜 [${shots[shotIdx].number}] 内容`);
+  }, [activeDatasetId, effectiveStoryShots, showToast, soundEngine]);
+
+  const deleteStoryShot = useCallback((shotIdx) => {
+    if (!activeDatasetId) return;
+    const shots = [...effectiveStoryShots];
+    if (shots.length <= 1) {
+      showToast('至少保留一个分镜', 'error');
+      return;
+    }
+    soundEngine?.playClick?.(440);
+    shots.splice(shotIdx, 1);
+    const reindexed = shots.map((s, idx) => ({
+      ...s,
+      number: String(idx + 1).padStart(2, '0'),
+    }));
+    setCustomStoryShotsByDataset((prev) => ({
+      ...prev,
+      [activeDatasetId]: reindexed,
+    }));
+    const nextIdx = Math.max(0, Math.min(shotIdx, reindexed.length - 1));
+    setKeynoteShotIdx(nextIdx);
+    applyKeynoteShot(nextIdx, reindexed);
+    showToast('已删除该分镜');
+  }, [activeDatasetId, effectiveStoryShots, showToast, soundEngine, applyKeynoteShot]);
+
+  const resetStoryShots = useCallback(() => {
+    if (!activeDatasetId) return;
+    soundEngine?.playClick?.(500);
+    setCustomStoryShotsByDataset((prev) => {
+      const next = { ...prev };
+      delete next[activeDatasetId];
+      return next;
     });
-  }, []);
+    setKeynoteShotIdx(0);
+    const defaultShots = generateDynamicKeynoteShots(currentDataset);
+    if (defaultShots[0]) {
+      applyKeynoteShot(0, defaultShots);
+    }
+    showToast('已恢复为当前数据集的自动推荐故事分镜');
+  }, [activeDatasetId, currentDataset, soundEngine, applyKeynoteShot, showToast]);
 
   const addFieldToZone = useCallback((zone, fieldName, source) => {
     if (isReadOnly) {
@@ -756,7 +744,7 @@ export default function PivotWorkbench() {
       return;
     }
     if (!currentDataset) return;
-    soundEngine.playClick(580);
+    soundEngine.playSnap ? soundEngine.playSnap() : soundEngine.playClick(580);
     setPivotConfig((previous) => {
       // Cross-zone moves form one history transaction, so Undo restores both sides.
       const prev = source?.itemId && source.source !== zone && source.source !== 'fieldList'
@@ -789,7 +777,6 @@ export default function PivotWorkbench() {
 
       const id = `${zone[0]}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       if (zone === 'values') {
-        const defaultAgg = fMeta?.type === 'number' ? 'sum' : 'count';
         return {
           ...prev,
           values: [
@@ -797,9 +784,8 @@ export default function PivotWorkbench() {
             {
               id,
               field: fieldName,
-              agg: defaultAgg,
               showAs: 'normal',
-              format: { thousands: true, decimals: 0, currency: fMeta?.currency || '', isPercent: false },
+              ...getMeasureDefaults(fMeta),
             },
           ],
         };
@@ -824,7 +810,7 @@ export default function PivotWorkbench() {
 
   const removeZoneItem = useCallback((zone, itemId) => {
     if (isReadOnly) return;
-    soundEngine.playClick(440);
+    soundEngine.playPop ? soundEngine.playPop() : soundEngine.playClick(440);
     setPivotConfig((prev) => ({
       ...prev,
       [zone]: (prev[zone] || []).filter((it) => it.id !== itemId),
@@ -838,7 +824,7 @@ export default function PivotWorkbench() {
       showToast('当前为只读预览模式 (Viewer)，无法修改排序配置', 'error');
       return;
     }
-    soundEngine.playClick(540);
+    soundEngine.playHaptic ? soundEngine.playHaptic('light') : soundEngine.playClick(540);
     setPivotConfig((prev) => ({
       ...prev,
       [zone]: (prev[zone] || []).map((it) => {
@@ -852,7 +838,7 @@ export default function PivotWorkbench() {
 
   const moveZoneItem = useCallback((zone, index, delta) => {
     if (isReadOnly) return;
-    soundEngine.playClick(500);
+    soundEngine.playHaptic ? soundEngine.playHaptic('medium') : soundEngine.playClick(500);
     setPivotConfig((prev) => {
       const list = [...(prev[zone] || [])];
       const targetIdx = index + delta;
@@ -930,11 +916,11 @@ export default function PivotWorkbench() {
     const rk = pointData?.rowKey || pointData?.payload?.rowKey;
     if (!rk) return;
 
-    if (chartSpecConfig.clickLinkMode === 'filter') {
+    if (chartSpecConfig.clickLinkMode === 'filter' && rk !== '__GRAND_TOTAL_ROW__') {
       const activeDim = pivotConfig.rows.length > 0 ? pivotConfig.rows[0] : (pivotConfig.columns.length > 0 ? pivotConfig.columns[0] : null);
       if (!activeDim) return;
 
-      const firstSeg = rk.split('||')[0];
+      const firstSeg = decodeGroupPath(rk)[0];
       let matchingRawVals;
       try { matchingRawVals = (await requestProfile(activeDim.field, activeDim, firstSeg))?.matchingRawValues; }
       catch(error) { if(error.name!=='AbortError') showToast(`联动筛选失败：${error.message}；请重试`,'error'); return; }
@@ -963,12 +949,33 @@ export default function PivotWorkbench() {
     } else {
       setHighlightedRowKey(rk);
       const onlyColumns = !pivotResult.rowConfigs.length && pivotResult.colConfigs.length;
-      requestDrillDown(onlyColumns ? '__GRAND_TOTAL_ROW__' : rk, onlyColumns ? rk : pointData.colKey || '__GRAND_TOTAL_COL__', {
-        rowLabel: pointData.name || rk, colLabel: pointData.colKey || '总计',
-        valLabel: unifiedChartSpec.primarySeriesKey, valueFormatted: pointData.formattedValue || '',
+      const rawPoint = pointData?.payload || pointData;
+      const rawColKey = pointData?.colKey || rawPoint?.colKey || '__GRAND_TOTAL_COL__';
+      const decodedRowLabel = rk === '__GRAND_TOTAL_ROW__'
+        ? '总计'
+        : (rawPoint?.name || decodeGroupPath(rk).join(' / ') || '总计');
+      const decodedColLabel = rawColKey === '__GRAND_TOTAL_COL__'
+        ? '总计'
+        : (decodeGroupPath(rawColKey).join(' / ') || '总计');
+      const formattedVal = pointData?.formattedValue
+        || rawPoint?.formattedValue
+        || rawPoint?.formattedDelta
+        || rawPoint?._compactPrimaryLabel
+        || (typeof rawPoint?.value === 'number'
+          ? UnifiedFormatter.formatValue(rawPoint.value, unifiedChartSpec.primaryValCfg, { compact: false })
+          : typeof rawPoint?.[unifiedChartSpec.primarySeriesKey] === 'number'
+            ? UnifiedFormatter.formatValue(rawPoint[unifiedChartSpec.primarySeriesKey], unifiedChartSpec.primaryValCfg, { compact: false })
+            : typeof rawPoint?.x === 'number' && typeof rawPoint?.y === 'number'
+              ? `${UnifiedFormatter.formatValue(rawPoint.x, unifiedChartSpec.primaryValCfg, { compact: true })} / ${UnifiedFormatter.formatValue(rawPoint.y, unifiedChartSpec.secondaryValCfg, { compact: true })}`
+              : '');
+      requestDrillDown(onlyColumns ? '__GRAND_TOTAL_ROW__' : rk, onlyColumns ? rk : rawColKey, {
+        rowLabel: onlyColumns ? '总计' : decodedRowLabel,
+        colLabel: onlyColumns ? decodedRowLabel : decodedColLabel,
+        valLabel: unifiedChartSpec.primarySeriesKey,
+        valueFormatted: formattedVal,
       });
     }
-  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotConfig.columns, pivotResult, showToast, requestDrillDown, unifiedChartSpec.primarySeriesKey, requestProfile]);
+  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotConfig.columns, pivotResult, showToast, requestDrillDown, unifiedChartSpec.primarySeriesKey, unifiedChartSpec.primaryValCfg, unifiedChartSpec.secondaryValCfg, requestProfile]);
 
   const handleFileUpload = useCallback(async (e) => {
     let file = null;
@@ -1006,6 +1013,20 @@ export default function PivotWorkbench() {
     } catch (error) { if (error.name !== 'AbortError') showToast(error.message, 'error'); }
   }, [runImport, showToast, uploadPreviewModal]);
 
+  // Every newly imported dataset uses the same defaults and independent undo history.
+  const commitImportedDataset = useCallback((newDs, autoInitPivot = true) => {
+    setDatasets(prev => [...prev, newDs]);
+    setActiveDatasetId(newDs.id);
+    setHighlightedRowKey(null);
+    setHoveredCellTelemetry(null);
+    setKeynoteShotIdx(0);
+    setChartSpecConfig(prev => ({...prev, primaryValueId:'', secondaryValueId:''}));
+    if (pendingViewRef.current) {
+      replacePivotConfig(pendingViewRef.current);
+      pendingViewRef.current = null;
+    } else replacePivotConfig(buildDefaultPivotConfig(autoInitPivot ? newDs : null));
+  }, [replacePivotConfig]);
+
   const confirmUploadDataset = useCallback(async (autoInitPivot = true) => {
     if (!uploadPreviewModal) return;
     const activeIdx = uploadPreviewModal.activeSheetIdx ?? 0;
@@ -1017,27 +1038,16 @@ export default function PivotWorkbench() {
 
     const newDs = {
       id: `ds_upload_${Date.now()}`,
+      metricCatalogSource: {fileName: uploadPreviewModal.fileName, sheetName: sheet.name || String(activeIdx)},
       name: `${uploadPreviewModal.fileName}${sheetSuffix} (${normalizedRows.length}行)`,
       fields: sheet.fields,
       rows: normalizedRows,
     };
-    setDatasets((prev) => [...prev, newDs]);
-    setActiveDatasetId(newDs.id);
-    setHighlightedRowKey(null);
-    setHoveredCellTelemetry(null);
-
-    if (pendingViewRef.current) {
-      setPivotConfig(pendingViewRef.current);
-      pendingViewRef.current = null;
-    } else if (autoInitPivot) {
-      setPivotConfig(buildDefaultPivotConfig(newDs));
-    } else {
-      setPivotConfig((prev) => ({ ...prev, filters: [], rows: [], columns: [], values: [], collapsedRowKeys: {}, collapsedColKeys: {} }));
-    }
+    commitImportedDataset(newDs, autoInitPivot);
     setUploadPreviewModal(null);
     soundEngine.playTransitionChord();
     showToast(`成功导入数据集「${newDs.name}」`);
-  }, [uploadPreviewModal, showToast, runImport]);
+  }, [uploadPreviewModal, showToast, runImport, commitImportedDataset]);
 
   const generate100kDataset = useCallback((count = 100000) => {
     const regions = ['华东', '华南', '华北', '西南', '华中', '西北'];
@@ -1093,41 +1103,26 @@ export default function PivotWorkbench() {
       return [...prev, preset];
     });
     switchDataset(preset.id, preset);
-    setPivotConfig(pendingViewRef.current || buildDefaultPivotConfig(preset));
+    if (pendingViewRef.current) replacePivotConfig(pendingViewRef.current);
     pendingViewRef.current = null;
     soundEngine?.playTransitionChord?.();
     showToast(`已加载测试集「${preset.name}」`);
-  }, [switchDataset, showToast]);
-
-  const loadRetailDataset = useCallback(() => {
-    setDatasets((prev) => {
-      const exists = prev.find((d) => d.id === RETAIL_TEST_DATASET.id);
-      if (exists) return prev;
-      return [RETAIL_TEST_DATASET, ...prev];
-    });
-    switchDataset(RETAIL_TEST_DATASET.id, RETAIL_TEST_DATASET);
-    setPivotConfig(buildDefaultPivotConfig(RETAIL_TEST_DATASET));
-    soundEngine?.playTransitionChord();
-    showToast('已加载全渠道零售经营测试集 (33行)');
-  }, [switchDataset, showToast]);
+  }, [switchDataset, showToast, replacePivotConfig]);
 
   const unloadDataset = useCallback((id) => {
-    setDatasets((prev) => {
-      const next = prev.filter((d) => d.id !== id);
-      if (id === activeDatasetId) {
-        const nextActive = next.length > 0 ? next[0].id : null;
-        setActiveDatasetId(nextActive);
-        if (next.length === 0) {
-          setPivotConfig(buildDefaultPivotConfig(null));
-        } else {
-          switchDataset(nextActive, next[0]);
-        }
+    const next = datasets.filter(d => d.id !== id);
+    datasetHistoriesRef.current.delete(id);
+    setDatasets(next);
+    if (id === activeDatasetId) {
+      if (next.length) switchDataset(next[0].id, next[0]);
+      else {
+        setActiveDatasetId(null);
+        replacePivotConfig(buildDefaultPivotConfig(null));
       }
-      return next;
-    });
+    }
     soundEngine?.playClick?.(440);
     showToast('已卸载指定数据集');
-  }, [activeDatasetId, switchDataset, showToast]);
+  }, [datasets,activeDatasetId, switchDataset, showToast, replacePivotConfig]);
 
   const unloadCurrentDataset = useCallback(() => {
     unloadDataset(activeDatasetId);
@@ -1200,7 +1195,7 @@ export default function PivotWorkbench() {
       { id: 'cmd_keynote', category: 'Keynote 叙事分镜', label: keynotePlaying ? '暂停 96 BPM Keynote 自动运镜' : '启动 96 BPM Apple Keynote 自动运镜', shortcut: 'Space', run: () => { setKeynotePlaying((p) => !p); } },
       { id: 'cmd_theater', category: 'Keynote 叙事分镜', label: cinemaTheaterMode ? '退出剧院全屏舞台模式' : '进入剧院全屏舞台模式 (隐藏侧栏)', shortcut: 'T', run: () => { setCinemaTheaterMode((p) => !p); } },
       { id: 'cmd_transpose', category: '矩阵与结构操作', label: '一键执行透视矩阵「行列互换 (Transpose)」', shortcut: 'R', run: transposeRowsAndColumns },
-      ...(currentStoryShots.length > 0 ? currentStoryShots : KEYNOTE_STORYBOARD_SHOTS).map((s, idx) => ({
+      ...(effectiveStoryShots.length > 0 ? effectiveStoryShots : KEYNOTE_STORYBOARD_SHOTS).map((s, idx) => ({
         id: `cmd_shot_${idx}`,
         category: 'Keynote 叙事分镜',
         label: `${t('切换分镜')} ${s.number}: ${s.title}`,
@@ -1215,11 +1210,10 @@ export default function PivotWorkbench() {
         run: () => { setChartType(ct.value); if (viewMode === 'table') setViewMode('split'); },
       })),
       { id: 'cmd_100k', category: '性能与引擎验证', label: '一键生成 100,000 行大数据压测集 (激活虚拟滚动)', shortcut: '100K', run: () => generate100kDataset(100000) },
-      { id: 'cmd_testsuite', category: '性能与引擎验证', label: '打开内置计算场景校验（非全量验收）', shortcut: '5/5', run: () => setShowTestSuiteModal(true) },
       { id: 'cmd_theme', category: '外观与导出', label: darkMode ? '切换为 Monokai Light 暖纸浅色主题' : '切换为 Monokai Pro 经典暗黑主题', shortcut: 'Theme', run: () => setDarkMode((p) => !p) },
       { id: 'cmd_excel', category: '外观与导出', label: '导出 Excel 工作簿 (.xlsx)', shortcut: 'XLS', run: exportToExcelMerged },
       { id: 'cmd_csv', category: '外观与导出', label: '导出标准 UTF-8 CSV 数据表 (.csv)', shortcut: 'CSV', run: exportToCSV },
-      { id: 'cmd_autofit_cols', category: '透视表排版与对齐', label: '透视表：一键自动优化调整行高与列宽 (Auto-Fit)', shortcut: 'Fit', run: () => { const newWidths = calculateAutoFitColumnWidths(pivotResult, tableSettings.customColWidths); setTableSettings((p) => ({ ...p, customColWidths: newWidths })); showToast('已自动计算并自适应优化全部行高与列宽'); } },
+      { id: 'cmd_autofit_cols', category: '透视表排版与对齐', label: '透视表：一键自动优化调整行高与列宽 (Auto-Fit)', shortcut: 'Fit', run: () => { const newWidths = calculateAutoFitColumnWidths(pivotResult, tableSettings.customColWidths); setTableSettings((p) => ({ ...p, colWidthMode: 'autofit', customColWidths: newWidths })); showToast('已自动计算并自适应优化全部行高与列宽'); } },
       { id: 'cmd_align_center', category: '透视表排版与对齐', label: '透视表：设置数据与表头居中对齐 (Centered 默认)', shortcut: 'Align', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'center' })); showToast('数据已设置为居中对齐'); } },
       { id: 'cmd_align_left', category: '透视表排版与对齐', label: '透视表：设置数据靠左对齐 (Left)', shortcut: 'Left', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'left' })); showToast('数据已设置为靠左对齐'); } },
       { id: 'cmd_align_right', category: '透视表排版与对齐', label: '透视表：设置数据靠右对齐 (Right)', shortcut: 'Right', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'right' })); showToast('数据已设置为靠右对齐'); } },
@@ -1232,7 +1226,7 @@ export default function PivotWorkbench() {
     if (!commandQuery.trim()) return list;
     const q = commandQuery.toLowerCase();
     return list.filter((item) => [item.label, item.category, t(item.label), t(item.category), item.shortcut].some(text => text.toLowerCase().includes(q)));
-  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, locale, pivotResult, tableSettings, showToast]);
+  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, locale, pivotResult, tableSettings, showToast, effectiveStoryShots]);
 
   // Default and synchronized height matching the PivotTable's rendered dimension
   const defaultTableHeight = useMemo(() => {
@@ -1268,8 +1262,8 @@ export default function PivotWorkbench() {
   }, [pivotResult]);
 
   const rowHeightMap = { compact: 28, normal: 36, relaxed: 44, auto: 44 };
-  const currentDensity = tableSettings.density || 'normal';
-  const ROW_HEIGHT = rowHeightMap[currentDensity] || 36;
+  const currentDensity = tableSettings.density || 'compact';
+  const ROW_HEIGHT = rowHeightMap[currentDensity] || 28;
   const isVirtualized = pivotResult.tableRows.length > 80 && !isPrintingReport && currentDensity !== 'auto' && !tableSettings.wrapText;
 
   const visibleRowWindow = useMemo(() => {
@@ -1290,11 +1284,14 @@ export default function PivotWorkbench() {
 
   return (
     <div data-testid="pivot-workbench" data-calculation-status={isWorkerComputing ? 'running' : computeError ? 'failed' : resultIsCurrent ? 'idle' : 'pending'} className={darkMode && !isPrintingReport ? 'dark' : ''}>
-      <div className={`min-h-[100dvh] h-auto md:h-[100dvh] bg-[#F7F6F0] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans print:bg-white print:text-black apple-transition ${isPrintingReport ? 'overflow-visible' : 'overflow-x-hidden md:overflow-hidden'}`}>
-        <div className="hidden print:block px-6 py-4 border-b border-black/15">
+      <div className={`min-h-[100dvh] h-auto md:h-[100dvh] bg-[#F7F6F0] dark:bg-[#1E1F1C] ambient-glow-mesh text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans print:bg-white print:text-black apple-transition ${isPrintingReport ? 'overflow-visible' : 'overflow-x-hidden md:overflow-hidden'}`}>
+        {isPrintingReport ? (
+          <div className="hidden print:block px-6 py-4 border-b border-black/15">
           <h1 className="text-base font-semibold tracking-tight text-black">{t("PivotEngine Studio [Monokai Pro] 数据透视分析报告 —") + ' '}{currentDataset?.name || '空白工程'}</h1>
           <p className="text-[11px] text-ink-muted mt-1">{t("导出时间:") + ' '}{new Date().toLocaleString('zh-CN')}{' ' + t("· 有效记录:") + ' '}{pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()}{' ' + t("行 · 导出人:") + ' '}{currentUser.name}</p>
         </div>
+
+        ) : null}
 
         {/* Modular Header Bar */}
         <HeaderBar
@@ -1313,6 +1310,14 @@ export default function PivotWorkbench() {
           setKeynotePlaying={setKeynotePlaying}
           keynoteShotIdx={keynoteShotIdx}
           applyKeynoteShot={applyKeynoteShot}
+          storyShots={effectiveStoryShots}
+          onSaveCurrentViewAsShot={saveCurrentViewAsShot}
+          onUpdateStoryShot={updateStoryShot}
+          onDeleteStoryShot={deleteStoryShot}
+          onResetStoryShots={resetStoryShots}
+          unifiedChartSpec={unifiedChartSpec}
+          onEnsureDatasetLoaded={loadRetailDataset}
+          currentDataset={currentDataset}
           cinemaTheaterMode={cinemaTheaterMode}
           setCinemaTheaterMode={setCinemaTheaterMode}
           shotProgressPct={shotProgressPct}
@@ -1322,17 +1327,19 @@ export default function PivotWorkbench() {
           viewMode={viewMode}
           isPrintingReport={isPrintingReport}
           setShowSpecModal={setShowSpecModal}
+          setShowShortcutsModal={setShowShortcutsModal}
           setShowCommandPalette={setShowCommandPalette}
           setCommandQuery={setCommandQuery}
-          setShowTestSuiteModal={setShowTestSuiteModal}
           setActiveFormatModal={setActiveFormatModal}
           setShowWorkspaceModal={setShowWorkspaceModal}
-          liveEngineTestResults={liveEngineTestResults}
           exportToExcelMerged={exportToExcelMerged}
           exportToCSV={exportToCSV}
           exportChartAsPNG={exportChartAsPNG}
           exportChartAsSVG={exportChartAsSVG}
           exportPDFReport={exportPDFReport}
+          handleFileUpload={handleFileUpload}
+          handlePasteText={handlePasteText}
+          setActiveDataSourceModal={setActiveDataSourceModal}
           showToast={showToast}
           toastMessage={toastMessage}
           setToastMessage={setToastMessage}
@@ -1350,50 +1357,24 @@ export default function PivotWorkbench() {
         {computeError && <div role="alert" className="px-4 py-2 border-b border-[#F92672] text-ink-pink flex flex-wrap gap-3 items-center">
           <span>{computeError}</span><button onClick={() => setComputeAttempt((value) => value + 1)} className="border rounded px-2 py-1">重新计算</button>
         </div>}
-        {/* Workspace Dataset Tab Strip */}
+        {/* Workspace Dataset Tab Strip & Context Bar */}
         <DatasetTabStrip
           datasets={datasets}
           activeDatasetId={activeDatasetId}
+          currentDataset={currentDataset}
           switchDataset={switchDataset}
           unloadDataset={unloadDataset}
           onOpenIntro={() => setActiveDatasetId(null)}
           pivotResult={pivotResult}
           isWorkerComputing={isWorkerComputing}
           soundEngine={soundEngine}
+          handleFileUpload={handleFileUpload}
+          onPasteText={handlePasteText}
+          setActiveDataSourceModal={setActiveDataSourceModal}
+          isReadOnly={isReadOnly}
+          uploadProgress={uploadProgress}
+          showToast={showToast}
         />
-
-        <div role="status" className="shrink-0 flex items-center gap-2 px-4 py-1.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/65 dark:bg-[#272822]/75 text-[10px] text-ink-muted dark:text-[#B8B5A8] apple-font-mono">
-          <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[#66D9EF]" />
-          <span className="truncate">{t("数据来源：")}{!currentDataset ? t("未载入数据集 · 等待输入以开启透视分析 · 本地 JavaScript 极速计算引擎就绪") : currentDataset.id === RETAIL_TEST_DATASET?.id ? '内置演示数据（非真实业务记录）' : currentDataset.id.startsWith('ds_100k_') ? '本地合成压测数据' : currentDataset.id.startsWith('ds_google_') ? 'Google Sheets 公开数据（导入时快照）' : '本地导入文件'} · {(pivotResult?.filteredCount || 0).toLocaleString()} / {(pivotResult?.totalCount || 0).toLocaleString()}{' ' + t("行 · 本地 JavaScript 计算")}</span>
-        </div>
-
-        {/* Bento KPI Cards Strip with Mini Sparklines */}
-        {currentDataset && unifiedChartSpec.kpiCards.length > 0 && (
-          <div className="bg-[#F7F6F0] dark:bg-[#1E1F1C] px-4 pt-3 pb-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 shrink-0">
-            {unifiedChartSpec.kpiCards.map((kpi) => (
-              <div key={kpi.id} className="px-4 py-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822] apple-specular-card flex items-center justify-between gap-3 apple-transition hover:border-[#66D9EF]/60">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-medium text-ink-muted flex items-center gap-1.5 truncate apple-font-mono">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: kpi.color }} />
-                    <span className="truncate">{kpi.title}</span>
-                    {kpi.unit && <span className="px-1.5 py-0.2 rounded bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-ink-pink text-[10px] apple-font-mono shrink-0">{kpi.unit}</span>}
-                  </div>
-                  <div className="text-base font-bold tracking-tight apple-font-mono text-[#272822] dark:text-[#F8F8F2] mt-0.5">{kpi.formattedCurrent}</div>
-                  {kpi.comparison && (
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold apple-font-mono ${kpi.comparison.isPositive ? 'bg-[#A6E22E]/15 text-ink-green border border-[#A6E22E]/30' : 'bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30'}`}>
-                        {kpi.comparison.pctFormatted}
-                      </span>
-                      <span className="text-[9px] text-ink-muted truncate max-w-[125px]" title={`较 ${kpi.comparison.baselineLabel}`}>{' ' + t("较") + ' '}{kpi.comparison.baselineLabel}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <MiniSparkline values={kpi.sparkValues} color={kpi.color} />
-              </div>
-            ))}
-          </div>
-        )}
 
         {!currentDataset ? (
           <IntroScreen
@@ -1401,7 +1382,6 @@ export default function PivotWorkbench() {
             onLoadPresetDataset={loadPresetDataset}
             onLoadRetailDataset={loadRetailDataset}
             onGenerate100kDataset={generate100kDataset}
-            onOpenTestSuite={() => setShowTestSuiteModal(true)}
             onPasteText={handlePasteText}
             uploadProgress={uploadProgress}
             soundEngine={soundEngine}
@@ -1456,6 +1436,7 @@ export default function PivotWorkbench() {
           showToast={showToast}
           toggleFieldRole={toggleFieldRole}
           setCondFormat={setCondFormat}
+          isPrintingReport={isPrintingReport}
         >
           {/* 字段有效性自愈横幅: 当配置中遗留失效字段时提醒用户并提供一键重置 */}
           {pivotResult?.sanitizedInfo?.hasInvalidFields && (
@@ -1492,6 +1473,8 @@ export default function PivotWorkbench() {
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col w-full min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
+                isReadOnly={isReadOnly}
+                onAddRecordCount={() => addFieldToZone('values', '__COUNT__')}
                 requestProfile={requestProfile}
                 pivotResult={pivotResult}
                 pivotConfig={pivotConfig}
@@ -1525,6 +1508,18 @@ export default function PivotWorkbench() {
                 setViewMode={setViewMode}
                 copyTextToClipboard={copyTextToClipboard}
                 showToast={showToast}
+                draggingPayload={draggingPayload}
+                setDraggingPayload={setDraggingPayload}
+                dragOverZone={dragOverZone}
+                setDragOverZone={setDragOverZone}
+                addFieldToZone={addFieldToZone}
+                removeZoneItem={removeZoneItem}
+                moveZoneItem={moveZoneItem}
+                setHeaderFilterSearch={setHeaderFilterSearch}
+                setActiveHeaderFilterModal={setActiveHeaderFilterModal}
+                setBinFormState={setBinFormState}
+                setActiveBinModal={setActiveBinModal}
+                transposeRowsAndColumns={transposeRowsAndColumns}
               />
             </div>
           )}
@@ -1566,14 +1561,18 @@ export default function PivotWorkbench() {
           )}
 
           {(viewMode !== 'table' || isPrintingReport) && (
-            <div
-              id="pivot-chart-container"
+            <ChartFrame
+              fullscreen={isChartFullscreen && !isPrintingReport}
+              onExit={() => setIsChartFullscreen(false)}
+              darkMode={darkMode}
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%`, minHeight: 460 } : {}),
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col w-full min-h-0 p-4 apple-transition relative ${isChartFullscreen ? 'fixed inset-4 z-50 shadow-2xl' : viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'h-auto' : ''}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-w-0 min-h-0 p-4 apple-transition ${isChartFullscreen ? '' : 'w-full flex-1'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
               <ChartStudio
+                isReadOnly={isReadOnly}
+                requestDrillDown={requestDrillDown}
                 chartType={chartType}
                 setChartType={setChartType}
                 unifiedChartSpec={unifiedChartSpec}
@@ -1586,15 +1585,32 @@ export default function PivotWorkbench() {
                 showChartStudioPopover={showChartStudioPopover}
                 setShowChartStudioPopover={setShowChartStudioPopover}
                 highlightedRowKey={highlightedRowKey}
+                onClearHighlight={() => setHighlightedRowKey(null)}
                 handleChartPointClick={handleChartPointClick}
                 setDrillDownModal={setDrillDownModal}
                 setDrillSearch={setDrillSearch}
                 setDrillPage={setDrillPage}
                 applyKeynoteShot={applyKeynoteShot}
                 keynoteShotIdx={keynoteShotIdx}
+                storyShots={effectiveStoryShots}
+                onSaveCurrentViewAsShot={saveCurrentViewAsShot}
+                onUpdateStoryShot={updateStoryShot}
+                onDeleteStoryShot={deleteStoryShot}
+                onResetStoryShots={resetStoryShots}
+                hasCustomStoryShots={Boolean(activeDatasetId && customStoryShotsByDataset[activeDatasetId])} setPivotConfig={setPivotConfig} addFieldToZone={addFieldToZone} removeZoneItem={removeZoneItem}
+                pivotConfig={pivotConfig}
                 soundEngine={soundEngine}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+                onAddRecordCount={() => addFieldToZone('values', '__COUNT__')}
+                onAddMeasure={(field) => addFieldToZone('values', field)}
+                currentDataset={currentDataset}
+                showToast={showToast}
+                copyTextToClipboard={copyTextToClipboard}
+                onExportPNG={exportChartAsPNG}
+                onExportSVG={exportChartAsSVG}
               />
-            </div>
+            </ChartFrame>
           )}
         </div>
       </FieldShelf>
@@ -1618,6 +1634,7 @@ export default function PivotWorkbench() {
           commandQuery={commandQuery}
           setCommandQuery={setCommandQuery}
           commandActions={commandActions}
+          soundEngine={soundEngine}
         />
 
         <DrillDownModal
@@ -1662,6 +1679,7 @@ export default function PivotWorkbench() {
         />
 
         <FormatModal
+          isReadOnly={isReadOnly}
           isOpen={activeFormatModal}
           condFormat={condFormat}
           setCondFormat={setCondFormat}
@@ -1673,6 +1691,8 @@ export default function PivotWorkbench() {
         />
 
         <DataSourceModal
+          onModeChange={setActiveDataSourceModal}
+          onImportDataset={commitImportedDataset}
           runImport={runImport}
           activeDataSourceModal={activeDataSourceModal}
           onClose={() => setActiveDataSourceModal(null)}
@@ -1681,29 +1701,14 @@ export default function PivotWorkbench() {
           duckdbThreshold={duckdbThreshold}
           currentDataset={currentDataset}
           pivotConfig={pivotConfig}
-          setDatasets={setDatasets}
-          setActiveDatasetId={setActiveDatasetId}
-          setPivotConfig={setPivotConfig}
           generate100kDataset={generate100kDataset}
           copyTextToClipboard={copyTextToClipboard}
           soundEngine={soundEngine}
           showToast={showToast}
         />
 
-        <TestSuiteModal
-          isOpen={showTestSuiteModal}
-          onClose={() => setShowTestSuiteModal(false)}
-          liveEngineTestResults={liveEngineTestResults}
-          isReadOnly={isReadOnly}
-          setDatasets={setDatasets}
-          setActiveDatasetId={setActiveDatasetId}
-          setPivotConfig={setPivotConfig}
-          soundEngine={soundEngine}
-          showToast={showToast}
-        />
-
         <WorkspaceModal
-          restorePivotConfig={(config, datasetAvailable) => { pendingViewRef.current = datasetAvailable ? null : config; setPivotConfig(config); }}
+          restorePivotConfig={(config, datasetAvailable) => { pendingViewRef.current = datasetAvailable ? null : config; replacePivotConfig(config); }}
           isOpen={showWorkspaceModal}
           onClose={() => setShowWorkspaceModal(false)}
           currentUser={currentUser}
@@ -1740,6 +1745,11 @@ export default function PivotWorkbench() {
         <SpecModal
           isOpen={showSpecModal}
           onClose={() => setShowSpecModal(false)}
+        />
+
+        <KeyboardShortcutsModal
+          isOpen={showShortcutsModal}
+          onClose={() => setShowShortcutsModal(false)}
         />
       </div>
     </div>

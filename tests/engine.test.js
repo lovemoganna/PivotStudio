@@ -12,6 +12,14 @@ test('quoted CSV supports multi-line data', () => {
   assert.deepEqual(parseCSVRecords('a,b\r\n"x,y","quoted ""word""\nline"\r\n'), [['a', 'b'], ['x,y', 'quoted "word"\nline']]);
 });
 
+test('explicit empty filter selects no records while legacy empty selections include all', () => {
+  const ds = {fields:[{name:'region',type:'text'},{name:'value',type:'number'}],rows:[{region:'East',value:12},{region:'West',value:25}]};
+  const config = {rows:[{field:'region'}],columns:[],values:[{id:'v',field:'value',agg:'sum'}],filters:[{field:'region',selectedValues:[]}]};
+  assert.equal(calculatePivot(ds,config).filteredCount,2);
+  assert.equal(calculatePivot(ds,{...config,filters:[{...config.filters[0],excludeAll:true}]}).filteredCount,0);
+  assert.equal(calculatePivot(ds,{...config,filters:[{...config.filters[0],selectedValues:['West'],excludeAll:false}]}).filteredCount,1);
+});
+
 test('CSV rejects malformed and duplicate headings', () => {
   assert.throws(() => parseCSVRecords('a\n"broken'));
   assert.throws(() => parseCSVTextToSheet('a,a\n1,2'));
@@ -162,7 +170,8 @@ test('handles completely empty dataset and all-filtered rows safely', () => {
     filters: [{ field: 'dim', selectedValues: ['Y'] }]
   });
   assert.equal(resFilteredOut.filteredCount, 0);
-  assert.equal(resFilteredOut.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v1'], 0);
+  // No matching numeric observations is unknown, unlike a genuine sum of zero.
+  assert.equal(resFilteredOut.rawValueMatrix['__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@v1'], null);
 });
 
 test('type inference respects 70% threshold consistently', () => {
@@ -273,8 +282,8 @@ test('formatDimensionValue supports hour, minute and day_of_week', () => {
 
   // 2026-03-01 14:35:00
   const dStr = '2026-03-01T14:35:00';
-  assert.equal(formatDimensionValue(dStr, dimCfgHour, meta), '03-01 14:00');
-  assert.equal(formatDimensionValue(dStr, dimCfgMinute, meta), '14:35');
+  assert.equal(formatDimensionValue(dStr, dimCfgHour, meta), '2026-03-01 14:00');
+  assert.equal(formatDimensionValue(dStr, dimCfgMinute, meta), '2026-03-01 14:35');
   assert.equal(formatDimensionValue(dStr, dimCfgDow, meta), '周日');
 });
 

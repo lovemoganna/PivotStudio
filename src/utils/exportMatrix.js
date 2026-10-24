@@ -1,4 +1,6 @@
 import { getDimDisplayLabel, formatCellNumber, UnifiedFormatter } from './formatters.js';
+import { t } from '../i18n.js';
+import { decodeGroupPath } from './groupKeys.js';
 
 /** All export rows originate from the complete pivot result, not the virtualized DOM. */
 export function buildPivotExportRows(pivotResult, { formatted = false } = {}) {
@@ -10,22 +12,22 @@ export function buildPivotExportRows(pivotResult, { formatted = false } = {}) {
     ...dimensionHeaders,
     ...groups.flatMap((group) => metrics.map((metric) => {
       const path = group.pathLabels?.length ? group.pathLabels.join(' / ') + ' · ' : '';
-      const percent = metric.showAs?.startsWith('pct_') || metric.format?.isPercent ? ' [%]' : '';
-      return path + metric.field + ' (' + metric.agg + ')' + percent;
+      const percent = metric.showAs?.startsWith('pct_') || (!['count','count_distinct'].includes(metric.agg) && metric.format?.isPercent) ? ' [%]' : '';
+      return path + (metric.field === '__COUNT__' ? t('记录数') : metric.field) + ' (' + metric.agg + ')' + percent;
     }))
   ];
 
   const rows = (pivotResult.tableRows || []).map((row) => {
     let labels;
     if (row.isTotal) labels = ['总计'];
-    else labels = String(row.rowKey ?? '').replace('__SUBTOTAL__','').split('||');
+    else labels = decodeGroupPath(row.rowKey ?? '');
     while (labels.length < dimensionHeaders.length) labels.push('');
     labels = labels.slice(0,dimensionHeaders.length);
     const values = groups.flatMap((group) => metrics.map((metric) => {
       const key = row.rowKey + '@@' + group.key + '@@' + metric.id;
       const cell = pivotResult.displayMatrix?.[key];
       if (formatted) return formatCellNumber(cell,metric);
-      if (cell?.isBaseline) return '-';
+      if (cell?.isBaseline || cell?.display === null || cell?.display === undefined) return '-';
       const value = cell?.display;
       return typeof value === 'number' && Number.isFinite(value) ? value : value ?? '';
     }));
@@ -43,8 +45,9 @@ export function encodeCsvCell(value, numericDisplay = false) {
 }
 
 export function excelNumberFormat(metric) {
-  const percent = metric.showAs?.startsWith('pct_') || metric.format?.isPercent;
-  const decimals = metric.showAs?.startsWith('pct_') ? 1 : Math.max(0,Math.min(12,metric.format?.decimals ?? 0));
+  const count = ['count','count_distinct'].includes(metric.agg);
+  const percent = metric.showAs?.startsWith('pct_') || (!count && metric.format?.isPercent);
+  const decimals = metric.showAs?.startsWith('pct_') ? 1 : count ? 0 : Math.max(0,Math.min(12,metric.format?.decimals ?? 0));
   const unit = UnifiedFormatter.inferUnit(metric);
   const currency = !percent && /^[\$¥€£元]/.test(unit) ? unit : '';
   const suffix = percent ? '%' : currency ? '' : unit ? ` ${unit}` : '';
