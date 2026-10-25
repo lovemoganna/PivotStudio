@@ -134,16 +134,21 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
               <button
                 type="button"
                 disabled={isReadOnly}
+                data-testid="apply-recommended-config"
                 onClick={() => {
                   soundEngine?.playClick?.(520);
                   setPivotConfig?.(buildDefaultPivotConfig(currentDataset));
-                  showToast?.('已恢复默认推荐透视配置');
+                  showToast?.(setupEmpty ? '已应用推荐配置' : '已恢复默认推荐透视配置');
                 }}
-                className="px-1.5 py-0.5 min-h-[24px] inline-flex items-center rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-ink-muted hover:text-ink-cyan text-[9.5px] font-semibold transition disabled:opacity-40"
+                className={`px-1.5 py-0.5 min-h-[24px] inline-flex items-center gap-1 rounded-md border text-[9.5px] font-semibold transition disabled:opacity-40 ${
+                  setupEmpty
+                    ? 'bg-[#66D9EF] border-[#66D9EF] text-[#1E1F1C] hover:opacity-90'
+                    : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-ink-muted hover:text-ink-cyan'
+                }`}
                 title={t("根据当前数据集自动生成推荐行列与指标")}
               >
-                <Sparkles className="w-2.5 h-2.5 text-ink-yellow" />
-                <span>{t("恢复推荐")}</span>
+                <Sparkles className={`w-2.5 h-2.5 ${setupEmpty ? 'text-[#1E1F1C]' : 'text-ink-yellow'}`} />
+                <span>{setupEmpty ? t('推荐配置') : t('恢复推荐')}</span>
               </button>
 
               <button
@@ -172,32 +177,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
             </div>
           </div>
 
-          {/* Beginner Guided Quick Start when config is completely empty */}
-          {(pivotConfig?.rows?.length || 0) === 0 && (pivotConfig?.values?.length || 0) === 0 && (
-            <div className="p-2 rounded-lg border border-dashed border-[#66D9EF]/50 bg-[#66D9EF]/10 space-y-1 text-xs shrink-0 select-none">
-              <div className="flex items-center justify-between text-[10.5px] font-bold text-ink-cyan">
-                <span className="flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-ink-yellow" />
-                  {t("快速开始")}
-                </span>
-                <button
-                  type="button"
-                  disabled={isReadOnly}
-                  onClick={() => {
-                    soundEngine?.playClick?.(520);
-                    setPivotConfig?.(buildDefaultPivotConfig(currentDataset));
-                    showToast?.('已应用推荐配置');
-                  }}
-                  className="px-1.5 py-0.2 rounded bg-[#66D9EF] text-[#1E1F1C] text-[9.5px] font-bold hover:opacity-90 transition"
-                >
-                  {t("⚡ 推荐配置")}
-                </button>
-              </div>
-              <p className="text-[9.5px] text-ink-muted leading-relaxed">
-                {t("点击字段旁的【+行】选分类（如地区），再点【+值】选数值（如销售额），即可生成透视表与图表。")}
-              </p>
-            </div>
-          )}
+          {/* Empty-setup guidance lives in zone hints + the table analysis-start CTA; avoid a third copy block here. */}
 
           {/* 4 Dropzones Grid with Independent Scroll */}
           <div className="grid grid-cols-1 min-[340px]:grid-cols-2 gap-1.5 overflow-y-auto pr-0.5 max-h-[280px] md:max-h-none md:flex-1 md:min-h-0 content-start items-start auto-rows-max">
@@ -304,14 +284,17 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                               values: '要计算什么？从字段列表点击 +值，或统计记录数。',
                             }[z.key])}
                           </span>
-                          <span className="text-[8.5px] text-ink-muted/65 block">
-                            {t({
-                              filters: '例如只看华东或线上渠道',
-                              columns: '例如按年份或月份并排比较',
-                              rows: '例如按地区或类别列出',
-                              values: '例如销售额求和、记录数',
-                            }[z.key])}
-                          </span>
+                          {/* Examples only after the user starts configuring — full empty setup already has table CTA. */}
+                          {!setupEmpty && (
+                            <span className="text-[8.5px] text-ink-muted/65 block">
+                              {t({
+                                filters: '例如只看华东或线上渠道',
+                                columns: '例如按年份或月份并排比较',
+                                rows: '例如按地区或类别列出',
+                                values: '例如销售额求和、记录数',
+                              }[z.key])}
+                            </span>
+                          )}
                         </div>
                         {z.key === 'values' && (pivotConfig?.rows?.length || 0) > 0 && !isReadOnly && (
                           <button

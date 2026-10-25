@@ -116,17 +116,19 @@ export function PivotTable({
   }, [updateScrollState, tableContainerRef, pivotResult]);
 
   // Row and Column Index Maps for O(1) range selection lookup
-  // Available Slicer Fields (Rows + Columns + Filters, fallback to text fields)
+  // Slicer fields: only from the active analysis structure. Fallback to text dims only when
+  // values already exist (grand-total view) — never while the setup is completely empty.
   const slicerFields = useMemo(() => {
     const list = [];
     (pivotConfig?.rows || []).forEach((r) => { if (r.field && !list.includes(r.field)) list.push(r.field); });
     (pivotConfig?.columns || []).forEach((c) => { if (c.field && !list.includes(c.field)) list.push(c.field); });
     (pivotConfig?.filters || []).forEach((f) => { if (f.field && !list.includes(f.field)) list.push(f.field); });
-    if (list.length === 0 && currentDataset?.fields) {
+    const hasValues = (pivotConfig?.values?.length || 0) > 0;
+    if (list.length === 0 && hasValues && currentDataset?.fields) {
       currentDataset.fields.filter((f) => f.type !== 'number').forEach((f) => list.push(f.name));
     }
     return list;
-  }, [pivotConfig?.rows, pivotConfig?.columns, pivotConfig?.filters, currentDataset?.fields]);
+  }, [pivotConfig?.rows, pivotConfig?.columns, pivotConfig?.filters, pivotConfig?.values, currentDataset?.fields]);
 
   const [activeSlicerField, setActiveSlicerField] = useState(() => slicerFields[0] || '');
 
@@ -502,7 +504,11 @@ export function PivotTable({
       {pivotConfig?.values?.length === 0 && (
         <div data-testid="analysis-start" className="px-4 py-3 border-b border-[#D6D4C8] dark:border-[#3E3D32] text-sm leading-6 shrink-0">
           <p className="font-semibold">{t('还没有数值指标')}</p>
-          <p>{t('从字段列表点击 +值，或先统计记录数。添加行维度后，可查看每个类别有多少条记录。')}</p>
+          <p className="text-[13px] text-ink-muted">
+            {(pivotConfig?.rows?.length || 0) === 0
+              ? t('从字段列表点 +行 选分类，再点 +值 选数值；也可先统计记录数，或使用左侧「推荐配置」。')
+              : t('从字段列表点击 +值，或先统计记录数。添加行维度后，可查看每个类别有多少条记录。')}
+          </p>
           <button type="button" disabled={isReadOnly} onClick={onAddRecordCount} className="mt-2 px-3 py-1.5 rounded bg-action text-white font-semibold disabled:opacity-40">{t('统计记录数')}</button>
         </div>
       )}
@@ -1243,6 +1249,12 @@ export function PivotTable({
                       </button>
                     </div>
                   ) : (pivotResult?.rowConfigs?.length || 0) === 0 && (pivotResult?.valConfigs?.length || 0) === 0 ? (
+                    (pivotConfig?.values?.length || 0) === 0 ? (
+                      /* analysis-start banner already owns the primary CTA — keep the table body quiet. */
+                      <div className="py-4 text-ink-muted text-[11px]" aria-hidden="true">
+                        {t('配置行与值后，结果将显示在这里')}
+                      </div>
+                    ) : (
                     <div className="space-y-2 max-w-md mx-auto">
                       <p className="font-semibold text-[#272822] dark:text-[#F8F8F2]">
                         {t('透视表未配置分组维度与数值指标')}
@@ -1272,6 +1284,7 @@ export function PivotTable({
                         </button>
                       </div>
                     </div>
+                    )
                   ) : (
                     <div className="text-ink-muted">
                       {t('当前视图无行维度分组数据。可在左侧为行区域添加维度以展开明细。')}

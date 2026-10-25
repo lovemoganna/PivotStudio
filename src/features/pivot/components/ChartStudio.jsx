@@ -817,13 +817,13 @@ export function ChartStudio({
                 : t("请在左侧把金额、数量等字段加到「值」区域，图表才会出现。")}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {/* Avoid duplicating the table's primary CTA while both panes are visible. */}
+              {/* In split view the table owns next-step CTAs; chart-only keeps measure shortcuts. */}
               {viewMode !== 'split' && typeof onAddRecordCount === 'function' && (
                 <button type="button" disabled={isReadOnly} onClick={onAddRecordCount} className="px-3 py-1.5 rounded-lg bg-action text-white text-xs font-medium">
                   {t('统计记录数')}
                 </button>
               )}
-              {onAddMeasure && candidateMeasureFields.slice(0, 3).map((mf) => (
+              {viewMode !== 'split' && onAddMeasure && candidateMeasureFields.slice(0, 3).map((mf) => (
                 <button
                   key={mf.name}
                   type="button"
