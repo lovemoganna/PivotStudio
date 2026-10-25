@@ -161,7 +161,11 @@ try{
   console.log('CHART_TYPES_VERIFIED',JSON.stringify(kinds));
   await evaluate('(() => { const el=document.querySelector(\'select[aria-label="选择图表类型"]\');el.value="bar";el.dispatchEvent(new Event("change",{bubbles:true}));return true; })()');
   await sleep(130);
-  for(const [label,description] of [['格式与数值','数值与条件格式设置'],['内置校验','内置校验结果'],['工作区','本机工作区与配置分享']]){
+  // The older internal-verification action was retired from the user-facing toolbar.
+  // Assert its absence rather than resurrect a diagnostic entry just to satisfy an old smoke selector.
+  const diagnosticEntryVisible=await evaluate('Array.from(document.querySelectorAll("button")).some(b=>b.textContent.trim()==="内置校验")');
+  if(diagnosticEntryVisible)errors.push('retired internal diagnostic action reappeared in user UI');
+  for(const [label,description] of [['格式与数值','数值与条件格式设置'],['工作区','本机工作区与配置分享']]){
     assert.equal(await clickText(label),true,'open '+description);
     await sleep(130);
     const focused=await evaluate('(() => {const d=document.querySelector("[role=dialog]"); return d?{label:d.getAttribute("aria-label"),focused:d.contains(document.activeElement)}:null;})()');
@@ -170,20 +174,20 @@ try{
     await sleep(130);
     if(await evaluate('!!document.querySelector("[role=dialog]")'))errors.push('Escape did not close '+description);
   }
-  assert.equal(await clickText('SQL代理'),true);
-  await sleep(160);
-  const sql=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
-  if(!sql.includes('尚未实现'))errors.push('SQL integration misrepresented');
-  const modalFocused=await evaluate('document.querySelector("[role=dialog]")?.contains(document.activeElement) ?? false');
-  if(!modalFocused)errors.push('SQL dialog failed initial keyboard focus');
-  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
-  await sleep(160);
-  if(await evaluate('!!document.querySelector("[role=dialog]")'))errors.push('Escape did not close SQL dialog');
-  assert.equal(await clickText('GSheet'),true);
+  // Data sources use a single +来源 entry with distinct tabs, not old toolbar buttons.
+  assert.equal(await clickText('+来源'),true,'open external data source manager');
   await sleep(160);
   const gsheet=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
   if(!gsheet.includes('公开'))errors.push('GSheet access limits missing');
-  await evaluate('document.querySelector("button[aria-label=\\"关闭数据源\\"]")?.click()');
+  const modalFocused=await evaluate('document.querySelector("[role=dialog]")?.contains(document.activeElement) ?? false');
+  if(!modalFocused)errors.push('data source dialog failed initial keyboard focus');
+  assert.equal(await clickText('SQL 连接说明'),true,'select SQL status tab');
+  await sleep(160);
+  const sql=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
+  if(!sql.includes('尚未实现'))errors.push('SQL integration misrepresented');
+  await evaluate('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
+  await sleep(160);
+  if(await evaluate('!!document.querySelector("[role=dialog]")'))errors.push('Escape did not close data source dialog');
   const themeBefore=await evaluate('!!document.querySelector(".dark")');
   await evaluate('document.querySelector("button[aria-label=\\"切换主题\\"]")?.click()');
   await sleep(250);
@@ -237,7 +241,9 @@ try{
   // Browser performance evidence: actual 100k synthetic records and responsiveness.
   await evaluate('(() => { window.__psLongTasks = []; if(typeof PerformanceObserver === "function"){try{const obs=new PerformanceObserver(list=>window.__psLongTasks.push(...list.getEntries().map(e=>e.duration)));obs.observe({entryTypes:["longtask"]});window.__psLongTaskObserver=obs;}catch{}}return true;})()');
   const largeStart=Date.now();
-  assert.equal(await clickText('100K压测'),true,'open synthetic data benchmark');
+  assert.equal(await clickText('+来源'),true,'open synthetic data source manager');
+  await sleep(120);
+  assert.equal(await clickText('SQL 模板与压测'),true,'select local benchmark tab');
   await sleep(120);
   assert.equal(await clickText('生成 100,000 行合成数据'),true,'generate 100k local rows');
   await waitFor(async()=>await evaluate('document.body.textContent.includes("100,000 / 100,000 行") && document.body.textContent.includes("本地合成压测数据")'),'100k-row real browser analysis',45000);
