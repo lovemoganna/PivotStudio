@@ -52,7 +52,7 @@ test('interpretation: Top N names the visible denominator while overall table re
  await expect(page.getByTestId('chart-scope')).toContainText('2/3');await expect(page.getByTestId('chart-scope')).toContainText('图中分组合计为分母');
  await expect(page.locator('#pivot-chart-container .recharts-pie-labels')).toContainText('66.7%');
  await expect(page.getByTestId('pivot-value-cell')).toHaveText(['60','30','10']);await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('100');
- await page.locator('#pivot-chart-container .recharts-pie-sector').first().hover();await expect(page.locator('.recharts-tooltip-wrapper')).toContainText('占图中分组合计');
+ await page.locator('#pivot-chart-container .recharts-pie-sector').first().hover();await expect(page.locator('.recharts-tooltip-wrapper')).toContainText('占图中合计');
 });
 test('interpretation: funnel order and relative comparison survive keyboard drilldown',async({page})=>{
  await start(page,{csv:'Group,Amount\nVisit,100\nPay,20\nRetry,50',type:'funnel'});
@@ -96,6 +96,7 @@ test('interpretation: chart studio guide & notes, donut highlight value, and len
  await page.route('https://fonts.googleapis.com/**',r=>r.abort());await page.route('https://fonts.gstatic.com/**',r=>r.abort());
  await page.emulateMedia({reducedMotion:'reduce'});
  await page.goto('/?demo=retail');await ready(page);
+ await page.getByRole('button',{name:/表格选项/}).click();
  await expect(page.getByRole('button',{name:'均分',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.getByRole('button',{name:'紧凑',exact:true})).toHaveAttribute('aria-pressed','true');
  // Highlight first row in table, then switch to donut chart and verify center shows highlighted slice value rather than grand total
@@ -103,41 +104,42 @@ test('interpretation: chart studio guide & notes, donut highlight value, and len
  await page.getByLabel('选择图表类型',{exact:true}).selectOption('donut');await ready(page);
  const chart=page.locator('#pivot-chart-container');
  await expect(chart).not.toContainText('TOTAL_SUM');
- await expect(chart).toContainText('153.8K');
- await expect(chart).toContainText('12.8%');
- // Switch to chart-only mode: guide & notes panel auto-opens
+ // Leaf-row highlight (e.g. 华东/上海) maps to its pie-slice ancestor (华东), not the grand total.
+ await expect(chart).toContainText('301.1K');
+ await expect(chart).toContainText('25.1%');
+ await expect(chart).not.toContainText('图中合计');
+ // Switch to chart-only mode: reading tips stay collapsed so the chart stays primary
  await page.getByRole('button',{name:'仅图表',exact:true}).click();
+ await page.getByRole('button',{name:'阅读提示',exact:true}).click();
  const guide=page.getByTestId('chart-guide-note');
  await expect(guide).toBeVisible();
- await expect(guide).toContainText('零基础读图与分析方法指南');
- await expect(guide).toContainText('首位领跑:');
- // Switching analysis lens preset in chart-only mode preserves chart-only mode
- await page.getByRole('button',{name:/分析视角/}).click();
- await page.locator('#pivot-lens-presets button').nth(2).click();await ready(page);
+ await expect(guide).toContainText('怎么读这张图');
+ await expect(guide).toContainText('我的结论');
+ // Switching chart type in chart-only mode preserves chart-only mode
+ await page.getByLabel('选择图表类型',{exact:true}).selectOption('line');await ready(page);
  await expect(page.getByRole('button',{name:'仅图表',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#pivot-main-html-table')).toHaveCount(0);
  // Edit note from chart studio guide panel
- await guide.getByRole('button',{name:'编辑笔记',exact:true}).click();
- const dialog=page.getByRole('dialog',{name:'编辑分镜内容',exact:true});
- await dialog.getByLabel('业务结论与讲解旁白:',{exact:true}).fill('零基础用户记录的季度增长结论');
+ await guide.getByRole('button',{name:'编辑',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:/编辑分析笔记/});
+ await dialog.getByLabel('分析结论:',{exact:true}).fill('零基础用户记录的季度增长结论');
  await dialog.getByRole('button',{name:'保存修改',exact:true}).click();await expect(dialog).toHaveCount(0);
  await expect(guide).toContainText('零基础用户记录的季度增长结论');
- // Clicking chart bar opens drill-down without leaking __GRAND_TOTAL_COL__
+ // Back to bars for drill-down; click must not leak __GRAND_TOTAL_COL__
+ await page.getByLabel('选择图表类型',{exact:true}).selectOption('bar');await ready(page);
  await chart.locator('.recharts-bar-rectangle').first().click();
  const drill=page.getByRole('dialog',{name:'原始交易明细下钻',exact:true});
  await expect(drill).toBeVisible();
  await expect(drill).not.toContainText('__GRAND_TOTAL_COL__');
  await page.keyboard.press('Escape');
- // Chart direct sorting, TopN quick chips, and direct PNG export
- const sortBtn=chart.getByRole('button',{name:'图表排序',exact:true});
- await sortBtn.click();
- await expect(sortBtn).toContainText('降序');
- await sortBtn.click();
- await expect(sortBtn).toContainText('升序');
+ // Chart sorting via toolbar; Top N and export via options
+ await chart.getByRole('button',{name:'图表排序',exact:true}).click();
+ await chart.getByRole('button',{name:'图表选项',exact:true}).click();
  await expect(chart.getByRole('button',{name:'PNG',exact:true})).toBeVisible();
- await expect(chart.getByRole('button',{name:'Top5',exact:true})).toBeVisible();
- await chart.getByRole('button',{name:'Top5',exact:true}).click();
- await expect(chart.locator('.recharts-bar-rectangle')).toHaveCount(5);
+ await chart.getByLabel('只显示前 N 组:',{exact:true}).selectOption('3');
+ await ready(page);
+ await page.keyboard.press('Escape');
+ await expect(chart.getByTestId('chart-scope')).toContainText('3/');
  const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze();
  expect(axe.violations).toEqual([]);
 });

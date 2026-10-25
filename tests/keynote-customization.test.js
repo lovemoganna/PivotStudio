@@ -20,7 +20,7 @@ test('Keynote dynamic generation adapts to datasets with rows and highlights rea
   const shots = generateDynamicKeynoteShots(datasetWithRows);
   assert.equal(shots.length, 5);
   // Shot 1 should highlight 'Shanghai' as top frequency in rows
-  assert.equal(shots[0].title, '全景「City」对比概览');
+  assert.equal(shots[0].title, '按「City」对比Sales');
   assert.ok(shots[0].subtitle.includes('Shanghai'), 'Subtitle should dynamically include top category highlight');
   assert.equal(shots[0].pivotOverride.rows[0].field, 'City');
   assert.equal(shots[0].pivotOverride.values[0].field, 'Sales');

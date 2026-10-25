@@ -1,9 +1,9 @@
 import { t } from '../../../i18n.js';
 import React from 'react';
 import {
-  Terminal, Layers3, Lock, Search, Zap, Film, CheckCircle2, Palette,
-  FolderOpen, Volume2, VolumeX, Sun, Moon, SkipBack, SkipForward, AlertCircle, ChevronRight, X,
-  Undo2, Redo2, Upload, Sparkles, Plus, Pencil, Trash2, RotateCcw, Play, Pause, Database, FileSpreadsheet, Keyboard
+  Terminal, Lock, Search, Film, CheckCircle2, Palette,
+  FolderOpen, Volume2, VolumeX, Sun, Moon, SkipBack, SkipForward, AlertCircle, ChevronRight, ChevronDown, X,
+  Undo2, Redo2, Upload, Sparkles, Plus, Pencil, Trash2, RotateCcw, Play, Pause, Database, Keyboard, MoreHorizontal, Download
 } from 'lucide-react';
 import { KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
 import { StoryShotDialog } from './modals/StoryShotDialog';
@@ -31,7 +31,6 @@ export function HeaderBar({
   isReadOnly,
   viewMode,
   isPrintingReport,
-  setShowSpecModal,
   setShowShortcutsModal,
   setShowCommandPalette,
   setCommandQuery,
@@ -59,11 +58,62 @@ export function HeaderBar({
 }) {
   const effectiveStoryShots = (storyShots && storyShots.length > 0) ? storyShots : KEYNOTE_STORYBOARD_SHOTS;
   const activeKeynoteShot = effectiveStoryShots[keynoteShotIdx] || effectiveStoryShots[0] || KEYNOTE_STORYBOARD_SHOTS[0];
+  const hasDataset = Boolean(currentDataset);
   const [isEditingShot, setIsEditingShot] = React.useState(false);
   const [editShotForm, setEditShotForm] = React.useState({ title: '', subtitle: '' });
   const [isSavingNewShot, setIsSavingNewShot] = React.useState(false);
   const [newShotForm, setNewShotForm] = React.useState({ title: '', subtitle: '' });
+  const [exportMenuOpen, setExportMenuOpen] = React.useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = React.useState(false);
+  const [toolbarOverflows, setToolbarOverflows] = React.useState(false);
+  const exportMenuRef = React.useRef(null);
+  const moreMenuRef = React.useRef(null);
   const toolbarRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setToolbarOverflows(el.scrollWidth > el.clientWidth + 4);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [hasDataset, keynotePlaying, cinemaTheaterMode]);
+
+  React.useEffect(() => {
+    if (!exportMenuOpen && !moreMenuOpen) return;
+    const onPointerDown = (event) => {
+      if (exportMenuOpen && exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+        setExportMenuOpen(false);
+      }
+      if (moreMenuOpen && moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
+        setMoreMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setExportMenuOpen(false);
+        setMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [exportMenuOpen, moreMenuOpen]);
+
+  React.useEffect(() => {
+    if (!hasDataset) {
+      setExportMenuOpen(false);
+      setMoreMenuOpen(false);
+    }
+  }, [hasDataset]);
   const scrollBehavior = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
   const scrollToolbar = () => {
     const el = toolbarRef.current;
@@ -99,38 +149,31 @@ export function HeaderBar({
             <div className="flex items-center gap-2">
               <h1 className="text-[14px] font-bold tracking-tight flex items-center gap-2">
                 <span className="text-[#272822] dark:text-[#F8F8F2]">PivotStudio</span>
-                <span className="text-[9px] tracking-[0.08em] text-ink-cyan font-semibold apple-font-mono">DATA WORKBENCH</span>
+                <span className="text-[10px] font-medium text-ink-muted hidden sm:inline">{t("数据透视")}</span>
               </h1>
-              <button
-                onClick={() => { soundEngine?.playClick(620); setShowSpecModal(true); }}
-                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#AE81FF]/15 text-ink-purple border border-[#AE81FF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition shrink-0 whitespace-nowrap"
-                title={t("查看项目设计与交互规范")}
-                aria-label={t("设计规范")}
-              >
-                <Layers3 className="w-3 h-3 text-ink-orange" />
-                <span className="hidden sm:inline">{t("设计规范")}</span>
-              </button>
               {setShowShortcutsModal && (
                 <button
                   type="button"
                   onClick={() => { soundEngine?.playPop?.(); setShowShortcutsModal(true); }}
-                  className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#66D9EF]/15 text-ink-cyan border border-[#66D9EF]/35 font-semibold apple-font-mono hover:scale-105 apple-transition shrink-0 whitespace-nowrap"
-                  title={t("查看键盘快捷键与高效操作指南 (?)")}
+                  className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md text-ink-muted hover:text-ink-cyan hover:bg-[#66D9EF]/10 border border-transparent hover:border-[#66D9EF]/30 font-medium apple-transition shrink-0 whitespace-nowrap"
+                  title={t("查看键盘快捷键 (?)")}
                   aria-label={t("快捷键指南")}
                 >
-                  <Keyboard className="w-3 h-3 text-ink-cyan" />
+                  <Keyboard className="w-3 h-3" />
                   <span className="hidden sm:inline">{t("快捷键")}</span>
                   <kbd className="text-[8px] opacity-75 hidden sm:inline">?</kbd>
                 </button>
               )}
               {isReadOnly && (
-                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#FD971F]/15 text-ink-orange font-semibold border border-[#FD971F]/35 apple-font-mono">
+                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-[#FD971F]/15 text-ink-orange font-semibold border border-[#FD971F]/35">
                   <Lock className="w-2.5 h-2.5" />
-                  <span>READ_ONLY (Viewer)</span>
+                  <span>{t("只读预览")}</span>
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-ink-muted hidden xl:block leading-tight mt-0.5 apple-font-mono">{' ' + t("数据透视分析 · 多维筛选 · 表图联动") + ' '}</p>
+            <p className="text-[10px] text-ink-muted hidden xl:block leading-tight mt-0.5">
+              {hasDataset ? t("选择行、列与指标，查看透视结果") : t("导入表格，开始分析")}
+            </p>
           </div>
         </div>
 
@@ -205,53 +248,58 @@ export function HeaderBar({
                 )}
               </div>
 
-              {/* Sub-cluster: 数据导出 (Outbound) */}
-              <div className="flex items-center h-full px-1 gap-0.5">
-                <span className="px-1 hidden md:flex items-center text-ink-green select-none" title={t("数据导出")}>
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                </span>
-                <button
-                  onClick={exportToExcelMerged}
-                  title={t("导出真正的 Excel 工作簿 (.xlsx)")}
-                  className="h-7 px-1.5 min-w-[28px] rounded hover:bg-[#A6E22E]/15 text-[#272822] dark:text-ink-green font-semibold text-[10.5px] transition"
-                >
-                  <span>.XLSX</span>
-                </button>
-                <button
-                  onClick={exportToCSV}
-                  title={t("导出 CSV 数据表 (.csv)")}
-                  className="h-7 px-1.5 min-w-[28px] rounded hover:bg-[#66D9EF]/15 text-[#272822] dark:text-ink-cyan font-semibold text-[10.5px] transition"
-                >
-                  <span>.CSV</span>
-                </button>
-                <button
-                  disabled={viewMode === 'table'}
-                  onClick={exportChartAsPNG}
-                  title={viewMode === 'table' ? '当前为「仅透视表」模式，请切换至「表图并列」或「仅图表」视图导出图表' : '导出 PNG 图表'}
-                  className={`h-7 px-1.5 min-w-[28px] rounded font-semibold text-[10.5px] transition ${
-                    viewMode === 'table'
-                      ? 'opacity-35 cursor-not-allowed text-ink-muted'
-                      : 'hover:bg-[#FD971F]/15 text-[#272822] dark:text-ink-orange'
-                  }`}
-                >
-                  <span>.PNG</span>
-                </button>
-                <button
-                  disabled={viewMode === 'table'}
-                  onClick={exportChartAsSVG}
-                  title={t("导出 SVG 矢量图表")}
-                  className="h-7 px-1.5 min-w-[28px] rounded font-semibold text-[10.5px] text-ink-yellow hover:bg-[#E6DB74]/15 disabled:opacity-35 transition"
-                >
-                  .SVG
-                </button>
-                <button
-                  onClick={exportPDFReport}
-                  title={t("打开打印窗口，可选择另存为 PDF")}
-                  className="h-7 px-1.5 min-w-[28px] rounded hover:bg-[#AE81FF]/15 text-[#272822] dark:text-ink-purple font-semibold text-[10.5px] transition"
-                >
-                  <span>.PDF</span>
-                </button>
-              </div>
+              {/* Sub-cluster: 数据导出 — one quiet menu after data is loaded */}
+              {hasDataset && (
+                <div ref={exportMenuRef} className="relative flex items-center h-full px-1">
+                  <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={exportMenuOpen}
+                    onClick={() => { soundEngine?.playClick?.(520); setMoreMenuOpen(false); setExportMenuOpen((open) => !open); }}
+                    className={`h-7 flex items-center gap-1 px-2 rounded-md font-semibold transition ${
+                      exportMenuOpen
+                        ? 'bg-[#A6E22E]/20 text-ink-green'
+                        : 'hover:bg-[#A6E22E]/15 text-[#272822] dark:text-ink-green'
+                    }`}
+                    title={t("导出表格或图表")}
+                  >
+                    <Download className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("导出")}</span>
+                    <ChevronDown className={`w-3 h-3 opacity-70 transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {exportMenuOpen && (
+                    <div
+                      role="menu"
+                      aria-label={t("导出格式")}
+                      className="absolute top-[calc(100%+6px)] right-0 z-50 min-w-[148px] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#1E1F1C] shadow-xl p-1"
+                    >
+                      {[
+                        { label: '.XLSX', onClick: exportToExcelMerged, title: t('导出真正的 Excel 工作簿 (.xlsx)'), disabled: false },
+                        { label: '.CSV', onClick: exportToCSV, title: t('导出 CSV 数据表 (.csv)'), disabled: false },
+                        { label: '.PNG', onClick: exportChartAsPNG, title: viewMode === 'table' ? t('请先切换到含图表的视图再导出 PNG') : t('导出 PNG 图表'), disabled: viewMode === 'table' },
+                        { label: '.SVG', onClick: exportChartAsSVG, title: t('导出 SVG 矢量图表'), disabled: viewMode === 'table' },
+                        { label: '.PDF', onClick: exportPDFReport, title: t('打开打印窗口，可选择另存为 PDF'), disabled: false },
+                      ].map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          role="menuitem"
+                          disabled={item.disabled}
+                          title={item.title}
+                          onClick={() => {
+                            if (item.disabled) return;
+                            item.onClick?.();
+                            setExportMenuOpen(false);
+                          }}
+                          className="w-full h-8 px-2.5 rounded-lg text-left text-[11px] font-semibold text-[#272822] dark:text-[#F8F8F2] hover:bg-[#A6E22E]/15 disabled:opacity-35 disabled:cursor-not-allowed transition"
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* ---------------------------------------------------------------------
@@ -284,94 +332,111 @@ export function HeaderBar({
                 </button>
               </div>
 
-              {/* Command Palette */}
+              {/* Command Palette — always available for power users */}
               <button
                 onClick={() => { soundEngine?.playClick(640); setShowCommandPalette(true); setCommandQuery(''); }}
-                className="h-full flex items-center gap-1.5 px-2 hover:bg-[#3E3D32]/10 dark:hover:bg-[#3E3D32]/50 text-[11px] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] apple-transition"
+                className={`h-full flex items-center gap-1.5 px-2 hover:bg-[#3E3D32]/10 dark:hover:bg-[#3E3D32]/50 text-[11px] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] apple-transition ${!hasDataset ? 'rounded-r-lg' : ''}`}
                 title={t("打开全局指令面板 (⌘K / Ctrl+K)")}
                 aria-label={t("打开指令面板")}
               >
                 <Search className="w-3.5 h-3.5 text-ink-cyan" />
-                <span className="hidden md:inline font-medium text-[11px] apple-font-mono">{t("指令")}</span>
+                <span className="hidden md:inline font-medium text-[11px]">{t("指令")}</span>
                 <kbd aria-hidden="true" className="px-1.5 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] text-[9px] font-semibold text-ink-pink border border-[#D6D4C8] dark:border-[#49483E] apple-font-mono hidden sm:inline">⌘K</kbd>
               </button>
 
-              {/* Format & Values Modal Trigger */}
-              <button
-                onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }}
-                className="h-full flex items-center gap-1.5 px-2.5 rounded-r-lg hover:bg-[#FD971F]/10 text-[#272822] dark:text-[#F8F8F2] text-[11px] font-medium apple-transition"
-                title={t("数值格式、条件高亮与千分位设置")}
-              >
-                <Palette className="w-3.5 h-3.5 text-ink-orange" />
-                <span>{t("格式与数值")}</span>
-              </button>
+              {/* Format — only after data is loaded */}
+              {hasDataset && (
+                <button
+                  onClick={() => { soundEngine?.playClick(580); setActiveFormatModal(true); }}
+                  className="h-full flex items-center gap-1.5 px-2.5 rounded-r-lg hover:bg-[#FD971F]/10 text-[#272822] dark:text-[#F8F8F2] text-[11px] font-medium apple-transition"
+                  title={t("数值格式、条件高亮与千分位设置")}
+                >
+                  <Palette className="w-3.5 h-3.5 text-ink-orange" />
+                  <span>{t("格式与数值")}</span>
+                </button>
+              )}
             </div>
 
             {/* ---------------------------------------------------------------------
-                CLUSTER 3: 协同与演示模式 (Collaboration & Presentation)
+                CLUSTER 3: 更多 — workspace / demo stay available without crowding the bar
                 --------------------------------------------------------------------- */}
-            <div
-              className="flex items-center h-8 bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] rounded-lg shadow-xs divide-x divide-[#D6D4C8] dark:divide-[#3E3D32]"
-              role="group"
-              aria-label={t("协同与演示")}
-            >
-              {/* Workspace Snapshot / Sharing */}
-              <button
-                onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); }}
-                className="h-full flex items-center gap-1.5 px-2.5 rounded-l-lg hover:bg-[#F92672]/15 text-ink-pink font-semibold text-[11px] apple-transition"
-                title={t("本地工作区快照、演示角色与分享配置")}
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-ink-pink shrink-0" />
-                <span>{t("工作区 ·") + ' '}{currentUser.name.split(' ')[0]}</span>
-              </button>
-
-              {/* Keynote Storyboard Playback */}
-              <button
-                onClick={() => {
-                  if (!currentDataset) {
-                    onEnsureDatasetLoaded?.();
-                  }
-                  const nextState = !keynotePlaying;
-                  setKeynotePlaying(nextState);
-                  if (nextState) {
-                    soundEngine?.playToggle ? soundEngine.playToggle(true) : soundEngine?.playClick?.(600);
-                    applyKeynoteShot(keynoteShotIdx);
-                    showToast?.('已开启 Monokai Keynote 96 BPM 叙事运镜演示');
-                  } else {
-                    soundEngine?.playToggle ? soundEngine.playToggle(false) : soundEngine?.playClick?.(440);
-                    showToast?.('已暂停 Keynote 自动运镜，可自由交互');
-                  }
-                }}
-                className={`h-full flex items-center gap-1.5 px-2.5 text-[11px] font-semibold apple-font-mono apple-transition tactile-btn ${keynotePlaying ? 'bg-action text-[#F8F8F2] shadow-sm' : 'text-[#272822] dark:text-[#F8F8F2] hover:bg-[#3E3D32]/15'}`}
-                title={t("开启 96 BPM 分镜运镜模式")}
-              >
-                {keynotePlaying ? (
-                  <span className="flex items-end gap-0.5 h-3 mr-0.5">
-                    <span className="w-0.5 bg-[#E6DB74] rounded-full" style={{ animation: 'eqPulse1 0.625s infinite ease-in-out' }} />
-                    <span className="w-0.5 bg-[#A6E22E] rounded-full" style={{ animation: 'eqPulse2 0.625s infinite ease-in-out' }} />
-                    <span className="w-0.5 bg-[#66D9EF] rounded-full" style={{ animation: 'eqPulse3 0.625s infinite ease-in-out' }} />
-                  </span>
-                ) : (
-                  <Film className="w-3.5 h-3.5 text-ink-pink shrink-0" />
+            {hasDataset && (
+              <div ref={moreMenuRef} className="relative flex items-center h-8">
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={moreMenuOpen}
+                  onClick={() => { soundEngine?.playClick?.(520); setExportMenuOpen(false); setMoreMenuOpen((open) => !open); }}
+                  className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[11px] font-semibold apple-transition ${
+                    moreMenuOpen || keynotePlaying || cinemaTheaterMode
+                      ? 'text-ink-pink border-[#F92672]/40 bg-[#F92672]/10'
+                      : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+                  }`}
+                  title={t("工作区、演示与更多")}
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                  <span>{t("更多")}</span>
+                  <ChevronDown className={`w-3 h-3 opacity-70 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {moreMenuOpen && (
+                  <div
+                    role="menu"
+                    aria-label={t("更多操作")}
+                    className="absolute top-[calc(100%+6px)] right-0 z-50 min-w-[180px] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#1E1F1C] shadow-xl p-1"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { soundEngine?.playClick(600); setShowWorkspaceModal(true); setMoreMenuOpen(false); }}
+                      className="w-full h-8 px-2.5 rounded-lg text-left text-[11px] font-semibold text-ink-pink hover:bg-[#F92672]/10 inline-flex items-center gap-2 transition"
+                      title={t("本地工作区快照、演示角色与分享配置")}
+                    >
+                      <FolderOpen className="w-3.5 h-3.5 shrink-0" />
+                      <span>{t("工作区 ·") + ' '}{currentUser.name.split(' ')[0]}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        if (!currentDataset) onEnsureDatasetLoaded?.();
+                        const nextState = !keynotePlaying;
+                        setKeynotePlaying(nextState);
+                        if (nextState) {
+                          soundEngine?.playToggle ? soundEngine.playToggle(true) : soundEngine?.playClick?.(600);
+                          applyKeynoteShot(keynoteShotIdx);
+                          showToast?.('已开始演示播放');
+                        } else {
+                          soundEngine?.playToggle ? soundEngine.playToggle(false) : soundEngine?.playClick?.(440);
+                          showToast?.('已暂停演示');
+                        }
+                        setMoreMenuOpen(false);
+                      }}
+                      className="w-full h-8 px-2.5 rounded-lg text-left text-[11px] font-semibold text-[#272822] dark:text-[#F8F8F2] hover:bg-[#3E3D32]/10 inline-flex items-center gap-2 transition"
+                      title={t("播放 / 暂停演示")}
+                    >
+                      <Film className="w-3.5 h-3.5 text-ink-pink shrink-0" />
+                      <span>{keynotePlaying ? `${t("演示")} [${activeKeynoteShot.number}]` : t("演示")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        if (!currentDataset) onEnsureDatasetLoaded?.();
+                        soundEngine?.playWhoosh ? soundEngine.playWhoosh() : soundEngine?.playClick?.(560);
+                        setCinemaTheaterMode((p) => !p);
+                        setMoreMenuOpen(false);
+                      }}
+                      className={`w-full h-8 px-2.5 rounded-lg text-left text-[11px] font-semibold inline-flex items-center gap-2 transition ${
+                        cinemaTheaterMode ? 'bg-[#A6E22E]/20 text-[#1E1F1C] dark:text-ink-green' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-[#3E3D32]/10'
+                      }`}
+                      title={t("切换演示舞台模式 (快捷键: T)")}
+                    >
+                      <span>{t("演示舞台")}</span>
+                    </button>
+                  </div>
                 )}
-                <span>{keynotePlaying ? `KEYNOTE [${activeKeynoteShot.number}]` : t("Keynote 演示")}</span>
-              </button>
-
-              {/* Theater Mode */}
-              <button
-                onClick={() => {
-                  if (!currentDataset) {
-                    onEnsureDatasetLoaded?.();
-                  }
-                  soundEngine?.playWhoosh ? soundEngine.playWhoosh() : soundEngine?.playClick?.(560);
-                  setCinemaTheaterMode((p) => !p);
-                }}
-                className={`h-full px-2.5 rounded-r-lg text-[10.5px] font-semibold apple-font-mono transition tactile-btn ${cinemaTheaterMode ? 'bg-[#A6E22E] text-[#1E1F1C]' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-[#3E3D32]/15'}`}
-                title={t("切换纯净剧院舞台模式 (快捷键: T)")}
-              >
-                {t("剧院舞台")}
-              </button>
-            </div>
+              </div>
+            )}
 
             {/* ---------------------------------------------------------------------
                 CLUSTER 4: 系统与环境偏好 (System & Environment Preferences)
@@ -439,16 +504,18 @@ export function HeaderBar({
 
           </div>
 
-          {/* Toolbar Scroll Advance Button */}
-          <button
-            type="button"
-            onClick={scrollToolbar}
-            aria-label={t("更多工具，滚动到末尾后返回开头")}
-            title={t("查看更多工具")}
-            className="h-8 w-8 shrink-0 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] flex items-center justify-center text-ink-cyan hover:border-[#66D9EF] shadow-xs transition"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          {/* Only show scroll affordance when the decluttered toolbar actually overflows. */}
+          {toolbarOverflows && (
+            <button
+              type="button"
+              onClick={scrollToolbar}
+              aria-label={t("更多工具，滚动到末尾后返回开头")}
+              title={t("查看更多工具")}
+              className="h-8 w-8 shrink-0 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] flex items-center justify-center text-ink-cyan hover:border-[#66D9EF] shadow-xs transition"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -460,18 +527,11 @@ export function HeaderBar({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="px-2.5 py-1 rounded bg-action text-[#F8F8F2] text-[10px] apple-font-mono font-bold tracking-wider uppercase shadow-sm shrink-0">
-                SHOT {activeKeynoteShot.number} · 96 BPM
+                {t("场景")} {activeKeynoteShot.number}
               </span>
               <div className="min-w-0">
                 <div className="text-xs font-semibold tracking-tight flex items-center gap-2 flex-wrap">
                   <span className="text-ink-yellow apple-font-mono">{activeKeynoteShot.title}</span>
-                  <span className="text-[10px] text-ink-cyan font-normal hidden md:inline apple-font-mono">// {activeKeynoteShot.cameraNote}</span>
-                  {unifiedChartSpec?.executiveInsight && (
-                    <span className="hidden xl:inline-flex items-center gap-1 px-2 py-0.2 rounded bg-[#E6DB74]/15 border border-[#E6DB74]/30 text-ink-yellow text-[9.5px]">
-                      <Sparkles className="w-2.5 h-2.5 text-ink-orange" />
-                      <span>{unifiedChartSpec.executiveInsight.topName} ({unifiedChartSpec.executiveInsight.topFormatted})</span>
-                    </span>
-                  )}
                   {/* Action buttons inside Stage HUD */}
                   <div className="inline-flex items-center gap-1 ml-1 text-[10px] apple-font-mono">
                     <button
@@ -483,7 +543,7 @@ export function HeaderBar({
                         setIsEditingShot(true);
                       }}
                       className="px-1.5 py-0.5 rounded bg-[#272822] hover:bg-[#3E3D32] border border-[#49483E] text-ink-muted hover:text-[#F8F8F2] flex items-center gap-0.5 transition"
-                      title={t("编辑当前分镜标题与业务结论")}
+                      title={t("编辑当前分析笔记标题与结论")}
                     >
                       <Pencil className="w-2.5 h-2.5 text-ink-cyan" />
                       <span>{t("编辑结论")}</span>
@@ -496,16 +556,18 @@ export function HeaderBar({
                         soundEngine?.playClick?.(540);
                         const insight = unifiedChartSpec?.executiveInsight;
                         setNewShotForm({
-                          title: `自定义分析 · ${effectiveStoryShots.length + 1}`,
-                          subtitle: insight ? `首位：${insight.topName} (${insight.topFormatted}) · 样本总计 ${insight.groupCount} 组` : '当前透视与图表视图快照'
+                          title: `${t('分析笔记')} ${effectiveStoryShots.length + 1}`,
+                          subtitle: insight
+                            ? `${t('最高')}：${insight.topName} (${insight.topFormatted}) · ${insight.groupCount} ${t('组')}`
+                            : t('当前透视与图表视图'),
                         });
                         setIsSavingNewShot(true);
                       }}
                       className="px-1.5 py-0.5 rounded bg-[#272822] hover:bg-[#3E3D32] border border-[#AE81FF]/50 text-ink-purple hover:text-[#F8F8F2] flex items-center gap-0.5 transition"
-                      title={t("将当前工作区状态保存为新分镜")}
+                      title={t("将当前视图保存为分析笔记")}
                     >
                       <Plus className="w-2.5 h-2.5 text-ink-purple" />
-                      <span>{t("存为新分镜")}</span>
+                      <span>{t("存为笔记")}</span>
                     </button>
 
                     {effectiveStoryShots.length > 1 && (
@@ -514,7 +576,7 @@ export function HeaderBar({
                         disabled={isReadOnly}
                         onClick={() => onDeleteStoryShot?.(keynoteShotIdx)}
                         className="p-1 rounded bg-[#272822] hover:bg-[#3E3D32] border border-[#49483E] text-ink-muted hover:text-ink-pink transition"
-                        title={t("删除当前分镜")}
+                        title={t("删除当前分析笔记")}
                       >
                         <Trash2 className="w-2.5 h-2.5" />
                       </button>
@@ -525,7 +587,7 @@ export function HeaderBar({
                       disabled={isReadOnly}
                       onClick={() => onResetStoryShots?.()}
                       className="p-1 rounded bg-[#272822] hover:bg-[#3E3D32] border border-[#49483E] text-ink-muted hover:text-ink-yellow transition"
-                      title={t("恢复为当前数据集的推荐故事分镜")}
+                      title={t("恢复为推荐分析场景")}
                     >
                       <RotateCcw className="w-2.5 h-2.5" />
                     </button>
@@ -544,14 +606,14 @@ export function HeaderBar({
                   if (nextState) {
                     soundEngine?.playToggle ? soundEngine.playToggle(true) : soundEngine?.playClick?.(600);
                     applyKeynoteShot(keynoteShotIdx);
-                    showToast?.('已开启 Monokai Keynote 96 BPM 叙事运镜演示');
+                    showToast?.('已开始演示播放');
                   } else {
                     soundEngine?.playToggle ? soundEngine.playToggle(false) : soundEngine?.playClick?.(440);
-                    showToast?.('已暂停 Keynote 自动运镜');
+                    showToast?.('已暂停演示');
                   }
                 }}
                 className={`p-1.5 rounded border apple-font-mono transition tactile-btn ${keynotePlaying ? 'bg-action text-[#F8F8F2] border-[#F92672]' : 'bg-[#272822] text-ink-green border-[#49483E] hover:border-[#A6E22E]'}`}
-                title={keynotePlaying ? t("暂停自动播放") : t("96 BPM 自动播放")}
+                title={keynotePlaying ? t("暂停自动播放") : t("自动播放")}
               >
                 {keynotePlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
               </button>
@@ -562,7 +624,7 @@ export function HeaderBar({
                   applyKeynoteShot(keynoteShotIdx - 1);
                 }}
                 className="p-1.5 rounded bg-[#272822] hover:bg-[#3E3D32] border border-[#49483E] text-[#F8F8F2] transition tactile-btn"
-                title={t("上一分镜 (快捷键: [)")}
+                title={t("上一场景 (快捷键: [)")}
               >
                 <SkipBack className="w-3.5 h-3.5 text-ink-cyan" />
               </button>
@@ -587,7 +649,7 @@ export function HeaderBar({
                   applyKeynoteShot(keynoteShotIdx + 1);
                 }}
                 className="p-1.5 rounded bg-[#272822] hover:bg-[#3E3D32] border border-[#49483E] text-[#F8F8F2] transition tactile-btn"
-                title={t("下一分镜 (快捷键: ])")}
+                title={t("下一场景 (快捷键: ])")}
               >
                 <SkipForward className="w-3.5 h-3.5 text-ink-cyan" />
               </button>
@@ -606,6 +668,8 @@ export function HeaderBar({
         number={activeKeynoteShot.number}
         form={isEditingShot ? editShotForm : newShotForm}
         setForm={isEditingShot ? setEditShotForm : setNewShotForm}
+        currentInsight={unifiedChartSpec?.executiveInsight}
+        unifiedChartSpec={unifiedChartSpec}
         onClose={() => {setIsEditingShot(false);setIsSavingNewShot(false);}}
         onSubmit={() => {
           if(isEditingShot)onUpdateStoryShot?.(keynoteShotIdx,editShotForm);

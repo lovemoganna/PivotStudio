@@ -1,7 +1,9 @@
 import { AGG_METHODS, CHART_COLORS } from '../../../constants/pivotConstants.js';
+import { CV } from '../../../constants/chartVisual.js';
 import { UnifiedFormatter, getDimDisplayLabel } from '../../../utils/formatters.js';
 import { isMissingValue } from '../../../utils/normalizeScalar.js';
 import { getMeasureDefaults, isMeasureField } from '../../../utils/fieldSemantics.js';
+import { decodeGroupPath, encodeGroupSegment } from '../../../utils/groupKeys.js';
 import { computeAggregation } from './calculatePivot.js';
 import { buildHistogramBins } from './histogram.js';
 
@@ -43,13 +45,24 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     }
   }
 
-  const xDimensionLabel = (pivotResult?.rowConfigs?.length || 0) > 0
-    ? pivotResult.rowConfigs.map((r) => getDimDisplayLabel(r)).join(' / ')
-    : (pivotResult?.colConfigs?.length || 0) > 0
-      ? pivotResult.colConfigs.map((c) => getDimDisplayLabel(c)).join(' / ')
-      : '汇总维度';
-
+  const rowConfigs = pivotResult?.rowConfigs || [];
+  const colConfigs = pivotResult?.colConfigs || [];
+  const groupingMode = chartSpecConfig?.groupingMode || 'grouped';
   const dataRows = (pivotResult?.tableRows || []).filter((r) => !r.isTotal && !r.isSubtotal);
+  const shouldGroupRows = chartType !== 'histogram'
+    && groupingMode !== 'detailed'
+    && rowConfigs.length >= 2
+    && dataRows.length > 0;
+
+  let xDimensionLabel = '汇总维度';
+  if (shouldGroupRows) {
+    xDimensionLabel = getDimDisplayLabel(rowConfigs[0]);
+  } else if (rowConfigs.length > 0) {
+    xDimensionLabel = rowConfigs.map((r) => getDimDisplayLabel(r)).join(' / ');
+  } else if (colConfigs.length > 0) {
+    xDimensionLabel = colConfigs.map((c) => getDimDisplayLabel(c)).join(' / ');
+  }
+
   const allGrandTotalRecords = pivotResult?.cellRecordsMap?.get?.('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || [];
   const grandTotalBucket = allGrandTotalRecords;
   const grandTotalRecords = allGrandTotalRecords.slice(0, 50);
@@ -58,11 +71,20 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     chartType,
     hasValues: false,
     isPercentMode: false,
+    isGroupedView: false,
+    groupingDimension: null,
+    subGroupingDimension: null,
     xDimensionLabel: '未配置度量指标',
     primaryValCfg,
     secondaryValCfg,
     primarySeriesKey: '无指标',
     secondarySeriesKey: '无指标',
+    primaryMeasureLabel: '无指标',
+    secondaryMeasureLabel: '无指标',
+    canStack: false,
+    hasColGroups: false,
+    hasDualAxis: false,
+    isPrimaryAdditive: false,
     derivedSeriesKey: null,
     derivedMode: 'none',
     seriesMetaList: [],
@@ -116,7 +138,47 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   // 2. Build Series Metadata & Items
   const hasColGroups = chartType !== 'histogram' && pivotResult.leafColGroups && pivotResult.leafColGroups.length > 0;
   const seriesMetaList = [];
-  if (hasColGroups && chartType !== 'combo' && dataRows.length > 0) {
+
+  if (shouldGroupRows && (!hasColGroups || chartType === 'combo')) {
+    // Multi-row dimensions without column dimension: group by 1st row dim, cluster by 2nd row dim
+    const uniqueSubLabels = [];
+    const subLabelSet = new Set();
+    dataRows.forEach((r) => {
+      const path = decodeGroupPath(r.rowKey);
+      const sub = path.slice(1).join(' / ');
+      if (sub && !subLabelSet.has(sub)) {
+        subLabelSet.add(sub);
+        uniqueSubLabels.push(sub);
+      }
+    });
+
+    if (uniqueSubLabels.length > 0) {
+      uniqueSubLabels.forEach((subName, idx) => {
+        seriesMetaList.push({
+          key: subName,
+          colKey: '__GRAND_TOTAL_COL__',
+          subName,
+          valCfg: primaryValCfg,
+          color: CHART_COLORS[idx % CHART_COLORS.length],
+          gradId: `appleGrad_${idx % CHART_COLORS.length}`,
+          yAxisId: 'left',
+        });
+      });
+    } else {
+      valConfigs.forEach((vc, idx) => {
+        const aggShort = AGG_METHODS.find((m) => m.value === vc.agg)?.short || vc.agg;
+        const sKey = `${vc.field === '__COUNT__' ? '记录数' : vc.field}(${aggShort})`;
+        seriesMetaList.push({
+          key: sKey,
+          colKey: '__GRAND_TOTAL_COL__',
+          valCfg: vc,
+          color: CHART_COLORS[idx % CHART_COLORS.length],
+          gradId: `appleGrad_${idx % CHART_COLORS.length}`,
+          yAxisId: idx === 0 ? 'left' : 'right',
+        });
+      });
+    }
+  } else if (hasColGroups && chartType !== 'combo' && dataRows.length > 0) {
     pivotResult.leafColGroups.forEach((cg, idx) => {
       const sKey = cg.pathLabels.join(' / ');
       seriesMetaList.push({
@@ -169,7 +231,11 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       ? dataRows.map((row) => Number(pivotResult.displayMatrix[`${row.rowKey}@@${series.colKey}@@${series.valCfg.id}`]?.display ?? 0))
       : pivotResult.leafColGroups.map((group) => Number(pivotResult.displayMatrix[`__GRAND_TOTAL_ROW__@@${group.key}@@${series.valCfg.id}`]?.display ?? 0));
     return { ...emptySpec, hasValues: true, kpiCards, seriesMetaList, xDimensionLabel,
-      primarySeriesKey, secondarySeriesKey, primaryStats: summarizeValues(values),
+      primarySeriesKey, secondarySeriesKey,
+      primaryMeasureLabel: primaryValCfg?.field === '__COUNT__' ? '记录数' : (primaryValCfg?.field || primarySeriesKey),
+      secondaryMeasureLabel: secondaryValCfg?.field === '__COUNT__' ? '记录数' : (secondaryValCfg?.field || secondarySeriesKey),
+      primaryStats: summarizeValues(values),
+      hasColGroups,
       canStack: hasColGroups || (valConfigs.length > 1 && valConfigs.every((value) => UnifiedFormatter.inferUnit(value) === UnifiedFormatter.inferUnit(valConfigs[0]))),
       renderLimit: { groupCount, maximum: maximumGroups } };
   }
@@ -177,7 +243,101 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   const lastSeenBySeries = {};
   let processedItems = [];
 
-  if (dataRows.length > 0 && chartType !== 'histogram') {
+  if (shouldGroupRows && (!hasColGroups || chartType === 'combo') && dataRows.length > 0) {
+    // 1. Grouped by primary row dimension, with sub-categories as series
+    const groupItemsMap = new Map();
+    dataRows.forEach((r) => {
+      const path = decodeGroupPath(r.rowKey);
+      const groupName = path[0] || r.label;
+      const subName = path.slice(1).join(' / ') || getDimDisplayLabel(rowConfigs[1]);
+      const groupKey = encodeGroupSegment(groupName);
+
+      if (!groupItemsMap.has(groupName)) {
+        groupItemsMap.set(groupName, {
+          name: groupName,
+          rowKey: groupKey,
+          _rawSeriesValues: {},
+          _seriesRowKeys: {},
+          _seriesMatchedRows: {},
+          matchedRows: [],
+          _stackSum: 0,
+        });
+      }
+
+      const item = groupItemsMap.get(groupName);
+      const cKey = `${r.rowKey}@@__GRAND_TOTAL_COL__@@${primaryValCfg.id}`;
+      const val = pivotResult.displayMatrix[cKey]?.display ?? null;
+      const numVal = val === null ? null : Number(val);
+
+      item[subName] = val;
+      item._rawSeriesValues[subName] = numVal;
+      item._seriesRowKeys[subName] = r.rowKey;
+
+      const rowRecs = (pivotResult?.cellRecordsMap?.get?.(`${r.rowKey}@@__GRAND_TOTAL_COL__`) || []);
+      item._seriesMatchedRows[subName] = rowRecs.slice(0, 50);
+      if (item.matchedRows.length < 50) {
+        item.matchedRows.push(...rowRecs.slice(0, 50 - item.matchedRows.length));
+      }
+      if (Number.isFinite(numVal)) {
+        item._stackSum += numVal;
+      }
+    });
+
+    processedItems = Array.from(groupItemsMap.values());
+    processedItems.forEach((item) => {
+      seriesMetaList.forEach((sm) => {
+        if (!(sm.key in item)) {
+          item[sm.key] = null;
+          item._rawSeriesValues[sm.key] = null;
+        }
+      });
+    });
+  } else if (shouldGroupRows && hasColGroups && dataRows.length > 0) {
+    // 2. Grouped by primary row dimension, with column dimension as series
+    const groupItemsMap = new Map();
+    dataRows.forEach((r) => {
+      const path = decodeGroupPath(r.rowKey);
+      const groupName = path[0] || r.label;
+      const groupKey = encodeGroupSegment(groupName);
+
+      if (!groupItemsMap.has(groupName)) {
+        groupItemsMap.set(groupName, {
+          name: groupName,
+          rowKey: groupKey,
+          _rawSeriesValues: {},
+          _subRowKeys: [],
+          matchedRows: [],
+          _stackSum: 0,
+        });
+      }
+      const item = groupItemsMap.get(groupName);
+      item._subRowKeys.push(r.rowKey);
+
+      seriesMetaList.forEach((sm) => {
+        const cKey = `${r.rowKey}@@${sm.colKey}@@${sm.valCfg.id}`;
+        const val = pivotResult.displayMatrix[cKey]?.display;
+        const numVal = Number(val);
+        if (Number.isFinite(numVal)) {
+          item._rawSeriesValues[sm.key] = (item._rawSeriesValues[sm.key] || 0) + numVal;
+        }
+      });
+      const rowRecs = (pivotResult?.cellRecordsMap?.get?.(`${r.rowKey}@@__GRAND_TOTAL_COL__`) || []);
+      if (item.matchedRows.length < 50) {
+        item.matchedRows.push(...rowRecs.slice(0, 50 - item.matchedRows.length));
+      }
+    });
+
+    processedItems = Array.from(groupItemsMap.values()).map((item) => {
+      let stackSum = 0;
+      seriesMetaList.forEach((sm) => {
+        const val = item._rawSeriesValues[sm.key] ?? null;
+        item[sm.key] = val;
+        if (Number.isFinite(val)) stackSum += val;
+      });
+      item._stackSum = stackSum;
+      return item;
+    });
+  } else if (dataRows.length > 0 && chartType !== 'histogram') {
     processedItems = dataRows.map((r) => {
       const item = {
         name: r.label,
@@ -390,10 +550,12 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   }
 
   // 3. Pie / Donut Items
-  const pieTotal = validItems.reduce((acc, it) => acc + it._rawSeriesValues[primarySeriesKey], 0);
+  const isClusteredBarMode = shouldGroupRows && (!hasColGroups || chartType === 'combo');
+  const getPrimaryOrGroupTotal = (it) => isClusteredBarMode ? (it._stackSum ?? 0) : (it._rawSeriesValues[primarySeriesKey] ?? 0);
+  const pieTotal = validItems.reduce((acc, it) => acc + getPrimaryOrGroupTotal(it), 0);
   if (['pie', 'donut', 'funnel'].includes(chartType) && !chartIssue && pieTotal <= 0 && validItems.length) chartIssue = '当前数值合计为 0，没有可解释的占比。请切换柱图查看各组数值。';
   const pieItems = (isAdditive(primaryValCfg) && !primaryHasNegative && pieTotal > 0 ? validItems : []).map((it, idx) => {
-    const rawV = it._rawSeriesValues[primarySeriesKey];
+    const rawV = getPrimaryOrGroupTotal(it);
     return {
       name: it.name,
       rowKey: it.rowKey,
@@ -421,7 +583,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       startVal,
       cumulativeVal: wfRunning,
       range: [low, high],
-      fill: idx === 0 ? '#66D9EF' : delta >= 0 ? '#A6E22E' : '#F92672',
+      fill: idx === 0 ? CV.semantic.start : delta >= 0 ? CV.semantic.positive : CV.semantic.negative,
       semanticType: idx === 0 ? '起点 (首项)' : delta >= 0 ? '正向增长' : '负向减少',
       formattedDelta: UnifiedFormatter.formatValue(delta, primaryValCfg, { compact: true, showPlusSign: idx > 0 }),
       formattedCumulative: UnifiedFormatter.formatValue(wfRunning, primaryValCfg, { compact: false }),
@@ -438,7 +600,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       startVal: 0,
       cumulativeVal: wfRunning,
       range: [0, wfRunning],
-      fill: '#AE81FF',
+      fill: CV.semantic.total,
       semanticType: '终点 (累计总计)',
       formattedDelta: UnifiedFormatter.formatValue(wfRunning, primaryValCfg, { compact: true }),
       formattedCumulative: UnifiedFormatter.formatValue(wfRunning, primaryValCfg, { compact: false }),
@@ -523,7 +685,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
         p.expectedY = (slope * p.x + intercept).toFixed(1);
         if (z > 1.65) {
           p.isOutlier = true;
-          p.fill = '#F92672';
+          p.fill = CV.semantic.negative;
         }
       });
     }
@@ -574,14 +736,24 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     chartType,
     hasValues: true,
     isPercentMode,
+    isGroupedView: shouldGroupRows,
+    groupingDimension: shouldGroupRows ? rowConfigs[0]?.field : null,
+    subGroupingDimension: (shouldGroupRows && !hasColGroups && rowConfigs[1]) ? rowConfigs[1]?.field : null,
     isPrimaryAdditive,
     canStack,
+    hasColGroups,
     hasDualAxis,
     xDimensionLabel: chartType === 'histogram' ? histField : xDimensionLabel,
     primaryValCfg,
     secondaryValCfg,
     primarySeriesKey,
     secondarySeriesKey,
+    primaryMeasureLabel: primaryValCfg?.field === '__COUNT__'
+      ? '记录数'
+      : (primaryValCfg?.field || primarySeriesKey),
+    secondaryMeasureLabel: secondaryValCfg?.field === '__COUNT__'
+      ? '记录数'
+      : (secondaryValCfg?.field || secondarySeriesKey),
     derivedSeriesKey,
     derivedMode,
     seriesMetaList,

@@ -266,11 +266,11 @@ export function DataSourceModal({
                       onClick={() => {
                         generate100kDataset(1000);
                         onClose();
-                        showToast?.('已生成 1,000 行极速体验数据集');
+                        showToast?.('已生成 1,000 行数据集');
                       }}
                       className="px-3 py-1.5 rounded-lg border border-[#A6E22E]/40 bg-[#A6E22E]/15 text-ink-green hover:bg-[#A6E22E]/25 font-bold transition apple-font-mono text-xs"
                     >
-                      {t("1,000 行 (极速体验)")}
+                      {t("1,000 行")}
                     </button>
                     <button
                       type="button"

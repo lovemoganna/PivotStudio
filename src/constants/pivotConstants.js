@@ -60,128 +60,128 @@ export const DATE_GRANULARITIES = [
 export const CHART_COLORS = ['#F92672', '#A6E22E', '#66D9EF', '#FD971F', '#AE81FF', '#E6DB74', '#FF6188', '#78DCE8'];
 
 export const VISUAL_CHART_TYPES = [
-  { value: 'heatmap', label: '矩阵热力图 (Heatmap)', short: '热力图', category: 'heatmap', intent: 'compare' },
-  { value: 'bar', label: '分组柱状图 (Bar)', short: '柱状', category: 'bar', intent: 'compare' },
-  { value: 'horizontal_bar', label: '横向条形图 (Horizontal)', short: '条形', category: 'bar', intent: 'compare' },
-  { value: 'stacked_bar', label: '堆叠柱状图 (Stacked)', short: '堆叠柱', category: 'bar', intent: 'proportion' },
-  { value: 'pct_stacked_bar', label: '百分比堆叠柱 (100% Bar)', short: '100%柱', category: 'bar', intent: 'proportion' },
-  { value: 'line', label: '趋势折线图 (Line)', short: '折线', category: 'line', intent: 'trend' },
-  { value: 'area', label: '标准面积图 (Area)', short: '面积', category: 'area', intent: 'trend' },
-  { value: 'stacked_area', label: '堆叠面积图 (Stacked Area)', short: '堆叠面', category: 'area', intent: 'proportion' },
-  { value: 'pct_area', label: '百分比面积图 (100% Area)', short: '100%面', category: 'area', intent: 'proportion' },
-  { value: 'combo', label: '双轴柱线组合图 (Dual-Axis)', short: '双轴', category: 'combo', intent: 'trend' },
-  { value: 'pie', label: '经典饼图 (Pie)', short: '饼图', category: 'pie', intent: 'proportion' },
-  { value: 'donut', label: '中心聚焦圆环图 (Donut)', short: '圆环', category: 'pie', intent: 'proportion' },
-  { value: 'waterfall', label: '增减桥接瀑布图 (Waterfall)', short: '瀑布', category: 'waterfall', intent: 'bridge' },
-  { value: 'funnel', label: '对称锥形漏斗图 (Funnel)', short: '漏斗', category: 'funnel', intent: 'bridge' },
-  { value: 'scatter', label: 'OLS回归散点图 (Scatter)', short: '散点', category: 'scatter', intent: 'distribution' },
-  { value: 'histogram', label: 'Sturges分布直方图 (Histogram)', short: '直方', category: 'histogram', intent: 'distribution' },
+  { value: 'heatmap', label: '矩阵热力图', short: '热力图', category: 'heatmap', intent: 'compare' },
+  { value: 'bar', label: '柱状图', short: '柱状', category: 'bar', intent: 'compare' },
+  { value: 'horizontal_bar', label: '条形图', short: '条形', category: 'bar', intent: 'compare' },
+  { value: 'stacked_bar', label: '堆叠柱状图', short: '堆叠柱', category: 'bar', intent: 'proportion' },
+  { value: 'pct_stacked_bar', label: '百分比堆叠柱', short: '100%柱', category: 'bar', intent: 'proportion' },
+  { value: 'line', label: '折线图', short: '折线', category: 'line', intent: 'trend' },
+  { value: 'area', label: '面积图', short: '面积', category: 'area', intent: 'trend' },
+  { value: 'stacked_area', label: '堆叠面积图', short: '堆叠面', category: 'area', intent: 'proportion' },
+  { value: 'pct_area', label: '百分比面积图', short: '100%面', category: 'area', intent: 'proportion' },
+  { value: 'combo', label: '双轴组合图', short: '双轴', category: 'combo', intent: 'trend' },
+  { value: 'pie', label: '饼图', short: '饼图', category: 'pie', intent: 'proportion' },
+  { value: 'donut', label: '圆环图', short: '圆环', category: 'pie', intent: 'proportion' },
+  { value: 'waterfall', label: '瀑布图', short: '瀑布', category: 'waterfall', intent: 'bridge' },
+  { value: 'funnel', label: '漏斗图', short: '漏斗', category: 'funnel', intent: 'bridge' },
+  { value: 'scatter', label: '散点图', short: '散点', category: 'scatter', intent: 'distribution' },
+  { value: 'histogram', label: '直方图', short: '直方', category: 'histogram', intent: 'distribution' },
 ];
 
 export const CHART_INTENT_GROUPS = [
-  { id: 'compare', label: '对比排行', desc: '看谁高谁低、排名先后', types: ['bar', 'horizontal_bar', 'heatmap'] },
-  { id: 'trend', label: '趋势演变', desc: '看随时间或序列的升降斜率', types: ['line', 'area', 'combo'] },
-  { id: 'proportion', label: '结构占比', desc: '看各部分占整体的份额比重', types: ['donut', 'pie', 'stacked_bar', 'pct_stacked_bar', 'stacked_area', 'pct_area'] },
-  { id: 'bridge', label: '贡献拆解', desc: '看增量拉动与层级转化', types: ['waterfall', 'funnel'] },
-  { id: 'distribution', label: '分布与相关', desc: '看双指标相关性与样本分布', types: ['scatter', 'histogram'] },
+  { id: 'compare', label: '对比排行', desc: '比较各组高低与排名', types: ['bar', 'horizontal_bar', 'heatmap'] },
+  { id: 'trend', label: '趋势演变', desc: '看指标随时间或顺序如何变化', types: ['line', 'area', 'combo'] },
+  { id: 'proportion', label: '结构占比', desc: '看各部分占整体的份额', types: ['donut', 'pie', 'stacked_bar', 'pct_stacked_bar', 'stacked_area', 'pct_area'] },
+  { id: 'bridge', label: '贡献拆解', desc: '拆解累计构成；漏斗仅表示相邻比值，不等于转化率', types: ['waterfall', 'funnel'] },
+  { id: 'distribution', label: '分布与相关', desc: '看双指标相关或单指标区间分布', types: ['scatter', 'histogram'] },
 ];
 
 export const CHART_METHOD_GUIDES = {
   bar: {
     intent: '对比排行',
-    purpose: '对比不同分组的规模高低，快速找出领跑项与掉队项。',
-    howToRead: '横轴为分组类别，纵轴为指标数值；黄色虚线代表图中均值，高于虚线即为均值之上表现。',
-    actionTip: '可在「规格」中切换「按主指标降序」快速建立帕累托排名，或点击任一柱体下钻明细。',
+    purpose: '比较各组高低，找出最高与最低。',
+    howToRead: '横轴是分组，纵轴是数值；虚线是各组均值，高于虚线即高于平均。',
+    actionTip: '点「排序」切到降序，或点某一柱查看明细。',
   },
   horizontal_bar: {
     intent: '对比排行',
-    purpose: '适合名称较长或分组较多的排行榜对比，从上到下阅读更符合视线习惯。',
-    howToRead: '纵轴为分组名称，横轴长度代表数值大小；黄色纵向虚线标识图中均值基准。',
-    actionTip: '搭配「规格 -> TopN 焦点截断」可聚焦头部 Top 5 / Top 10 核心项目。',
+    purpose: '名称较长或分组较多时，条形图更易扫读。',
+    howToRead: '条越长数值越大；纵向虚线是均值。',
+    actionTip: '在「选项」里设 Top 5 / Top 10，先看头部。',
   },
   heatmap: {
     intent: '对比排行',
-    purpose: '一眼看清「行维度 × 列分组」交叉矩阵中的高值热区与低谷冷区。',
-    howToRead: '色块越深代表数值绝对规模越大（蓝青色代表正值，粉红色代表负值）；支持点击单元格下钻对应明细。',
-    actionTip: '在列区域放入时间或类别维度，可快速定位哪一组合贡献了最高密集产出。',
+    purpose: '看行×列交叉里哪里热、哪里冷。',
+    howToRead: '色越深绝对值越大；蓝青为正、粉红为负。点击格可下钻。',
+    actionTip: '列上放时间或渠道，便于定位高值组合。',
   },
   line: {
     intent: '趋势演变',
-    purpose: '追踪指标随时间或有序分类的升降趋势、拐点与波动幅度。',
-    howToRead: '观察折线斜率判断增速快慢；橙色虚线标识全周期均值基准（AVG），可在「规格」中开启移动均线或环比增速辅助研判。',
-    actionTip: '可在「规格 -> 衍生分析序列」开启「3期移动均线」平滑噪点，或开启「环比增长率%」观察增速拐点。',
+    purpose: '看指标随时间或顺序如何升降。',
+    howToRead: '斜率表示快慢；虚线是全程均值。',
+    actionTip: '在「选项 → 衍生线」可开移动平均或环比%。',
   },
   area: {
     intent: '趋势演变',
-    purpose: '在展示升降趋势的同时，通过填充面积强化整体体量感。',
-    howToRead: '曲线高度反映当期数值，下方阴影面积反映累计规模感；黄色虚线为全周期均值基准。',
-    actionTip: '适合单指标或少量分组的趋势展示；若分组较多且需看合计，可切换为「堆叠面积图」。',
+    purpose: '在趋势之外，用面积强调体量。',
+    howToRead: '曲线高度是当期值，下方填充帮助感受规模。',
+    actionTip: '多分组看合计时，可改用堆叠面积图。',
   },
   combo: {
     intent: '趋势演变',
-    purpose: '同屏对比两个量纲不同或量级悬殊的指标（如左轴看金额、右轴看件数/增长率）。',
-    howToRead: '粉色柱体对应左纵轴（主指标），绿色折线对应右纵轴（次轴指标），观察两者是否同向共振或背离。',
-    actionTip: '可在「规格 -> 次轴/Y轴指标」中自由指定右轴绑定的对比指标。',
+    purpose: '同屏对比两个量级或单位不同的指标。',
+    howToRead: '柱对应左轴主指标，线对应右轴次指标，看是否同向或背离。',
+    actionTip: '在「选项」里指定右轴绑定的指标。',
   },
   donut: {
     intent: '结构占比',
-    purpose: '聚焦各分组占整体总量的份额构成，中心区域直观汇总全局或当前高亮分组。',
-    howToRead: '扇区弧长代表占比大小，中心数字显示当前图中合计（当点击表格高亮某行时，中心会自动聚焦该项金额与占比）。',
-    actionTip: '适用于可加总的正数指标（如销售额、销量）；若分类超过 8 个，建议改用「横向条形图」。',
+    purpose: '看各部分占总体的份额。',
+    howToRead: '弧长即占比；中心显示合计或当前高亮项。',
+    actionTip: '分类超过 8 个时，改用条形图更清晰。',
   },
   pie: {
     intent: '结构占比',
-    purpose: '直观展示整体被切分为若干部分的比例关系（盘子结构分析）。',
-    howToRead: '扇区面积与角度对应份额占比，引线标签直接标出各分组名称与百分比。',
-    actionTip: '重点关注前三大扇区（CR3）是否超过 50%，判断业务集中度高低。',
+    purpose: '看整体如何被切成几块。',
+    howToRead: '扇区角度对应占比，标签给出名称与百分比。',
+    actionTip: '关注前三大合计是否过半（集中度）。',
   },
   stacked_bar: {
     intent: '结构占比',
-    purpose: '同时看清每个分组的「总规模高低」以及内部的「子项构成」。',
-    howToRead: '整根柱子的总高度代表该分组总额，柱内不同颜色色块代表各列分组的贡献体量。',
-    actionTip: '若想忽略总量差异、单纯对比内部结构比例，可切换为「100% 堆叠柱」。',
+    purpose: '同时看总量与内部构成。',
+    howToRead: '柱总高是合计，色块是各子项贡献。',
+    actionTip: '只比内部比例时，改用百分比堆叠柱。',
   },
   pct_stacked_bar: {
     intent: '结构占比',
-    purpose: '拉平各分组总量差异，纯粹对比不同分组内部的子结构占比变化（100% 归一化）。',
-    howToRead: '每根柱子总高恒为 100%，观察同一颜色色块在不同柱子间的高度变化即可判断结构迁移。',
-    actionTip: '常用于分析不同大区或不同年份的品类结构、客户等级结构占比差异。',
+    purpose: '忽略总量差异，只比内部结构。',
+    howToRead: '每柱总高为 100%，同一颜色的高低变化即结构迁移。',
+    actionTip: '适合比不同大区/年份的品类或客群结构。',
   },
   stacked_area: {
     intent: '结构占比',
-    purpose: '展现整体总量随时间的扩张/收缩趋势，同时观察各子项对总量的叠加贡献。',
-    howToRead: '最顶层边界线代表全部分组合计值，各色带厚度代表对应子项的当期体量。',
-    actionTip: '适合观察多条业务线随时间的总量膨胀与主力构成变化。',
+    purpose: '看总量随时间变化，同时看各子项叠加。',
+    howToRead: '顶边是合计，色带厚度是子项当期体量。',
+    actionTip: '适合多条业务线随时间的合计与构成。',
   },
   pct_area: {
     intent: '结构占比',
-    purpose: '追踪各组成部分的市场份额（%）随时间推移的此消彼长。',
-    howToRead: '纵轴固定为 0%~100%，色带变宽代表该项份额扩张，变窄代表份额萎缩。',
-    actionTip: '非常适合复盘不同渠道或品类在多个周期内的份额渗透率演进。',
+    purpose: '看各部分份额随时间此消彼长。',
+    howToRead: '纵轴 0%–100%；色带变宽即份额扩大。',
+    actionTip: '适合复盘渠道或品类份额变化。',
   },
   waterfall: {
     intent: '贡献拆解',
-    purpose: '像搭桥一样拆解「每一个分组是如何一步步累加（或扣减）到最终总计」的。',
-    howToRead: '绿色柱代表正向拉动，粉色柱代表负向拖累，最右侧紫色柱为汇总终点总计。',
-    actionTip: '点击任意分项柱体可穿透查看该分组支撑的原始订单明细。',
+    purpose: '拆解各组如何一步累加（或扣减）到总计。',
+    howToRead: '绿为正、粉为负，最右是总计。',
+    actionTip: '点击分项柱可查看该组明细。',
   },
   funnel: {
     intent: '贡献拆解',
-    purpose: '按当前图表顺序展示各分组的梯队规模与相邻项数值比值。',
-    howToRead: '梯形宽度对应数值大小，右侧标注各分组数值与“相对上项”百分比（仅代表相邻数值之比，不直接等同于用户转化率）。',
-    actionTip: '适合分析各分组梯队的数值规模衰减，可点击任意梯队下钻查看支撑该项的原始明细。',
+    purpose: '按顺序看各组梯队规模与相邻比值。',
+    howToRead: '宽度表示数值；右侧百分比是相对上一项，不等于转化率。',
+    actionTip: '点击梯队可下钻明细。',
   },
   scatter: {
     intent: '分布与相关',
-    purpose: '检验两个数值指标之间是否存在线性相关（如高销售额是否带来高毛利），并识别异常偏离点。',
-    howToRead: '横轴为主指标 X，纵轴为次指标 Y；绿色虚线为 OLS 线性回归拟合线，粉色空心大圈为偏离预期超过 1.6σ 的异常点。',
-    actionTip: '高于拟合线的点代表「产出高于预期（高效率）」，低于拟合线的点代表「产出低于预期」。',
+    purpose: '看两个数值指标是否相关，并找异常点。',
+    howToRead: '横轴 X、纵轴 Y；虚线为拟合趋势，偏离较大的点更醒目。',
+    actionTip: '线上方偏高、线下方偏低，可对照业务解释。',
   },
   histogram: {
     intent: '分布与相关',
-    purpose: '基于原始明细行自动分箱（Sturges 法则），检验数据集中在哪个数值区间、是否存在长尾偏态。',
-    howToRead: '横轴为数值分箱区间，纵轴为落入该区间的样本笔数；观察最高峰位置与左右两侧是否对称。',
-    actionTip: '当均值容易被极值拉高时，用直方图能看清绝大多数普通样本的真实集中水位。',
+    purpose: '看数值落在哪些区间，是否偏斜或长尾。',
+    howToRead: '横轴是区间，纵轴是落入该区间的行数；看主峰位置与左右是否对称。',
+    actionTip: '均值被极值拉高时，直方图更能反映多数样本所在区间。',
   },
 };
 
@@ -189,10 +189,9 @@ export const KEYNOTE_STORYBOARD_SHOTS = [
   {
     id: 'shot_1',
     number: '01',
-    title: '全景大区经营概览',
-    shortLabel: '大区概览',
-    subtitle: '一镜一意：聚焦五大销售大区销售额与销量双指标全局对比',
-    cameraNote: 'Wide Establishing Shot · 96 BPM Effortless Flow',
+    title: '按销售大区对比销售额与销量',
+    shortLabel: '大区对比',
+    subtitle: '比较五大销售大区的销售额与销量，找出高低差异。',
     viewMode: 'split',
     chartType: 'bar',
     pivotOverride: {
@@ -207,10 +206,9 @@ export const KEYNOTE_STORYBOARD_SHOTS = [
   {
     id: 'shot_2',
     number: '02',
-    title: '大区×品类交叉透视矩阵',
+    title: '大区 × 品类按年结构占比',
     shortLabel: '大区×品类',
-    subtitle: '销售大区 × 商品类别 × 年度三级交叉透视，呈现百分比堆叠结构占比',
-    cameraNote: 'Matrix Cross-Tab Focus · Structural Proportion',
+    subtitle: '行：销售大区与商品类别；列：订单年份；看各年内部品类结构占比。',
     viewMode: 'split',
     chartType: 'pct_stacked_bar',
     pivotOverride: {
@@ -227,10 +225,9 @@ export const KEYNOTE_STORYBOARD_SHOTS = [
   {
     id: 'shot_3',
     number: '03',
-    title: '季度时序双轴共振',
-    shortLabel: '时序双轴',
-    subtitle: '左轴绑定销售额 (¥)，右轴绑定订单销量 (件)，揭示各季度增长斜率',
-    cameraNote: 'Temporal Dual-Axis Tracking · Revenue vs Volume',
+    title: '按季度看销售额与销量趋势',
+    shortLabel: '季度趋势',
+    subtitle: '左轴销售额、右轴销量，观察各季度是否同向变化。',
     viewMode: 'split',
     chartType: 'combo',
     pivotOverride: {
@@ -245,10 +242,9 @@ export const KEYNOTE_STORYBOARD_SHOTS = [
   {
     id: 'shot_4',
     number: '04',
-    title: '热销商品贡献瀑布流',
+    title: '商品销售额累计贡献',
     shortLabel: '商品贡献',
-    subtitle: '清晰拆解重点商品对总营收的正向拉动与累计终点',
-    cameraNote: 'Incremental Bridge Breakdown · Waterfall',
+    subtitle: '用瀑布图拆解各商品对销售额合计的增减贡献。',
     viewMode: 'split',
     chartType: 'waterfall',
     pivotOverride: {
@@ -262,10 +258,9 @@ export const KEYNOTE_STORYBOARD_SHOTS = [
   {
     id: 'shot_5',
     number: '05',
-    title: '城市营收利润散点回归',
-    shortLabel: '城市回归',
-    subtitle: '城市销售额与毛利润 OLS 拟合趋势线与残差异常点自动识别',
-    cameraNote: 'Outlier Detection & OLS Regression · Scatter',
+    title: '城市销售额与毛利润相关',
+    shortLabel: '城市相关',
+    subtitle: '散点图看销售额与毛利润是否同向，并留意偏离趋势线的城市。',
     viewMode: 'split',
     chartType: 'scatter',
     pivotOverride: {
@@ -454,13 +449,7 @@ export function buildDefaultPivotConfig(dataset) {
 }
 
 /**
- * 根据任意数据集动态生成 5 个自适应分析故事镜头
- * 将原本固定的零售字段重构为通用模式模板：
- * Shot 1: 全景主次分类对比 (Top Categories Overview)
- * Shot 2: 双维度交叉透视矩阵 (Cross-Tab Proportion Matrix)
- * Shot 3: 时序双轴共振 (Temporal Dual-Axis Trend)
- * Shot 4: 细分贡献瀑布流 (Incremental Contribution Waterfall)
- * Shot 5: 相关拟合与离群检测 (Correlation & Scatter Regression)
+ * 按当前数据集字段生成 5 个推荐分析视图（对比 → 结构 → 趋势 → 贡献 → 相关/分布）。
  */
 export function generateDynamicKeynoteShots(dataset) {
   if (!dataset || !dataset.fields || dataset.fields.length === 0) {
@@ -523,16 +512,15 @@ export function generateDynamicKeynoteShots(dataset) {
       if (c > maxC) { maxC = c; dim1TopVal = k; }
     }
   }
-  const topValHighlight = dim1TopVal ? `（样本中「${dim1TopVal}」频数领先）` : '';
+  const topValHint = dim1TopVal ? `样本中「${dim1TopVal}」出现较多。` : '';
 
   return [
     {
       id: 'shot_1',
       number: '01',
-      title: `全景「${dim1}」对比概览`,
+      title: `按「${dim1}」对比${num1}${num2 !== num1 ? `与${num2}` : ''}`,
       shortLabel: `${dim1}对比`,
-      subtitle: `聚焦核心维度【${dim1}】在【${num1}】${num2 !== num1 ? `与【${num2}】` : ''}上的整体分布对比${topValHighlight}`,
-      cameraNote: 'Wide Establishing Shot · Effortless Analytical Flow',
+      subtitle: `比较各「${dim1}」在「${num1}」${num2 !== num1 ? `与「${num2}」` : ''}上的高低。${topValHint}`,
       viewMode: 'split',
       chartType: 'bar',
       pivotOverride: {
@@ -544,10 +532,11 @@ export function generateDynamicKeynoteShots(dataset) {
     {
       id: 'shot_2',
       number: '02',
-      title: colDimName ? `「${dim1}」×「${colDimName}」交叉矩阵` : `「${dim1}」结构占比圆环`,
+      title: colDimName ? `「${dim1}」×「${colDimName}」结构占比` : `「${dim1}」结构占比`,
       shortLabel: colDimName ? `${dim1}×${colDimName}` : `${dim1}占比`,
-      subtitle: colDimName ? `【${dim1}】×【${colDimName}】交叉透视，呈现百分比堆叠结构占比` : `【${dim1}】各项目在【${num1}】上的结构占比构成`,
-      cameraNote: 'Matrix Cross-Tab Focus · Structural Proportion',
+      subtitle: colDimName
+        ? `交叉看「${dim1}」与「${colDimName}」，用百分比堆叠比较内部结构。`
+        : `看各「${dim1}」在「${num1}」中的份额。`,
       viewMode: 'split',
       chartType: colDimName ? 'pct_stacked_bar' : 'donut',
       pivotOverride: {
@@ -561,10 +550,11 @@ export function generateDynamicKeynoteShots(dataset) {
     {
       id: 'shot_3',
       number: '03',
-      title: dates.length > 0 ? `「${dateDim}」时序演进透镜` : `「${dim1}」分项排序透镜`,
+      title: dates.length > 0 ? `「${dateDim}」趋势` : `「${dim1}」排序对比`,
       shortLabel: dates.length > 0 ? `${dateDim}趋势` : `${dim1}排序`,
-      subtitle: dates.length > 0 ? `追踪【${dateDim}】演进斜率与阶段性波动` : `对比【${dim1}】在【${num1}】上的横向排序分布`,
-      cameraNote: dates.length > 0 ? 'Temporal Tracking · Trendline & Acceleration' : 'Horizontal Pareto Ranking · Sorted Categories',
+      subtitle: dates.length > 0
+        ? `按「${dateDim}」观察「${num1}」如何随时间变化。`
+        : `按「${num1}」对「${dim1}」排序，便于扫读高低。`,
       viewMode: 'split',
       chartType: dates.length > 0 ? (measures.length > 1 ? 'combo' : 'line') : 'horizontal_bar',
       pivotOverride: {
@@ -576,10 +566,9 @@ export function generateDynamicKeynoteShots(dataset) {
     {
       id: 'shot_4',
       number: '04',
-      title: `「${dim1}」核心贡献瀑布流`,
-      shortLabel: `${dim1}瀑布`,
-      subtitle: `清晰拆解【${dim1}】各项目对【${num1}】累计总量的边际拉动`,
-      cameraNote: 'Incremental Bridge Breakdown · Waterfall',
+      title: `「${dim1}」对「${num1}」的累计贡献`,
+      shortLabel: `${dim1}贡献`,
+      subtitle: `用瀑布图拆解各「${dim1}」如何累加到「${num1}」合计。`,
       viewMode: 'split',
       chartType: 'waterfall',
       pivotOverride: {
@@ -591,12 +580,11 @@ export function generateDynamicKeynoteShots(dataset) {
     {
       id: 'shot_5',
       number: '05',
-      title: measures.length > 1 ? `「${num1}」与「${num2}」相关性拟合` : `「${num1}」数值频数分布`,
+      title: measures.length > 1 ? `「${num1}」与「${num2}」相关` : `「${num1}」数值分布`,
       shortLabel: measures.length > 1 ? `双指标相关` : `${num1}分布`,
       subtitle: measures.length > 1
-        ? `【${num1}】与【${num2}】在【${dim1}】维度的散点相关性与离群点识别`
-        : `【${num1}】的样本频数直方分布与偏度区间`,
-      cameraNote: 'Outlier Detection & Regression · Scatter / Histogram',
+        ? `在「${dim1}」上观察「${num1}」与「${num2}」是否同向，并留意偏离趋势的点。`
+        : `用直方图看「${num1}」落在哪些区间、是否偏斜。`,
       viewMode: 'split',
       chartType: measures.length > 1 ? 'scatter' : 'histogram',
       pivotOverride: {

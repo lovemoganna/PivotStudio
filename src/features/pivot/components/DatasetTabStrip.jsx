@@ -137,7 +137,7 @@ export function DatasetTabStrip({
           <Zap className="w-3 h-3" />
           <span>
             {isWorkerComputing
-              ? t("Worker 异步聚合中...")
+              ? t("计算中…")
               : `${elapsed}ms`}
           </span>
           <span className="text-[#D6D4C8] dark:text-[#49483E] hidden sm:inline">|</span>

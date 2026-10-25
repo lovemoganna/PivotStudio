@@ -37,10 +37,10 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
   const meanDiffPct = showMeanDiff ? ((primaryVal - primaryMean) / Math.abs(primaryMean)) * 100 : 0;
 
   return (
-    <div className={`p-3.5 rounded-xl shadow-2xl border text-xs max-w-xs transition-all ${darkMode ? 'bg-[#1E1F1C]/95 text-[#F8F8F2] border-[#49483E] shadow-[0_12px_32px_rgba(0,0,0,0.65)]' : 'bg-[#FFFDF7]/95 text-[#272822] border-[#D6D4C8] shadow-xl'} backdrop-blur-xl`}>
-      <div className="font-semibold tracking-tight border-b border-[#49483E]/40 pb-1.5 mb-2 truncate flex items-center justify-between gap-3">
-        <span className="truncate text-ink-yellow apple-font-mono">{rawPoint?.name || label}</span>
-        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30 apple-font-mono shrink-0">{actionBadgeText}</span>
+    <div className={`p-3 rounded-xl border text-xs max-w-xs ${darkMode ? 'bg-[#1E1F1C]/96 text-[#F8F8F2] border-[#49483E] shadow-[0_16px_40px_rgba(0,0,0,0.55)]' : 'bg-[#FFFDF7]/96 text-[#272822] border-[#D6D4C8] shadow-[0_12px_28px_rgba(39,40,34,0.12)]'} backdrop-blur-xl`}>
+      <div className="font-semibold tracking-tight border-b border-[#D6D4C8]/50 dark:border-[#49483E]/50 pb-1.5 mb-2 truncate flex items-center justify-between gap-3">
+        <span className="truncate text-[#272822] dark:text-[#F8F8F2] apple-font-mono">{rawPoint?.name || label}</span>
+        <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] text-ink-muted apple-font-mono shrink-0">{actionBadgeText}</span>
       </div>
 
       {chartType === 'scatter' && rawPoint ? (
@@ -59,14 +59,14 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
           </div>
           {rawPoint.expectedY && (
             <div className="flex items-center justify-between gap-4 text-[11px] border-t border-[#49483E]/30 pt-1">
-              <span className="text-ink-muted">{t("OLS 回归预期:")}</span>
+              <span className="text-ink-muted">{t("趋势预期:")}</span>
               <span className="apple-font-mono text-ink-purple">
                 {UnifiedFormatter.formatValue(Number(rawPoint.expectedY), secondaryValCfg, { compact: false })}
               </span>
             </div>
           )}
           {rawPoint.isOutlier && (
-            <div className="mt-1 px-2 py-1 rounded bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30 text-[10px] font-semibold apple-font-mono">{' ' + t("[异常点] Z-Score =") + ' '}{rawPoint.zScore}{' ' + t("(偏离拟合线)") + ' '}</div>
+            <div className="mt-1 px-2 py-1 rounded bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30 text-[10px] font-semibold">{t("异常点")} · {t("偏离趋势")} {rawPoint.zScore}</div>
           )}
         </div>
       ) : chartType === 'waterfall' && rawPoint?.semanticType ? (
@@ -111,7 +111,7 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
             </span>
           </div>
           <div className="flex items-center justify-between gap-4 border-t border-[#49483E]/30 pt-1">
-            <span className="text-ink-muted">{t("占图中分组合计:")}</span>
+            <span className="text-ink-muted">{t("占图中合计:")}</span>
             <span className="apple-font-mono font-bold text-ink-green">
               {rawPoint?.pct || ((payload[0].value / (chartSpec?.primaryStats?.total || 1)) * 100).toFixed(1)}%
             </span>
@@ -159,7 +159,7 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
             <div className="border-t border-[#49483E]/30 pt-1.5 mt-1.5 space-y-1 text-[11px]">
               {sharePctText && (
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-ink-muted">{t("占图中分组合计:")}</span>
+                  <span className="text-ink-muted">{t("占图中合计:")}</span>
                   <span className="apple-font-mono font-semibold text-ink-cyan">{sharePctText}</span>
                 </div>
               )}
@@ -174,7 +174,7 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
             </div>
           )}
           {rawPoint?.isOutlier && (
-            <div className="mt-1 px-2 py-1 rounded bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30 text-[10px] font-semibold apple-font-mono">{' ' + t("[异常点] Z-Score =") + ' '}{rawPoint.zScore}{' ' + t("(偏离均值)") + ' '}</div>
+            <div className="mt-1 px-2 py-1 rounded bg-[#F92672]/15 text-ink-pink border border-[#F92672]/30 text-[10px] font-semibold">{t("异常点")} · {t("偏离均值")} {rawPoint.zScore}</div>
           )}
         </div>
       )}

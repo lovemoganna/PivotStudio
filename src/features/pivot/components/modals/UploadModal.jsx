@@ -1,6 +1,6 @@
 import { t } from '../../../../i18n.js';
 import React from 'react';
-import { FileSpreadsheet, X, HelpCircle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 
 export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirmUploadDataset, onClose, onReparse, isImporting }) {
@@ -41,19 +41,6 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
 
         {/* Scrollable Body */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 text-xs">
-          {/* Beginner Guidance Card */}
-          <div className="p-3 rounded-xl bg-gradient-to-r from-[#66D9EF]/10 via-[#A6E22E]/10 to-[#FD971F]/10 border border-[#D6D4C8] dark:border-[#3E3D32] space-y-1">
-            <div className="font-semibold text-ink-cyan apple-font-mono flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span>{t("零基础字段类型识别指南：")}</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10.5px] text-ink-muted leading-relaxed">
-              <div>• <strong>{t("文本 (text):")}</strong> {t("分类与分组标签，如地区、商品类目。可作为透视行/列。")}</div>
-              <div>• <strong>{t("数字 (number):")}</strong> {t("用于求和、平均值计算。如金额被误识别为文本，请直接在下方切换为数字！")}</div>
-              <div>• <strong>{t("日期 (date):")}</strong> {t("自动支持按年、季度、月份聚合，开展趋势与同期对比。")}</div>
-            </div>
-          </div>
-
           {/* Worksheet Selection for Excel */}
           {isExcel && (
             <section className="space-y-2">

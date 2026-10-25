@@ -71,10 +71,17 @@ export function FieldProfilerModal({
   if (!field) return null;
   if (!stats) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('字段健康度与分布透视')} className="bg-[#FFFDF7] dark:bg-[#272822] p-5 rounded-xl">
-          <p role="status">{error || '正在分析字段，请稍候…'}</p>
-          <button onClick={onClose}>{t('取消')}</button>
+      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-apple-fade-in">
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('字段健康度与分布透视')} className="bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl p-6 rounded-2xl max-w-sm w-full text-center space-y-3 apple-font-mono animate-apple-modal">
+          <div className="w-8 h-8 rounded-full border-2 border-t-transparent border-[#66D9EF] animate-spin mx-auto" />
+          <p role="status" className="text-xs text-[#272822] dark:text-[#F8F8F2] font-semibold">{error || t('正在分析字段分布与数据健康度…')}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#3E3D32] hover:bg-black/5 dark:hover:bg-white/5 text-xs text-ink-muted transition"
+          >
+            {t('取消')}
+          </button>
         </div>
       </div>
     );

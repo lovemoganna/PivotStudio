@@ -139,17 +139,9 @@ try{
     const after=await evaluate('document.querySelector("[role=separator]")?.getAttribute("aria-valuenow")');
     if(Number(after)!==Math.min(75,Number(before)+5))errors.push('keyboard splitter did not update');
   }
-  // The secondary chart palettes must be discoverable but not obscure the data by default.
-  if(await evaluate('!!document.getElementById("pivot-chart-types")'))errors.push('chart shortcut palette open by default');
-  if(await evaluate('!!document.getElementById("pivot-lens-presets")'))errors.push('analysis preset palette open by default');
-  assert.equal(await clickText('图表类型'),true,'expand chart type palette');
-  await sleep(100);
-  if(!await evaluate('!!document.getElementById("pivot-chart-types")'))errors.push('chart palette did not expand');
-  assert.equal(await clickText('图表类型'),true);
-  assert.equal(await clickText('分析视角'),true,'expand analytical presets');
-  await sleep(100);
-  if(!await evaluate('!!document.getElementById("pivot-lens-presets")'))errors.push('analysis presets did not expand');
-  assert.equal(await clickText('分析视角'),true);
+  // Chart type lives in a compact select; analysis notes stay collapsed by default in split mode.
+  if(!await evaluate('!!document.querySelector(\'select[aria-label="选择图表类型"]\')'))errors.push('chart type select missing');
+  if(await evaluate('!!document.getElementById("pivot-chart-guide-note")'))errors.push('analysis notes open by default in split mode');
 
   // Every advertised chart type must remain switchable and preserve the workbench.
   const kinds=await evaluate(`Array.from(document.querySelector('select[aria-label="选择图表类型"]').options).map(x=>x.value)`);

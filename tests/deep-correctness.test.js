@@ -173,7 +173,7 @@ test('generateDynamicKeynoteShots adapts analysis presets dynamically to dataset
 
   // Shot 1: Dim1 (部门) vs Num1 (月薪) & Num2 (绩效得分), ID ignored
   assert.equal(hrShots[0].shortLabel, '部门对比');
-  assert.equal(hrShots[0].title, '全景「部门」对比概览');
+  assert.equal(hrShots[0].title, '按「部门」对比月薪与绩效得分');
   assert.equal(hrShots[0].pivotOverride.rows[0].field, '部门');
   assert.equal(hrShots[0].pivotOverride.values[0].field, '月薪');
   assert.equal(hrShots[0].pivotOverride.values[0].format.currency, '¥');
@@ -189,7 +189,7 @@ test('generateDynamicKeynoteShots adapts analysis presets dynamically to dataset
   assert.equal(hrShots[2].pivotOverride.rows[0].field, '入职日期');
 
   // Shot 4: Waterfall
-  assert.equal(hrShots[3].shortLabel, '部门瀑布');
+  assert.equal(hrShots[3].shortLabel, '部门贡献');
   assert.equal(hrShots[3].chartType, 'waterfall');
 
   // Shot 5: Dual measure scatter

@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   Calculator, Sparkles, Plus, Trash2, Edit3, Check, AlertCircle,
   Copy, ArrowLeft, ArrowRight, Search, X, Download, Upload,
-  BookOpen, HelpCircle, ChevronDown, ChevronUp, ShieldCheck, Lightbulb,
+  ShieldCheck,
   Tag, Hash, ArrowUpDown, RefreshCw, Wand2, Target, CheckCircle2, AlertTriangle, Layers
 } from 'lucide-react';
 import { AGG_METHODS, SHOW_AS_MODES } from '../../../constants/pivotConstants.js';
@@ -103,7 +103,6 @@ export function MetricCenterPanel({
   setCustomMetricsCatalog,
 }) {
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [showAnalystNotes, setShowAnalystNotes] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState('all');
   const [targetBenchmarkInputs, setTargetBenchmarkInputs] = useState({});
   const [activeBenchmarkModalId, setActiveBenchmarkModalId] = useState(null);
@@ -1034,24 +1033,6 @@ export function MetricCenterPanel({
             ))}
           </div>
 
-          {/* Analyst's Notes Guide Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine?.playClick?.(510);
-              setShowAnalystNotes((p) => !p);
-            }}
-            className={`inline-flex items-center gap-1 px-2 py-0.5 min-h-[24px] rounded-lg border text-[9.5px] font-semibold transition ${
-              showAnalystNotes
-                ? 'bg-[#E6DB74]/25 border-[#E6DB74]/60 text-ink-yellow font-bold shadow-2xs'
-                : 'bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-            }`}
-            title={t("零基础数据分析方法笔记：理解加权平均、辛普森悖论与去重计数")}
-          >
-            <BookOpen className="w-3 h-3 text-ink-yellow shrink-0" />
-            <span>{t("分析师笔记")}</span>
-            {showAnalystNotes ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
-          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -1074,53 +1055,6 @@ export function MetricCenterPanel({
           </button>
         </div>
       </div>
-
-      {/* Expandable Analyst's Notes & Methodology Guide */}
-      {showAnalystNotes && (
-        <div className="p-3 rounded-lg border border-[#E6DB74]/40 bg-[#FFFBEA]/70 dark:bg-[#2A2B20] text-[#272822] dark:text-[#F8F8F2] text-[10px] space-y-2 animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-[#E6DB74]/30 pb-1.5">
-            <div className="flex items-center gap-1.5 font-bold text-ink-yellow text-[11px]">
-              <Lightbulb className="w-3.5 h-3.5 text-ink-yellow shrink-0" />
-              <span>{t("零基础分析师笔记：数据指标设计与避坑指南")}</span>
-            </div>
-            <span className="text-[9px] text-ink-muted">{t("点击上方按钮可随时收起")}</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 pt-0.5">
-            <div className="p-2 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8]/60 dark:border-[#3E3D32] space-y-1">
-              <div className="font-bold text-ink-purple flex items-center gap-1">
-                <span>1. 聚合求和 vs 逐行平均</span>
-              </div>
-              <p className="text-ink-muted leading-relaxed">
-                在计算毛利率、转化率等比率时，必须使用全量加权 <code className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 font-bold">SUM(A)/SUM(B)</code>。如果直接对每行比率取均值，会导致大额订单与极小订单权重相同，产生严重的“辛普森悖论”统计偏差。
-              </p>
-            </div>
-            <div className="p-2 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8]/60 dark:border-[#3E3D32] space-y-1">
-              <div className="font-bold text-ink-cyan flex items-center gap-1">
-                <span>2. 什么时候用去重计数 COUNTD？</span>
-              </div>
-              <p className="text-ink-muted leading-relaxed">
-                统计客单价或人均产出时，分母应使用客户维度的去重计数 <code className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 font-bold">COUNTD([客户])</code>，而非明细记录数 <code className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 font-bold">COUNT()</code>。去重能真实剔除同一用户的重复购买，得出真正的单客价值。
-              </p>
-            </div>
-            <div className="p-2 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8]/60 dark:border-[#3E3D32] space-y-1">
-              <div className="font-bold text-ink-green flex items-center gap-1">
-                <span>3. 衍生指标 vs 快速表计算</span>
-              </div>
-              <p className="text-ink-muted leading-relaxed">
-                <strong>衍生指标 (FX)</strong> 是底层物理数据产生的新度量（如利润率）；而 <strong>表计算 (Show As)</strong> 是基于透视表已展开行列的二次横纵向折算（如行汇总百分比、环比差额），两者结合使用效率倍增。
-              </p>
-            </div>
-            <div className="p-2 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8]/60 dark:border-[#3E3D32] space-y-1">
-              <div className="font-bold text-ink-orange flex items-center gap-1">
-                <span>4. 内置零分母除零安全防护</span>
-              </div>
-              <p className="text-ink-muted leading-relaxed">
-                在分析长尾分类或过滤后数据集时，分母可能为 0。本工作台底层内置了除零安全拦截与空值优雅回退，计算结果会自动呈现为连字符 <code className="px-1 py-0.2 rounded bg-black/5 dark:bg-white/10 font-bold">-</code>，绝不会造成页面崩溃或报错。
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* TAB 1: Active Metrics & Live KPI Cards (已配指标与看板) */}
       {activeTab === 'active' && (

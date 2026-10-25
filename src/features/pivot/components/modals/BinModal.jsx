@@ -64,6 +64,25 @@ export function BinModal({
             </div>
           ) : (
             <div className="space-y-3">
+              <div className="space-y-1">
+                <span className="text-[10px] text-ink-muted font-medium">{t("常用步长:")}</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[10, 50, 100, 500, 1000].map((stepVal) => (
+                    <button
+                      key={stepVal}
+                      type="button"
+                      onClick={() => {
+                        soundEngine?.playClick?.(500);
+                        setBinFormState((p) => ({ ...p, start: p.start || '0', step: String(stepVal) }));
+                      }}
+                      className={"px-2 py-0.5 rounded-md border text-[10px] font-semibold transition " + (binFormState.step === String(stepVal) ? "bg-[#66D9EF]/20 border-[#66D9EF] text-ink-cyan font-bold" : "bg-[#EFECE1]/50 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:border-[#66D9EF]")}
+                    >
+                      +{stepVal}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label htmlFor="bin-start" className="block text-[11px] text-ink-muted mb-1 apple-font-mono">{t("起始值 (Start):")}</label>
                 <input

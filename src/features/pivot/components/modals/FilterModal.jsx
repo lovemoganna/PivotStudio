@@ -87,6 +87,40 @@ export function FilterModal({
     }));
   };
 
+  const deselectAll = () => {
+    setPivotConfig((prev) => ({
+      ...prev,
+      [zone]: prev[zone].map((it) => {
+        if (it.id !== liveDim.id) return it;
+        if (zone === 'filters') {
+          return { ...it, excludeAll: true, selectedValues: [] };
+        }
+        return { ...it, excludedValues: [...allDistinctVals] };
+      }),
+    }));
+  };
+
+  const invertSelection = () => {
+    setPivotConfig((prev) => ({
+      ...prev,
+      [zone]: prev[zone].map((it) => {
+        if (it.id !== liveDim.id) return it;
+        if (zone === 'filters') {
+          if (it.excludeAll) {
+            return { ...it, excludeAll: false, selectedValues: [] };
+          }
+          const curSel = it.selectedValues || [];
+          const effectiveSel = curSel.length === 0 ? allDistinctVals : curSel;
+          const inverted = allDistinctVals.filter((v) => !effectiveSel.includes(v));
+          return { ...it, excludeAll: inverted.length === 0, selectedValues: inverted };
+        }
+        const curExcl = it.excludedValues || [];
+        const invertedExcl = allDistinctVals.filter((v) => !curExcl.includes(v));
+        return { ...it, excludedValues: invertedExcl };
+      }),
+    }));
+  };
+
   return (
     <div
       onClick={onClose}
@@ -116,17 +150,35 @@ export function FilterModal({
             placeholder={t("搜索筛选项...")}
             className="flex-1 px-2.5 py-1 rounded-lg bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-xs apple-font-mono focus:outline-none"
           />
-          <button
-            onClick={resetAll}
-            disabled={loading || Boolean(profileError)}
-            className="shrink-0 px-2.5 py-1 rounded-lg bg-[#A6E22E]/20 text-ink-green text-[10px] font-bold apple-font-mono"
-          >{' ' + t("全选重置") + ' '}</button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={resetAll}
+              disabled={loading || Boolean(profileError)}
+              className="px-2 py-1 rounded-lg bg-[#A6E22E]/20 text-ink-green text-[10px] font-bold apple-font-mono hover:bg-[#A6E22E]/30 transition"
+              title={t("全部选中")}
+            >{t("全选")}</button>
+            <button
+              type="button"
+              onClick={deselectAll}
+              disabled={loading || Boolean(profileError)}
+              className="px-2 py-1 rounded-lg bg-[#F92672]/15 text-ink-pink text-[10px] font-bold apple-font-mono hover:bg-[#F92672]/25 transition"
+              title={t("清除全部选中")}
+            >{t("全不选")}</button>
+            <button
+              type="button"
+              onClick={invertSelection}
+              disabled={loading || Boolean(profileError)}
+              className="px-2 py-1 rounded-lg bg-[#66D9EF]/15 text-ink-cyan text-[10px] font-bold apple-font-mono hover:bg-[#66D9EF]/25 transition"
+              title={t("反选")}
+            >{t("反选")}</button>
+          </div>
         </div>
         <div aria-busy={loading} className="min-h-0 flex-1 overflow-y-auto p-3 space-y-1">
           {loading && <p role="status" className="text-xs text-ink-muted">{t('正在读取筛选项…')}</p>}
           {profileError && <p role="alert">{profileError}</p>}
           {!loading && !profileError && matchedValues.length === 0 && <p role="status" className="text-xs text-ink-muted">{t(q ? '没有匹配的筛选项，请修改搜索。' : '当前字段没有可用筛选项。')}</p>}
-          {matchedValues.length > 200 && <p role="status">{t('仅显示前 200 项，请搜索定位其他值；全选仍覆盖全部值。')}</p>}
+          {matchedValues.length > 200 && <p role="status" className="px-2.5 py-1.5 rounded-lg bg-[#FD971F]/15 border border-[#FD971F]/30 text-ink-orange text-[10px] leading-relaxed">{t("仅显示前 200 项，请搜索定位其他值；全选仍覆盖全部值。")}</p>}
           {visibleVals.map((val) => {
             const checked = isValueChecked(val);
             return (

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickMoreItem } from './_toolbar.js';
 
 const ready = page => expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status', 'idle');
 test.beforeEach(async ({page}) => {
@@ -55,11 +56,11 @@ test('quality: keyboard file chooser, named preview types and long headers',asyn
 test('quality: named chart settings, target sizes and semantic text contrast',async({page})=>{
   await page.goto('/?demo=retail'); await ready(page);
   await page.getByLabel('主题模式',{exact:true}).selectOption('light');
-  await page.getByRole('button',{name:'规格',exact:true}).click();
-  for(const name of ['主指标绑定:','次轴/Y轴指标:','图表内排序:','TopN 焦点截断:','衍生分析序列:','缺失值处理策略:']) {
+  await page.getByRole('button',{name:'图表选项',exact:true}).click();
+  for(const name of ['主指标绑定:','次轴/Y轴指标:','只显示前 N 组:','衍生线:','缺失值:']) {
     await expect(page.getByLabel(name,{exact:true})).toBeVisible();
   }
-  await page.getByRole('button',{name:'关闭图表规格面板',exact:true}).click();
+  await page.getByRole('button',{name:'关闭图表选项',exact:true}).click();
   const small=await page.locator('button:visible,select:visible,[role=button]:visible').evaluateAll(els=>els.filter(el=>{const r=el.getBoundingClientRect();return r.width<24||r.height<24}).map(el=>el.outerHTML.slice(0,100)));
   expect(small).toEqual([]);
   const ratios=await page.evaluate(()=>{
@@ -82,10 +83,10 @@ test('quality: named chart settings, target sizes and semantic text contrast',as
 
 });
 
-test('quality: mobile display controls stay discoverable and preserve settings',async({page})=>{
+test('quality: table options stay collapsed by default and preserve settings',async({page})=>{
   await page.setViewportSize({width:360,height:800});
   await page.goto('/?demo=retail'); await ready(page);
-  const toggle=page.getByRole('button',{name:/表格显示设置/});
+  const toggle=page.getByRole('button',{name:/表格选项/});
   const settings=page.locator('#pivot-table-display-settings');
   await expect(toggle).toHaveAttribute('aria-expanded','false');
   await expect(settings).toBeHidden();
@@ -97,7 +98,8 @@ test('quality: mobile display controls stay discoverable and preserve settings',
   await toggle.click();
   await expect(zebra).not.toBeChecked();
   await page.setViewportSize({width:1280,height:900});
-  await expect(toggle).toBeHidden();
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded','true');
   await expect(settings).toBeVisible();
 });
 
@@ -117,18 +119,18 @@ test('quality: English command search finds and executes exports by keyboard',as
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('quality: desktop toolbar remains scrollable and mobile tabs never overlap telemetry',async({page})=>{
+test('quality: decluttered toolbar stays reachable and mobile tabs never overlap telemetry',async({page})=>{
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/?demo=retail'); await ready(page);
   const toolbar=page.getByRole('toolbar');
   expect(await toolbar.evaluate(el=>getComputedStyle(el).overflowX)).toBe('auto');
-  const more=page.getByRole('button',{name:'更多工具，滚动到末尾后返回开头',exact:true});
-  await expect(more).toBeVisible();
-  await more.click();
-  await expect.poll(()=>toolbar.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);
+  // After declutter, a 1280px toolbar should usually fit without forced scrolling.
+  const overflow=await toolbar.evaluate(el=>el.scrollWidth-el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(8);
+  await expect(page.getByRole('button',{name:'导出',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'更多',exact:true})).toBeVisible();
   const theme=page.getByRole('button',{name:'切换主题',exact:true});
   await theme.focus();
-  await expect.poll(()=>theme.evaluate(el=>el.getBoundingClientRect().right-el.closest('[role=toolbar]').getBoundingClientRect().right)).toBeLessThanOrEqual(1);
   const rects=await theme.evaluate(el=>{const t=el.closest('[role=toolbar]').getBoundingClientRect(),r=el.getBoundingClientRect();return {right:r.right,left:r.left,edge:t.right,start:t.left};});
   expect(rects.right).toBeLessThanOrEqual(rects.edge+1);
   expect(rects.left).toBeGreaterThanOrEqual(rects.start-1);
@@ -141,8 +143,13 @@ test('quality: core dialogs expose named controls and readable text',async({page
   const {default:AxeBuilder}=await import('@axe-core/playwright');
   await page.goto('/?demo=retail'); await ready(page);
   const issues=[];
-  for(const entry of [page.getByRole('button',{name:'格式与数值',exact:true}),page.getByRole('button',{name:/工作区 ·/}),page.getByRole('button',{name:'打开指令面板',exact:true})]) {
-    await entry.click();
+  const openers=[
+    ()=>page.getByRole('button',{name:'格式与数值',exact:true}).click(),
+    async()=>{await clickMoreItem(page,/工作区/);},
+    ()=>page.getByRole('button',{name:'打开指令面板',exact:true}).click(),
+  ];
+  for(const open of openers) {
+    await open();
     const dialog=page.getByRole('dialog'); await expect(dialog).toBeVisible();
     if (await dialog.getByRole('button',{name:'+ 新建衍生计算指标',exact:true}).count()) {
       await dialog.getByRole('button',{name:'+ 新建衍生计算指标',exact:true}).click();

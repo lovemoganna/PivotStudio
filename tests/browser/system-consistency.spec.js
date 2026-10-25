@@ -1,5 +1,6 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import {clickExport, clickMoreItem} from './_toolbar.js';
 
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 test.beforeEach(async({page})=>{
@@ -37,13 +38,13 @@ for(const width of [360,768,1280,1440])test(`system: shared configuration, dialo
     await expect(fullscreen).toBeVisible();
     await page.keyboard.press('Escape');await expect(fullscreen).toHaveCount(0);
     await expect(page.getByRole('button',{name:'图表全屏',exact:true})).toBeFocused();
-    await page.getByRole('button',{name:'剧院舞台',exact:true}).click();
+    await clickMoreItem(page,'演示舞台');
     // Safari pointer clicks do not focus buttons; exercise keyboard focus restoration explicitly.
     const opener=page.getByRole('button',{name:'编辑结论',exact:true});await opener.focus();await opener.press('Enter');
-    const dialog=page.getByRole('dialog',{name:'编辑分镜内容',exact:true});
-    await dialog.getByLabel('分镜标题:',{exact:true}).fill('');
+    const dialog=page.getByRole('dialog',{name:/编辑分析笔记/});
+    await dialog.getByLabel('笔记标题:',{exact:true}).fill('');
     await expect(dialog.getByRole('button',{name:'保存修改',exact:true})).toBeDisabled();
-    await dialog.getByLabel('分镜标题:',{exact:true}).fill('审查分镜');
+    await dialog.getByLabel('笔记标题:',{exact:true}).fill('审查笔记');
     const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze();
     expect(axe.violations).toEqual([]);
     await page.screenshot({path:info.outputPath(`${width}-${theme}-story.png`)});
@@ -54,8 +55,10 @@ for(const width of [360,768,1280,1440])test(`system: shared configuration, dialo
 
 test('system: modal shortcuts cannot mutate background configuration',async({page})=>{
   await start(page);const table=page.locator('#pivot-main-html-table');const before=await table.textContent();
-  await page.getByRole('button',{name:'设计规范',exact:true}).click();
-  await page.getByRole('button',{name:'关闭内部设计规范',exact:true}).focus();
+  await page.getByRole('button',{name:'格式与数值',exact:true}).click();
+  const formatDialog=page.getByRole('dialog');
+  await expect(formatDialog).toBeVisible();
+  await formatDialog.getByRole('button').first().focus();
   for(const key of ['r','t','[',']','Control+z','Control+Shift+z'])await page.keyboard.press(key);
   await expect(table).toHaveText(before);await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'销售额 · 查看字段分布',exact:true}).click();
@@ -68,32 +71,32 @@ test('system: modal shortcuts cannot mutate background configuration',async({pag
 
 test('system: readonly formatting is disabled and administrator can recover',async({page})=>{
   await start(page);const table=page.locator('#pivot-main-html-table'),before=await table.textContent();
-  await page.getByRole('button',{name:/^工作区/}).click();
+  await clickMoreItem(page,/^工作区/);
   await page.getByRole('button',{name:'访客预览账户 (只读)',exact:true}).click();await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'格式与数值',exact:true}).click();
   const controls=page.getByRole('dialog').locator('input,select');
   for(const control of await controls.all())await expect(control).toBeDisabled();
   await page.keyboard.press('Escape');await page.keyboard.press('Control+z');await expect(table).toHaveText(before);
-  await page.getByRole('button',{name:/^工作区/}).click();
+  await clickMoreItem(page,/^工作区/);
   await page.getByRole('button',{name:'张工 (BI架构师)',exact:true}).click();await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'格式与数值',exact:true}).click();await expect(page.getByRole('dialog').locator('select').first()).toBeEnabled();
 });
 
 test('system: deleting and resetting stories keeps displayed shot and chart synchronized',async({page})=>{
-  await start(page);await page.getByRole('button',{name:'剧院舞台',exact:true}).click();
-  for(const action of ['删除当前分镜','恢复为当前数据集的推荐故事分镜']){
+  await start(page);await clickMoreItem(page,'演示舞台');
+  for(const action of ['删除当前分析笔记','恢复为推荐分析场景']){
     await page.getByTitle(action,{exact:true}).click();await ready(page);
     const type=await page.getByLabel('选择图表类型',{exact:true}).inputValue();
     await page.getByRole('button',{name:'01',exact:true}).click();await ready(page);
     await expect(page.getByLabel('选择图表类型',{exact:true})).toHaveValue(type);
   }
   await page.getByRole('button',{name:'编辑结论',exact:true}).click();
-  await page.getByRole('dialog').getByLabel('分镜标题:',{exact:true}).fill('核对后的分析');
+  await page.getByRole('dialog').getByLabel('笔记标题:',{exact:true}).fill('核对后的分析');
   await page.getByRole('button',{name:'保存修改',exact:true}).click();
   await expect(page.getByRole('button',{name:'01',exact:true})).toHaveAttribute('title',/核对后的分析/);
-  await page.getByRole('button',{name:'存为新分镜',exact:true}).click();
-  await page.getByRole('dialog').getByLabel('分镜标题:',{exact:true}).fill('保存的分析');
-  await page.getByRole('button',{name:'保存分镜',exact:true}).click();await ready(page);
+  await page.getByRole('button',{name:'存为笔记',exact:true}).click();
+  await page.getByRole('dialog').getByLabel('笔记标题:',{exact:true}).fill('保存的分析');
+  await page.getByRole('button',{name:'保存笔记',exact:true}).click();await ready(page);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('button',{name:'06',exact:true})).toHaveAttribute('title',/保存的分析/);
 });
@@ -148,7 +151,7 @@ test('system: every chart type renders finite geometry with no runtime errors',a
 test('system: print report contains computed results and restores analysis controls',async({page})=>{
   await page.setViewportSize({width:1280,height:900});await start(page);
   await page.evaluate(()=>{window.print=()=>{window.__printedPivot={table:document.querySelector('#pivot-main-html-table')?.textContent,configCount:document.querySelectorAll('[data-testid="zone-values"]').length,chartCount:document.querySelectorAll('#pivot-chart-container').length};};});
-  await page.getByRole('button',{name:'.PDF',exact:true}).click();
+  await clickExport(page,'.PDF');
   await expect.poll(()=>page.evaluate(()=>window.__printedPivot)).toBeTruthy();
   const report=await page.evaluate(()=>window.__printedPivot);
   expect(report.table).toContain('1,623,510');expect(report.configCount).toBe(0);expect(report.chartCount).toBe(1);

@@ -37,7 +37,6 @@ import { DatasetTabStrip } from './components/DatasetTabStrip';
 import { ALL_BENCHMARK_PRESETS } from '../../constants/benchmarkDatasets';
 
 // Modals
-import { SpecModal } from './components/modals/SpecModal';
 import { DrillDownModal } from './components/modals/DrillDownModal';
 import { UploadModal } from './components/modals/UploadModal';
 import { BinModal } from './components/modals/BinModal';
@@ -80,7 +79,6 @@ export default function PivotWorkbench() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandQuery, setCommandQuery] = useState('');
   const [showChartStudioPopover, setShowChartStudioPopover] = useState(false);
-  const [showSpecModal, setShowSpecModal] = useState(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
   const [datasets, setDatasets] = useState(() => {
@@ -156,7 +154,7 @@ export default function PivotWorkbench() {
     lineDerivedMetric: 'none',
     showDataLabels: true,
     showAvgReferenceLine: true,
-    clickLinkMode: 'highlight',
+    clickLinkMode: 'drill',
     histogramBins: 0,
     stickyRowHeaders: true,
   });
@@ -502,7 +500,6 @@ export default function PivotWorkbench() {
       if (e.key === 'Escape') {
         setShowCommandPalette(false);
         setShowChartStudioPopover(false);
-        setShowSpecModal(false);
         setShowShortcutsModal(false);
         setDrillDownModal(null);
         setUploadPreviewModal(null);
@@ -572,6 +569,21 @@ export default function PivotWorkbench() {
   }, []);
 
   useEffect(() => {
+    // Intro / empty workspace: keep the synchronous empty result, skip worker chrome.
+    if (!currentDataset) {
+      if (busyRef.current) stopCalculation();
+      else {
+        busyRef.current = false;
+        setIsWorkerComputing(false);
+        setComputeProgress(0);
+        setComputeError(null);
+      }
+      cachedDatasetRef.current = null;
+      const pivotResult = calculatePivot(null, buildDefaultPivotConfig(null));
+      setActiveResults({ pivotResult, unifiedChartSpec: buildUnifiedChartSpec(null, pivotResult, chartType || 'bar', chartSpecConfig || {}) });
+      return;
+    }
+
     // Superseded work is stopped immediately rather than queued behind a stale request.
     if (busyRef.current) stopCalculation();
     const id = ++reqIdRef.current;
@@ -651,7 +663,7 @@ export default function PivotWorkbench() {
 
   const saveCurrentViewAsShot = useCallback((title, subtitle) => {
     if (!currentDataset) {
-      showToast('当前未加载数据集，无法保存分镜', 'error');
+      showToast('当前未加载数据集，无法保存分析笔记', 'error');
       return;
     }
     soundEngine?.playClick?.(620);
@@ -660,15 +672,14 @@ export default function PivotWorkbench() {
     const nextNumber = String(shots.length + 1).padStart(2, '0');
     const insight = unifiedChartSpec?.executiveInsight;
     const defaultSubtitle = insight
-      ? `最高：${insight.topName} (${insight.topFormatted}) · 样本总计 ${insight.groupCount} 组`
-      : '自定义分析分镜快照';
+      ? `最高：${insight.topName} (${insight.topFormatted}) · ${insight.groupCount} 组`
+      : '当前透视与图表视图';
     const newShot = {
       id: `custom_shot_${Date.now()}`,
       number: nextNumber,
-      title: title || `自定义分镜 ${shots.length + 1}`,
-      shortLabel: (title || `分镜${shots.length + 1}`).slice(0, 6),
+      title: title || `分析笔记 ${shots.length + 1}`,
+      shortLabel: (title || `笔记${shots.length + 1}`).slice(0, 6),
       subtitle: subtitle || defaultSubtitle,
-      cameraNote: 'Custom Analytical Lens · User Defined',
       viewMode,
       chartType,
       pivotOverride: JSON.parse(JSON.stringify(pivotConfig)),
@@ -679,7 +690,7 @@ export default function PivotWorkbench() {
       [targetId]: nextShots,
     }));
     setKeynoteShotIdx(nextShots.length - 1);
-    showToast(`已成功保存当前视图为分镜 [${nextNumber}]`);
+    showToast(`已保存分析笔记 [${nextNumber}]`);
   }, [currentDataset, activeDatasetId, effectiveStoryShots, unifiedChartSpec, viewMode, chartType, pivotConfig, showToast, soundEngine]);
 
   const updateStoryShot = useCallback((shotIdx, updatedData) => {
@@ -696,14 +707,14 @@ export default function PivotWorkbench() {
       ...prev,
       [activeDatasetId]: shots,
     }));
-    showToast(`已更新分镜 [${shots[shotIdx].number}] 内容`);
+    showToast(`已更新分析笔记 [${shots[shotIdx].number}]`);
   }, [activeDatasetId, effectiveStoryShots, showToast, soundEngine]);
 
   const deleteStoryShot = useCallback((shotIdx) => {
     if (!activeDatasetId) return;
     const shots = [...effectiveStoryShots];
     if (shots.length <= 1) {
-      showToast('至少保留一个分镜', 'error');
+      showToast('至少保留一个分析笔记', 'error');
       return;
     }
     soundEngine?.playClick?.(440);
@@ -719,7 +730,7 @@ export default function PivotWorkbench() {
     const nextIdx = Math.max(0, Math.min(shotIdx, reindexed.length - 1));
     setKeynoteShotIdx(nextIdx);
     applyKeynoteShot(nextIdx, reindexed);
-    showToast('已删除该分镜');
+    showToast('已删除该分析笔记');
   }, [activeDatasetId, effectiveStoryShots, showToast, soundEngine, applyKeynoteShot]);
 
   const resetStoryShots = useCallback(() => {
@@ -735,7 +746,7 @@ export default function PivotWorkbench() {
     if (defaultShots[0]) {
       applyKeynoteShot(0, defaultShots);
     }
-    showToast('已恢复为当前数据集的自动推荐故事分镜');
+    showToast('已恢复为推荐分析场景');
   }, [activeDatasetId, currentDataset, soundEngine, applyKeynoteShot, showToast]);
 
   const addFieldToZone = useCallback((zone, fieldName, source) => {
@@ -924,11 +935,17 @@ export default function PivotWorkbench() {
     const rk = pointData?.rowKey || pointData?.payload?.rowKey;
     if (!rk) return;
 
-    if (chartSpecConfig.clickLinkMode === 'filter' && rk !== '__GRAND_TOTAL_ROW__') {
+    const onlyColumns = !pivotConfig.rows.length && pivotConfig.columns.length > 0;
+    const filterColKey = pointData?.colKey || point?.colKey || null;
+    // Columns-only heatmaps click with rowKey=__GRAND_TOTAL_ROW__; filter by the column key instead.
+    const canChartFilter = chartSpecConfig.clickLinkMode === 'filter'
+      && (rk !== '__GRAND_TOTAL_ROW__' || (onlyColumns && filterColKey && filterColKey !== '__GRAND_TOTAL_COL__'));
+
+    if (canChartFilter) {
       const activeDim = pivotConfig.rows.length > 0 ? pivotConfig.rows[0] : (pivotConfig.columns.length > 0 ? pivotConfig.columns[0] : null);
       if (!activeDim) return;
 
-      const dimKey = (pivotConfig.rows.length ? rk : point?.colKey || rk);
+      const dimKey = pivotConfig.rows.length ? rk : (filterColKey || rk);
       const firstSeg = decodeGroupPath(dimKey)[0];
       let matchingRawVals;
       try { matchingRawVals = (await requestProfile(activeDim.field, activeDim, firstSeg))?.matchingRawValues; }
@@ -957,7 +974,6 @@ export default function PivotWorkbench() {
       });
     } else {
       setHighlightedRowKey(rk);
-      const onlyColumns = !pivotResult.rowConfigs.length && pivotResult.colConfigs.length;
       const rawPoint = pointData?.payload || pointData;
       const rawColKey = pointData?.colKey || rawPoint?.colKey || '__GRAND_TOTAL_COL__';
       const decodedRowLabel = rk === '__GRAND_TOTAL_ROW__'
@@ -1199,43 +1215,80 @@ export default function PivotWorkbench() {
   // Spotlight Command Palette Actions
   const commandActions = useMemo(() => {
     const list = [
-      { id: 'cmd_undo', category: '历史与操作', label: '撤销上一步透视配置修改 (Undo)', shortcut: '⌘Z', run: undo },
-      { id: 'cmd_redo', category: '历史与操作', label: '重做下一步透视配置修改 (Redo)', shortcut: '⌘Y', run: redo },
-      { id: 'cmd_keynote', category: 'Keynote 叙事分镜', label: keynotePlaying ? '暂停 96 BPM Keynote 自动运镜' : '启动 96 BPM Apple Keynote 自动运镜', shortcut: 'Space', run: () => { setKeynotePlaying((p) => !p); } },
-      { id: 'cmd_theater', category: 'Keynote 叙事分镜', label: cinemaTheaterMode ? '退出剧院全屏舞台模式' : '进入剧院全屏舞台模式 (隐藏侧栏)', shortcut: 'T', run: () => { setCinemaTheaterMode((p) => !p); } },
-      { id: 'cmd_transpose', category: '矩阵与结构操作', label: '一键执行透视矩阵「行列互换 (Transpose)」', shortcut: 'R', run: transposeRowsAndColumns },
+      { id: 'cmd_shortcuts', category: '工具', label: '查看快捷键', shortcut: '?', run: () => { soundEngine?.playPop?.(); setShowShortcutsModal(true); } },
+      { id: 'cmd_format', category: '透视表', label: '数值格式、条件色阶与小数位', shortcut: 'Format', run: () => { soundEngine?.playClick(580); setActiveFormatModal(true); } },
+      { id: 'cmd_workspace', category: '工作区', label: '本地工作区快照与分享链接', shortcut: 'Workspace', run: () => { soundEngine?.playClick(600); setShowWorkspaceModal(true); } },
+      { id: 'cmd_clear_filters', category: '透视表', label: '清空全部筛选条件', shortcut: 'Clear', run: () => {
+        setPivotConfig((prev) => ({
+          ...prev,
+          filters: [],
+          rows: (prev.rows || []).map((r) => ({ ...r, excludedValues: [] })),
+          columns: (prev.columns || []).map((c) => ({ ...c, excludedValues: [] })),
+        }));
+        showToast('已清空全部筛选条件');
+      } },
+      { id: 'cmd_add_count', category: '矩阵与结构操作', label: '在数值指标中一键添加「记录数 (COUNT)」统计样本量', shortcut: '+Count', run: () => {
+        addFieldToZone('values', '__COUNT__');
+        showToast('已添加「记录数」到数值指标');
+      } },
+      { id: 'cmd_export_report', category: '外观与导出', label: '导出分析报告 Markdown', shortcut: 'Doc', run: () => {
+        const colSummary = pivotConfig?.columns?.map((c) => c.field || c).join(' / ');
+        const ei = unifiedChartSpec?.executiveInsight;
+        const lines = [
+          `# 数据透视分析：${currentDataset?.name || '当前数据集'}`,
+          `\n> 生成时间：${new Date().toLocaleString('zh-CN')}`,
+          `\n## 一、摘要\n`,
+          ei
+            ? `- **最高**：「${ei.topName}」${ei.topFormatted}${ei.topSharePct ? `（占图中合计 ${ei.topSharePct}%）` : ''}。\n- **集中度**：${ei.top3SharePct ? `前 3 组合计 ${ei.top3SharePct}%` : `共 ${ei.groupCount} 组`}。\n- **均值**：${ei.meanFormatted}（${ei.aboveMeanCount}/${ei.groupCount} 组高于均值）。`
+            : `- 按「${unifiedChartSpec.xDimensionLabel || '维度'}」比较「${unifiedChartSpec.primarySeriesKey}」。`,
+          `\n## 二、透视配置\n`,
+          `- **行**：${(pivotConfig?.rows || []).map(r => r.field).join(' > ') || '无'}`,
+          `- **列**：${colSummary || '无'}`,
+          `- **值**：${(pivotConfig?.values || []).map(v => `${v.field} (${v.agg || 'sum'})`).join(', ') || unifiedChartSpec.primarySeriesKey}`,
+          `- **图表**：${t(VISUAL_CHART_TYPES.find(ct => ct.value === chartType)?.label || chartType)}`,
+          `\n## 三、说明\n`,
+          `1. 筛选后样本：${pivotResult.totalCount.toLocaleString()} 行。`,
+          `2. 可双击单元格或点击图中分组打开明细行核对。`,
+        ];
+        copyTextToClipboard(lines.join('\n'), '已复制分析报告 Markdown');
+      } },
+      { id: 'cmd_undo', category: '历史', label: '撤销', shortcut: '⌘Z', run: undo },
+      { id: 'cmd_redo', category: '历史', label: '重做', shortcut: '⌘Y', run: redo },
+      { id: 'cmd_keynote', category: '演示', label: keynotePlaying ? '暂停演示' : '开始演示', shortcut: 'Space', run: () => { setKeynotePlaying((p) => !p); } },
+      { id: 'cmd_theater', category: '演示', label: cinemaTheaterMode ? '退出演示舞台' : '进入演示舞台', shortcut: 'T', run: () => { setCinemaTheaterMode((p) => !p); } },
+      { id: 'cmd_transpose', category: '透视表', label: '行列互换', shortcut: 'R', run: transposeRowsAndColumns },
       ...(effectiveStoryShots.length > 0 ? effectiveStoryShots : KEYNOTE_STORYBOARD_SHOTS).map((s, idx) => ({
         id: `cmd_shot_${idx}`,
-        category: 'Keynote 叙事分镜',
-        label: `${t('切换分镜')} ${s.number}: ${s.title}`,
+        category: '演示',
+        label: `${t('切换场景')} ${s.number}: ${s.title}`,
         shortcut: `0${idx + 1}`,
         run: () => applyKeynoteShot(idx),
       })),
       ...VISUAL_CHART_TYPES.map((ct) => ({
         id: `cmd_chart_${ct.value}`,
-        category: '图表切换',
+        category: '图表',
         label: `${t('切换图表为:')} ${t(ct.label)}`,
         shortcut: ct.short,
         run: () => { setChartType(ct.value); if (viewMode === 'table') setViewMode('split'); },
       })),
-      { id: 'cmd_100k', category: '性能与引擎验证', label: '一键生成 100,000 行大数据压测集 (激活虚拟滚动)', shortcut: '100K', run: () => generate100kDataset(100000) },
-      { id: 'cmd_theme', category: '外观与导出', label: darkMode ? '切换为 Monokai Light 暖纸浅色主题' : '切换为 Monokai Pro 经典暗黑主题', shortcut: 'Theme', run: () => setDarkMode((p) => !p) },
-      { id: 'cmd_excel', category: '外观与导出', label: '导出 Excel 工作簿 (.xlsx)', shortcut: 'XLS', run: exportToExcelMerged },
-      { id: 'cmd_csv', category: '外观与导出', label: '导出标准 UTF-8 CSV 数据表 (.csv)', shortcut: 'CSV', run: exportToCSV },
-      { id: 'cmd_autofit_cols', category: '透视表排版与对齐', label: '透视表：一键自动优化调整行高与列宽 (Auto-Fit)', shortcut: 'Fit', run: () => { const newWidths = calculateAutoFitColumnWidths(pivotResult, tableSettings.customColWidths); setTableSettings((p) => ({ ...p, colWidthMode: 'autofit', customColWidths: newWidths })); showToast('已自动计算并自适应优化全部行高与列宽'); } },
-      { id: 'cmd_align_center', category: '透视表排版与对齐', label: '透视表：设置数据与表头居中对齐 (Centered 默认)', shortcut: 'Align', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'center' })); showToast('数据已设置为居中对齐'); } },
-      { id: 'cmd_align_left', category: '透视表排版与对齐', label: '透视表：设置数据靠左对齐 (Left)', shortcut: 'Left', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'left' })); showToast('数据已设置为靠左对齐'); } },
-      { id: 'cmd_align_right', category: '透视表排版与对齐', label: '透视表：设置数据靠右对齐 (Right)', shortcut: 'Right', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'right' })); showToast('数据已设置为靠右对齐'); } },
-      { id: 'cmd_density_compact', category: '透视表排版与对齐', label: '透视表行高：切换为紧凑规格 (28px)', shortcut: 'Dense', run: () => { setTableSettings((p) => ({ ...p, density: 'compact', wrapText: false })); showToast('行高已切换为紧凑规格 (28px)'); } },
-      { id: 'cmd_density_normal', category: '透视表排版与对齐', label: '透视表行高：切换为标准规格 (36px)', shortcut: 'Normal', run: () => { setTableSettings((p) => ({ ...p, density: 'normal', wrapText: false })); showToast('行高已切换为标准规格 (36px)'); } },
-      { id: 'cmd_density_relaxed', category: '透视表排版与对齐', label: '透视表行高：切换为宽松规格 (44px)', shortcut: 'Spacious', run: () => { setTableSettings((p) => ({ ...p, density: 'relaxed', wrapText: false })); showToast('行高已切换为宽松规格 (44px)'); } },
-      { id: 'cmd_density_auto', category: '透视表排版与对齐', label: '透视表行高：启用自适应换行 (随内容展开行高)', shortcut: 'Wrap', run: () => { setTableSettings((p) => ({ ...p, density: 'auto', wrapText: true })); showToast('已启用自适应换行与动态行高'); } },
-      { id: 'cmd_toggle_zebra', category: '透视表排版与对齐', label: '透视表：切换隔行轻柔斑马纹', shortcut: 'Zebra', run: () => { setTableSettings((p) => ({ ...p, showZebra: !p.showZebra })); showToast('已切换斑马纹显示'); } },
+      { id: 'cmd_100k', category: '数据', label: '生成 100,000 行压测数据集', shortcut: '100K', run: () => generate100kDataset(100000) },
+      { id: 'cmd_theme', category: '外观', label: darkMode ? '切换为浅色主题' : '切换为深色主题', shortcut: 'Theme', run: () => setDarkMode((p) => !p) },
+      { id: 'cmd_excel', category: '导出', label: '导出 Excel (.xlsx)', shortcut: 'XLS', run: exportToExcelMerged },
+      { id: 'cmd_csv', category: '导出', label: '导出 CSV (.csv)', shortcut: 'CSV', run: exportToCSV },
+      { id: 'cmd_autofit_cols', category: '透视表', label: '自动调整列宽', shortcut: 'Fit', run: () => { const newWidths = calculateAutoFitColumnWidths(pivotResult, tableSettings.customColWidths); setTableSettings((p) => ({ ...p, colWidthMode: 'autofit', customColWidths: newWidths })); showToast('已自动调整列宽'); } },
+      { id: 'cmd_align_center', category: '透视表', label: '居中对齐', shortcut: 'Align', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'center' })); showToast('数据已设置为居中对齐'); } },
+      { id: 'cmd_align_left', category: '透视表', label: '左对齐', shortcut: 'Left', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'left' })); showToast('数据已设置为靠左对齐'); } },
+      { id: 'cmd_align_right', category: '透视表', label: '右对齐', shortcut: 'Right', run: () => { setTableSettings((p) => ({ ...p, dataAlignment: 'right' })); showToast('数据已设置为靠右对齐'); } },
+      { id: 'cmd_density_compact', category: '透视表', label: '行高：紧凑', shortcut: 'Dense', run: () => { setTableSettings((p) => ({ ...p, density: 'compact', wrapText: false })); showToast('行高已切换为紧凑规格'); } },
+      { id: 'cmd_density_normal', category: '透视表', label: '行高：标准', shortcut: 'Normal', run: () => { setTableSettings((p) => ({ ...p, density: 'normal', wrapText: false })); showToast('行高已切换为标准规格'); } },
+      { id: 'cmd_density_relaxed', category: '透视表', label: '行高：宽松', shortcut: 'Spacious', run: () => { setTableSettings((p) => ({ ...p, density: 'relaxed', wrapText: false })); showToast('行高已切换为宽松规格'); } },
+      { id: 'cmd_density_auto', category: '透视表', label: '行高：自适应换行', shortcut: 'Wrap', run: () => { setTableSettings((p) => ({ ...p, density: 'auto', wrapText: true })); showToast('已启用自适应换行'); } },
+      { id: 'cmd_toggle_zebra', category: '透视表', label: '切换斑马纹', shortcut: 'Zebra', run: () => { setTableSettings((p) => ({ ...p, showZebra: !p.showZebra })); showToast('已切换斑马纹显示'); } },
     ];
     if (!commandQuery.trim()) return list;
     const q = commandQuery.toLowerCase();
     return list.filter((item) => [item.label, item.category, t(item.label), t(item.category), item.shortcut].some(text => text.toLowerCase().includes(q)));
-  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, locale, pivotResult, tableSettings, showToast, effectiveStoryShots]);
+  }, [keynotePlaying, cinemaTheaterMode, transposeRowsAndColumns, applyKeynoteShot, viewMode, generate100kDataset, darkMode, exportToExcelMerged, exportToCSV, commandQuery, locale, pivotResult, tableSettings, showToast, effectiveStoryShots, currentDataset, pivotConfig, chartType, unifiedChartSpec, copyTextToClipboard, addFieldToZone, setPivotConfig, setActiveFormatModal, setShowWorkspaceModal, setShowShortcutsModal, setChartType, setViewMode, setDarkMode, undo, redo]);
 
   // Default and synchronized height matching the PivotTable's rendered dimension
   const defaultTableHeight = useMemo(() => {
@@ -1296,7 +1349,7 @@ export default function PivotWorkbench() {
       <div className={`min-h-[100dvh] h-auto md:h-[100dvh] bg-[#F7F6F0] dark:bg-[#1E1F1C] ambient-glow-mesh text-[#272822] dark:text-[#F8F8F2] text-[11px] leading-relaxed antialiased tabular-nums flex flex-col apple-font-sans print:bg-white print:text-black apple-transition ${isPrintingReport ? 'overflow-visible' : 'overflow-x-hidden md:overflow-hidden'}`}>
         {isPrintingReport ? (
           <div className="hidden print:block px-6 py-4 border-b border-black/15">
-          <h1 className="text-base font-semibold tracking-tight text-black">{t("PivotEngine Studio [Monokai Pro] 数据透视分析报告 —") + ' '}{currentDataset?.name || '空白工程'}</h1>
+          <h1 className="text-base font-semibold tracking-tight text-black">{t("PivotStudio 数据透视分析报告 —") + ' '}{currentDataset?.name || t('未命名数据集')}</h1>
           <p className="text-[11px] text-ink-muted mt-1">{t("导出时间:") + ' '}{new Date().toLocaleString('zh-CN')}{' ' + t("· 有效记录:") + ' '}{pivotResult.filteredCount.toLocaleString()} / {pivotResult.totalCount.toLocaleString()}{' ' + t("行 · 导出人:") + ' '}{currentUser.name}</p>
         </div>
 
@@ -1335,7 +1388,6 @@ export default function PivotWorkbench() {
           isReadOnly={isReadOnly}
           viewMode={viewMode}
           isPrintingReport={isPrintingReport}
-          setShowSpecModal={setShowSpecModal}
           setShowShortcutsModal={setShowShortcutsModal}
           setShowCommandPalette={setShowCommandPalette}
           setCommandQuery={setCommandQuery}
@@ -1354,7 +1406,7 @@ export default function PivotWorkbench() {
           setToastMessage={setToastMessage}
         />
 
-        {(uploadProgress || isWorkerComputing) && (
+        {(uploadProgress || (currentDataset && isWorkerComputing)) && (
           <div className="flex items-center gap-3 px-4 py-2 shrink-0" role="status">
             <span>{uploadProgress ? `正在导入 ${uploadProgress.fileName}` : t("正在计算")}</span>
             <progress aria-label={uploadProgress ? t('导入进度') : t('计算进度')} max="100" value={uploadProgress?.pct ?? computeProgress} className="flex-1" />
@@ -1479,7 +1531,7 @@ export default function PivotWorkbench() {
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${splitRatioPct}%`, minHeight: 480 } : {}),
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col w-full min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-2xl border border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col w-full min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
                 isReadOnly={isReadOnly}
@@ -1488,7 +1540,9 @@ export default function PivotWorkbench() {
                 pivotResult={pivotResult}
                 pivotConfig={pivotConfig}
                 setPivotConfig={setPivotConfig}
+                unifiedChartSpec={unifiedChartSpec}
                 chartSpecConfig={chartSpecConfig}
+                setChartSpecConfig={setChartSpecConfig}
                 condFormat={condFormat}
                 setCondFormat={setCondFormat}
                 currentDataset={currentDataset}
@@ -1577,7 +1631,7 @@ export default function PivotWorkbench() {
               style={{
                 ...(viewMode === 'split' && !isPrintingReport ? { flexBasis: `${100 - splitRatioPct}%`, minHeight: 460 } : {}),
               }}
-              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] apple-specular-card flex flex-col min-w-0 min-h-0 p-4 apple-transition ${isChartFullscreen ? '' : 'w-full flex-1'} ${isPrintingReport ? 'h-auto' : ''}`}
+              className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-2xl border border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col min-w-0 min-h-0 p-3.5 sm:p-5 apple-transition ${isChartFullscreen ? '' : 'w-full flex-1'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
               <ChartStudio
                 isReadOnly={isReadOnly}
@@ -1628,7 +1682,7 @@ export default function PivotWorkbench() {
       <StatusBar
         hoveredCellTelemetry={hoveredCellTelemetry}
         unifiedChartSpec={unifiedChartSpec}
-        splitRatioPct={splitRatioPct}
+        pivotConfig={pivotConfig}
         pivotResult={pivotResult}
         duckdbThreshold={duckdbThreshold}
         isWorkerComputing={isWorkerComputing}
@@ -1749,11 +1803,6 @@ export default function PivotWorkbench() {
           applyShareTokenPayload={applyShareTokenPayload}
           copyTextToClipboard={copyTextToClipboard}
           showToast={showToast}
-        />
-
-        <SpecModal
-          isOpen={showSpecModal}
-          onClose={() => setShowSpecModal(false)}
         />
 
         <KeyboardShortcutsModal

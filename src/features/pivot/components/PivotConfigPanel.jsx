@@ -1,18 +1,37 @@
 import {t} from '../../../i18n.js';
 import React, {useState} from 'react';
-import {Info, RotateCcw, GripVertical, ArrowUp, ArrowDown, ArrowUpDown, Filter, X, Sparkles} from 'lucide-react';
+import {Info, RotateCcw, GripVertical, ArrowUp, ArrowDown, ArrowUpDown, Filter, X, Sparkles, Trash2} from 'lucide-react';
 import {AGG_METHODS, SHOW_AS_MODES, buildDefaultPivotConfig} from '../../../constants/pivotConstants';
 import {getDimDisplayLabel} from '../../../utils/formatters';
+
+/** Plain-language gloss for non-obvious aggregation / showAs modes. Null when defaults need no teaching. */
+function getValueMeasureHint(item) {
+  if (!item || item.isCalculated) return null;
+  const parts = [];
+  if (item.agg === 'avg') parts.push(t('均值是各记录的算术平均，不是加权业务比率'));
+  else if (item.agg === 'median') parts.push(t('中位数取排序后的正中值'));
+  else if (item.agg === 'count_distinct') parts.push(t('去重计数统计唯一值个数'));
+
+  const showAs = item.showAs || 'normal';
+  if (showAs === 'pct_grand') parts.push(t('显示为占全部总计的百分比'));
+  else if (showAs === 'pct_row') parts.push(t('显示为占该行合计的百分比'));
+  else if (showAs === 'pct_col') parts.push(t('显示为占该列合计的百分比'));
+  else if (showAs === 'prev_diff') parts.push(t('显示为与上一行的差值'));
+  else if (showAs === 'pct_prev_diff') parts.push(t('显示为相对上一行的变化率'));
+  else if (showAs === 'running_total') parts.push(t('显示为沿行方向的累计求和'));
+
+  return parts.length ? parts.join(' · ') : null;
+}
 
 // One analysis configuration surface, independent of table/chart display mode.
 export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, isReadOnly, draggingPayload, setDraggingPayload, dragOverZone, setDragOverZone, addFieldToZone, removeZoneItem, moveZoneItem, toggleDimensionSort, setHeaderFilterSearch, setActiveHeaderFilterModal, setBinFormState, setActiveBinModal, transposeRowsAndColumns, onOpenMetricCenter, onEditCustomMetric, soundEngine, showToast}) {
   const [showMobileConfig,setShowMobileConfig]=useState(false);
   const [showHelpGuide,setShowHelpGuide]=useState(false);
   const zoneConfigs = [
-    { key: 'filters', label: '筛选条件', badgeColor: 'text-ink-green', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
-    { key: 'columns', label: '列维度', badgeColor: 'text-ink-cyan', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
-    { key: 'rows', label: '行维度', badgeColor: 'text-ink-pink', borderAccent: 'border-l-2 border-l-[#F92672]' },
-    { key: 'values', label: '数值指标', badgeColor: 'text-ink-orange', borderAccent: 'border-l-2 border-l-[#FD971F]' },
+    { key: 'filters', label: '筛选（限定范围）', badgeColor: 'text-ink-green', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
+    { key: 'columns', label: '列（横向对比）', badgeColor: 'text-ink-cyan', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
+    { key: 'rows', label: '行（纵向分组）', badgeColor: 'text-ink-pink', borderAccent: 'border-l-2 border-l-[#F92672]' },
+    { key: 'values', label: '值（要算的数）', badgeColor: 'text-ink-orange', borderAccent: 'border-l-2 border-l-[#FD971F]' },
   ];
   return (
       /* Pivot Dropzones Config (透视结构放置区: 筛选 / 列 / 行 / 值) */
@@ -74,6 +93,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
 
             <div className="flex items-center gap-1 shrink-0">
               <button
+                type="button"
                 disabled={isReadOnly}
                 onClick={transposeRowsAndColumns}
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 min-h-[24px] rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] hover:text-[#FD971F] text-[9.5px] font-semibold transition disabled:opacity-40"
@@ -82,7 +102,9 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                 <RotateCcw className="w-2.5 h-2.5 text-ink-orange" />
                 <span>{t("行列互换")}</span>
               </button>
+
               <button
+                type="button"
                 disabled={isReadOnly}
                 onClick={() => {
                   soundEngine?.playClick?.(520);
@@ -92,13 +114,16 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                 className="px-1.5 py-0.5 min-h-[24px] inline-flex items-center rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-ink-muted hover:text-ink-cyan text-[9.5px] font-semibold transition disabled:opacity-40"
                 title={t("根据当前数据集自动生成推荐行列与指标")}
               >
+                <Sparkles className="w-2.5 h-2.5 text-ink-yellow" />
                 <span>{t("恢复推荐")}</span>
               </button>
+
               <button
-                disabled={isReadOnly}
+                type="button"
+                disabled={isReadOnly || (!pivotConfig.rows?.length && !pivotConfig.columns?.length && !pivotConfig.values?.length && !pivotConfig.filters?.length)}
                 onClick={() => {
-                  soundEngine?.playClick?.(460);
-                  setPivotConfig?.({
+                  soundEngine?.playPop?.();
+                  setPivotConfig({
                     filters: [],
                     rows: [],
                     columns: [],
@@ -110,9 +135,10 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                   });
                   showToast?.('已清空全部放置区配置，可按 ⌘Z / Ctrl+Z 随时撤销');
                 }}
-                className="px-1.5 py-0.5 min-h-[24px] inline-flex items-center rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] text-ink-muted hover:text-ink-pink text-[9.5px] font-semibold transition disabled:opacity-40"
-                title={t("清空全部行、列、值和筛选配置，重新开始")}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 min-h-[24px] rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] text-ink-muted hover:text-[#F92672] text-[9.5px] font-semibold transition disabled:opacity-40"
+                title={t("一键清空行、列、值和筛选配置，重新搭架 (支持 ⌘Z 撤销)")}
               >
+                <Trash2 className="w-2.5 h-2.5 text-ink-pink" />
                 <span>{t("清空")}</span>
               </button>
             </div>
@@ -124,7 +150,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
               <div className="flex items-center justify-between text-[10.5px] font-bold text-ink-cyan">
                 <span className="flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-ink-yellow" />
-                  {t("新手快速起步向导")}
+                  {t("快速开始")}
                 </span>
                 <button
                   type="button"
@@ -132,7 +158,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                   onClick={() => {
                     soundEngine?.playClick?.(520);
                     setPivotConfig?.(buildDefaultPivotConfig(currentDataset));
-                    showToast?.('已自动为您配置推荐透视模型');
+                    showToast?.('已应用推荐配置');
                   }}
                   className="px-1.5 py-0.2 rounded bg-[#66D9EF] text-[#1E1F1C] text-[9.5px] font-bold hover:opacity-90 transition"
                 >
@@ -140,7 +166,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                 </button>
               </div>
               <p className="text-[9.5px] text-ink-muted leading-relaxed">
-                {t("从上方点击【+行】选择分类主体（如地区），再点击【+值】选择汇总数值（如销售额），即可自动生成透视表与图表！")}
+                {t("点击字段旁的【+行】选分类（如地区），再点【+值】选数值（如销售额），即可生成透视表与图表。")}
               </p>
             </div>
           )}
@@ -241,14 +267,24 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                     <div className="min-w-0 space-y-1 flex-1">
                     {items.length === 0 ? (
                       <div className="py-1 px-1 border border-dashed border-[#D6D4C8]/70 dark:border-[#3E3D32]/70 rounded text-center select-none flex flex-col items-center justify-center gap-1">
-                        <span className="text-[10px] text-ink-muted/80 block">
-                          {t({
-                            filters: '拖入或点击 +筛',
-                            columns: '拖入或点击 +列',
-                            rows: '拖入或点击 +行',
-                            values: '拖入或点击 +值',
-                          }[z.key])}
-                        </span>
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] text-ink-muted font-semibold block">
+                            {t({
+                              filters: '拖入或点击 +筛',
+                              columns: '拖入或点击 +列',
+                              rows: '拖入或点击 +行',
+                              values: '拖入或点击 +值',
+                            }[z.key])}
+                          </span>
+                          <span className="text-[8.5px] text-ink-muted/65 block">
+                            {t({
+                              filters: '例如只看华东或线上渠道',
+                              columns: '例如按年份或月份并排比较',
+                              rows: '例如按地区或类别列出',
+                              values: '例如销售额求和、记录数',
+                            }[z.key])}
+                          </span>
+                        </div>
                         {z.key === 'values' && (pivotConfig?.rows?.length || 0) > 0 && !isReadOnly && (
                           <button
                             type="button"
@@ -271,6 +307,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                           z.key === 'filters'
                             ? (it.excludeAll || (it.selectedValues && it.selectedValues.length > 0))
                             : (it.excludedValues && it.excludedValues.length > 0);
+                        const valueHint = z.key === 'values' ? getValueMeasureHint(it) : null;
                         return (
                           <div
                             key={it.id}
@@ -345,7 +382,11 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                           }));
                                         }}
                                         className="bg-transparent text-ink-orange apple-font-mono font-bold focus:outline-none cursor-pointer disabled:opacity-40 text-[11px] shrink-0"
-                                        title={t("切换聚合口径")}
+                                        title={
+                                          it.agg === 'avg'
+                                            ? t('均值是各记录的算术平均，不是加权业务比率')
+                                            : t('切换聚合口径')
+                                        }
                                         aria-label={t("切换聚合口径")}
                                       >
                                         {AGG_METHODS.filter((m) => {
@@ -374,7 +415,10 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                           ? 'bg-[#AE81FF]/20 text-ink-purple border-[#AE81FF]/40'
                                           : 'bg-black/[0.04] dark:bg-white/[0.06] text-ink-muted border-transparent'
                                       }`}
-                                      title={t("快捷表计算 (普通值 / 占总计% / 占行% / 占列% / 环比差 / 环比增长率 / 累计求和)")}
+                                      title={
+                                        getValueMeasureHint({ ...it, agg: 'sum' }) ||
+                                        t('快捷表计算 (普通值 / 占总计% / 占行% / 占列% / 环比差 / 环比增长率 / 累计求和)')
+                                      }
                                       aria-label={t("快捷表计算")}
                                     >
                                       <option value="normal" className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t("普通")}</option>
@@ -458,6 +502,14 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                 )}
                               </div>
                             </div>
+                            {valueHint ? (
+                              <p
+                                data-testid="value-measure-hint"
+                                className="pl-4 text-[8.5px] leading-snug text-ink-muted/80 whitespace-normal"
+                              >
+                                {valueHint}
+                              </p>
+                            ) : null}
                           </div>
                         );
                       })

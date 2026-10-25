@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {encodeView} from '../../src/utils/viewConfig.js';
+import {clickMoreItem} from './_toolbar.js';
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 test.beforeEach(async({page})=>{await page.route('https://fonts.googleapis.com/**',r=>r.abort());await page.route('https://fonts.gstatic.com/**',r=>r.abort());await page.emulateMedia({reducedMotion:'reduce'});});
 async function importCSV(page,csv,config){
@@ -80,7 +81,7 @@ test('metric: malformed catalog import is atomic, recoverable, and copy failure 
   await expect(center).toContainText('已验证合计');
   await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('controlled permission denied');}}}));
   await center.getByTitle('复制该指标公式',{exact:true}).click();await expect(page.getByRole('status').filter({hasText:'复制公式失败'})).toBeVisible();
-  await center.getByTitle('收起指标中心',{exact:true}).click();await page.getByRole('button',{name:/^工作区/}).click();await page.getByRole('button',{name:'访客预览账户 (只读)',exact:true}).click();await page.keyboard.press('Escape');
+  await center.getByTitle('收起指标中心',{exact:true}).click();await clickMoreItem(page,/^工作区/);await page.getByRole('button',{name:'访客预览账户 (只读)',exact:true}).click();await page.keyboard.press('Escape');
   await openCenter(page);await center.getByRole('tab',{name:/指标库与模板/}).click();await expect(center.getByTitle('导入外部指标定义 (JSON)',{exact:true})).toBeDisabled();await expect(center.locator('input[type=file]')).toBeDisabled();
 });
 test('metric: fifth KPI uses actual totals and external new-metric entry navigates to a fresh form',async({page})=>{

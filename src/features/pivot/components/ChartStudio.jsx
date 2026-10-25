@@ -1,9 +1,9 @@
 import { t } from '../../../i18n.js';
 import React from 'react';
 import {
-  BarChart3, Sliders, Maximize2, Minimize2, X, BookOpen, Sparkles, Pencil, Plus, Copy,
-  Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, RotateCcw, Trash2,
-  Filter, Search, Layers, TrendingUp, Tag, ChevronDown, Check, Lightbulb, Compass
+  Sliders, Maximize2, Minimize2, X, BookOpen, Pencil, Copy, Download,
+  ArrowUpDown, ArrowUp, ArrowDown, ArrowLeftRight,
+  ChevronDown, Lightbulb
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -14,10 +14,22 @@ import {
   CHART_COLORS,
   VISUAL_CHART_TYPES,
   KEYNOTE_STORYBOARD_SHOTS,
-  CHART_INTENT_GROUPS,
   CHART_METHOD_GUIDES,
-  AGG_METHODS,
 } from '../../../constants/pivotConstants';
+import {
+  CV,
+  chartInk,
+  chartMuted,
+  chartPaper,
+  chartGridStroke,
+  chartMargin,
+  chartValueTick,
+  chartLegendStyle,
+  chartAvgLabel,
+  chartDimOpacity,
+  chartBarRadius,
+  seriesColor,
+} from '../../../constants/chartVisual';
 import { UnifiedFormatter, formatAxisTickLabel, formatCellNumber } from '../../../utils/formatters';
 import { isMeasureField, isIdentifierField, getMeasureDefaults } from '../../../utils/fieldSemantics';
 import { UnifiedChartTooltip } from './UnifiedChartTooltip';
@@ -66,20 +78,20 @@ export function ChartStudio({
   onExportPNG,
   onExportSVG,
 }) {
-  const [showChartTypes, setShowChartTypes] = React.useState(false);
-  const [showLensPresets, setShowLensPresets] = React.useState(false);
-  const chartTypeToggleRef = React.useRef(null);
+  const chartTypeSelectRef = React.useRef(null);
   const restoreScopeFocusRef = React.useRef(false);
   React.useEffect(() => {
     if (!unifiedChartSpec.renderLimit && restoreScopeFocusRef.current) {
       // A completed scope action removes its button; keep keyboard navigation in the chart.
-      if (document.activeElement === document.body) chartTypeToggleRef.current?.focus({ preventScroll: true });
+      if (document.activeElement === document.body) chartTypeSelectRef.current?.focus({ preventScroll: true });
       restoreScopeFocusRef.current = false;
     }
   }, [unifiedChartSpec]);
-  const [guideCollapsedInChartMode, setGuideCollapsedInChartMode] = React.useState(false);
+  // Keep the reading guide collapsed by default — chart first, notes on demand.
+  const [guideCollapsedInChartMode, setGuideCollapsedInChartMode] = React.useState(true);
   const [showGuideInSplitMode, setShowGuideInSplitMode] = React.useState(false);
-  const [activeRecipePopover, setActiveRecipePopover] = React.useState(null); // 'row' | 'col' | 'val' | null
+  // Split mode: sidebar shelves are primary; keep chart encoding collapsed unless needed.
+  const [encodingExpanded, setEncodingExpanded] = React.useState(false);
   const [isEditingNote, setIsEditingNote] = React.useState(false);
   const [editNoteForm, setEditNoteForm] = React.useState({ title: '', subtitle: '' });
   const [isSavingNewNote, setIsSavingNewNote] = React.useState(false);
@@ -110,11 +122,22 @@ export function ChartStudio({
     ? 0
     : Math.max(0, Math.ceil((unifiedChartSpec.items?.length || 0) / generalAxisMaxLabels) - 1);
 
+  const mutedFill = chartMuted(darkMode);
+  const inkFill = chartInk(darkMode);
+  const paperFill = chartPaper(darkMode);
+  const gridStroke = chartGridStroke(darkMode);
+  const valueTick = chartValueTick(darkMode);
+  const legendStyle = chartLegendStyle();
+  const cartesianMargin = chartMargin({ rotate: shouldRotateTicks, compact: compactAxis });
+  const dualMargin = chartMargin({ rotate: shouldRotateTicks, compact: compactAxis, dual: true });
+  const hbarMargin = chartMargin({ horizontal: true });
+
   const renderCategoryAxisTick = React.useCallback((props) => {
     const { x, y, payload } = props;
     const fullText = String(payload?.value ?? '');
     const maxLen = compactAxis ? 12 : 22;
     const displayText = formatAxisTickLabel(fullText, maxLen);
+    const tickSize = CV.typography.tickCategory;
 
     if (!shouldRotateTicks) {
       return (
@@ -124,8 +147,8 @@ export function ChartStudio({
             y={0}
             dy={14}
             textAnchor="middle"
-            fontSize={compactAxis ? 9 : 9.5}
-            fill={darkMode ? '#908E80' : '#75715E'}
+            fontSize={tickSize}
+            fill={mutedFill}
             className="select-none"
           >
             <title>{fullText}</title>
@@ -144,8 +167,8 @@ export function ChartStudio({
           dy={10}
           textAnchor="end"
           transform="rotate(-35)"
-          fontSize={compactAxis ? 9 : 9.5}
-          fill={darkMode ? '#908E80' : '#75715E'}
+          fontSize={tickSize}
+          fill={mutedFill}
           className="select-none"
         >
           <title>{fullText}</title>
@@ -153,7 +176,7 @@ export function ChartStudio({
         </text>
       </g>
     );
-  }, [compactAxis, darkMode, shouldRotateTicks]);
+  }, [compactAxis, mutedFill, shouldRotateTicks]);
 
   const allowsMetricDecimals = (metric) =>
     chartType.startsWith('pct_') || metric?.showAs?.startsWith('pct_') || !['count', 'count_distinct'].includes(metric?.agg);
@@ -167,31 +190,21 @@ export function ChartStudio({
     const xLabel = (unifiedChartSpec?.xDimensionLabel || '').toLowerCase();
     const isTemporal = /date|time|year|month|day|quarter|年|月|日|季|期/.test(xLabel);
     const itemCount = unifiedChartSpec?.items?.length || 0;
-    const hasColGroups = unifiedChartSpec?.hasColGroups;
+    const hasColGroups = Boolean(
+      unifiedChartSpec?.hasColGroups
+      ?? (pivotResult?.leafColGroups && pivotResult.leafColGroups.length > 0)
+    );
     const valCount = pivotResult?.valConfigs?.length || 0;
+    const seriesCount = unifiedChartSpec?.seriesMetaList?.length || 0;
 
+    // Column series → stacked comparison; time axis → trend; dual measures without columns → combo.
     if (isTemporal) return 'line';
-    if (hasColGroups) return 'stacked_bar';
-    if (valCount >= 2 && !hasColGroups) return 'scatter';
-    if (itemCount <= 6 && itemCount >= 2 && unifiedChartSpec?.isPrimaryAdditive) return 'pie';
+    if (hasColGroups || seriesCount > 1) return 'stacked_bar';
+    if (valCount >= 2) return 'combo';
+    if (itemCount <= 6 && itemCount >= 2 && unifiedChartSpec?.isPrimaryAdditive) return 'donut';
+    if (itemCount > 8) return 'horizontal_bar';
     return 'bar';
-  }, [unifiedChartSpec, pivotResult?.valConfigs]);
-
-  const isModifiedFromShot = React.useMemo(() => {
-    if (!activeShot?.pivotOverride) return false;
-    const po = activeShot.pivotOverride;
-    if (po.chartType && po.chartType !== chartType) return true;
-    if (po.rows && JSON.stringify(po.rows) !== JSON.stringify(pivotConfig?.rows || [])) return true;
-    const shotCols = po.columns || po.cols || [];
-    const configCols = pivotConfig?.columns || pivotConfig?.cols || [];
-    if (JSON.stringify(shotCols) !== JSON.stringify(configCols)) return true;
-    if (po.values) {
-      const curValSummary = (pivotConfig?.values || []).map((v) => `${v.field}:${v.agg}`).join(',');
-      const shotValSummary = (po.values || []).map((v) => `${v.field}:${v.agg}`).join(',');
-      if (curValSummary !== shotValSummary) return true;
-    }
-    return false;
-  }, [activeShot, chartType, pivotConfig]);
+  }, [unifiedChartSpec, pivotResult?.valConfigs, pivotResult?.leafColGroups]);
 
   const toggleGuide = () => {
     soundEngine?.playClick?.(530);
@@ -216,12 +229,146 @@ export function ChartStudio({
     [currentDataset]
   );
 
-  const showSecondaryMetricInSubtitle =
-    (chartType === 'scatter' || chartType === 'combo' || unifiedChartSpec.hasDualAxis) &&
-    unifiedChartSpec.secondarySeriesKey &&
-    unifiedChartSpec.secondarySeriesKey !== unifiedChartSpec.primarySeriesKey;
   const hasValidMean = Number.isFinite(unifiedChartSpec.primaryStats?.mean) && (unifiedChartSpec.primaryStats?.validCount || 0) > 0;
   const insight = unifiedChartSpec.executiveInsight;
+
+  const configRows = pivotConfig?.rows || [];
+  const configCols = pivotConfig?.columns || pivotConfig?.cols || [];
+  const configValues = pivotConfig?.values || [];
+  const primaryRowField = configRows[0]?.field || '';
+  const primaryColField = configCols[0]?.field || '';
+  const primaryValueField = (() => {
+    const byId = configValues.find((v) => v.id === chartSpecConfig.primaryValueId);
+    return byId?.field || configValues[0]?.field || '';
+  })();
+
+  const preferCompactEncoding = viewMode === 'split';
+  const encodingIncomplete = !primaryRowField || !primaryValueField;
+  const showEncodingEditors = !preferCompactEncoding || encodingExpanded || encodingIncomplete;
+  const encodingRecipe = [
+    primaryRowField || t('选择字段'),
+    primaryColField || t('无'),
+    primaryValueField === '__COUNT__' ? t('记录数') : (primaryValueField || t('选择字段')),
+  ].join(' → ');
+
+  const fieldSelectClass =
+    'appearance-none bg-[#FFFDF7] dark:bg-[#272822] border-0 text-[12px] font-medium text-[#272822] dark:text-[#F8F8F2] focus:outline-none cursor-pointer disabled:opacity-40 max-w-[7.5rem] truncate leading-none rounded-md px-1 [color-scheme:light] dark:[color-scheme:dark]';
+  const optionClass = 'bg-[#FFFDF7] text-[#272822] dark:bg-[#272822] dark:text-[#F8F8F2]';
+  const iconBtn = (active) =>
+    `h-8 w-8 inline-flex items-center justify-center rounded-lg transition ${
+      active
+        ? 'text-ink-cyan bg-[#66D9EF]/12'
+        : 'text-[#75715E] dark:text-[#908E80] hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
+    }`;
+
+  const makeDimItem = (fieldName) => {
+    const fMeta = (currentDataset?.fields || []).find((f) => f.name === fieldName);
+    return {
+      id: `d_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      field: fieldName,
+      sort: 'none',
+      dateGranularity: fMeta?.type === 'date' ? 'year' : 'raw',
+      excludedValues: [],
+    };
+  };
+
+  const handleSetRowField = (fieldName) => {
+    if (isReadOnly || !setPivotConfig || !fieldName) return;
+    soundEngine?.playClick?.(520);
+    setPivotConfig((prev) => {
+      const prevRows = prev.rows || [];
+      const restRows = prevRows.slice(1).filter((r) => r.field !== fieldName);
+      return {
+        ...prev,
+        rows: [makeDimItem(fieldName), ...restRows],
+        columns: (prev.columns || prev.cols || []).filter((c) => c.field !== fieldName),
+        collapsedRowKeys: {},
+        collapsedColKeys: {},
+      };
+    });
+  };
+
+  const handleSetColField = (fieldName) => {
+    if (isReadOnly || !setPivotConfig) return;
+    soundEngine?.playClick?.(520);
+    setPivotConfig((prev) => {
+      if (!fieldName) {
+        return { ...prev, columns: [], collapsedColKeys: {} };
+      }
+      const prevCols = prev.columns || prev.cols || [];
+      const restCols = prevCols.slice(1).filter((c) => c.field !== fieldName);
+      return {
+        ...prev,
+        rows: (prev.rows || []).filter((r) => r.field !== fieldName),
+        columns: [makeDimItem(fieldName), ...restCols],
+        collapsedRowKeys: {},
+        collapsedColKeys: {},
+      };
+    });
+  };
+
+  const handleSetValueField = (fieldName) => {
+    if (isReadOnly || !fieldName) return;
+    soundEngine?.playClick?.(520);
+    const existing = configValues.find((v) => v.field === fieldName);
+    if (existing) {
+      setChartSpecConfig((p) => ({ ...p, primaryValueId: existing.id }));
+      return;
+    }
+    if (!setPivotConfig) return;
+    const fMeta = (currentDataset?.fields || []).find((f) => f.name === fieldName);
+    const defaults = getMeasureDefaults(fMeta || { name: fieldName, type: 'number' });
+    const newId = `v_${Date.now()}`;
+    setPivotConfig((prev) => {
+      const others = (prev.values || []).filter((v) => v.field !== fieldName);
+      return {
+        ...prev,
+        values: [{ id: newId, field: fieldName, showAs: 'normal', ...defaults }, ...others],
+      };
+    });
+    setChartSpecConfig((p) => ({ ...p, primaryValueId: newId }));
+  };
+
+  const handleSwapRowsCols = () => {
+    if (isReadOnly || !setPivotConfig) return;
+    soundEngine?.playClick?.(540);
+    setPivotConfig((prev) => ({
+      ...prev,
+      rows: prev.columns || prev.cols || [],
+      columns: prev.rows || [],
+      collapsedRowKeys: {},
+      collapsedColKeys: {},
+    }));
+    showToast?.(t('已互换行与列'));
+  };
+
+  const handleExportFullReport = () => {
+    soundEngine?.playClick?.(560);
+    const configCols = pivotConfig?.columns || pivotConfig?.cols || [];
+    const colSummary = configCols.map((c) => c.field || c).join(' / ');
+    const reportLines = [
+      "# " + (activeShot?.title || t("数据透视分析报告")),
+      "> " + t("生成时间：") + new Date().toLocaleString() + " · " + t("数据集：") + (currentDataset?.name || t("当前工作表")),
+      "",
+      "## " + t("一、结论"),
+      activeShot?.subtitle || t("基于当前行列与指标配置的透视结果。"),
+      "",
+      "## " + t("二、关键发现"),
+      insight ? [
+        "- **" + t("首位") + "**：「" + insight.topName + "」" + insight.topFormatted + (insight.topSharePct ? "（" + insight.topSharePct + "%）" : ""),
+        insight.groupCount > 1 ? "- **" + t("末位") + "**：「" + insight.bottomName + "」" + insight.bottomFormatted : "",
+        insight.top3SharePct && insight.groupCount >= 3 ? "- **CR3**：前 3 组合计 " + insight.top3SharePct + "%" : "",
+        insight.groupCount > 1 ? "- **" + t("均值") + "**：" + insight.meanFormatted + "（" + t("高于均值") + " " + insight.aboveMeanCount + "/" + insight.groupCount + "）" : "",
+      ].filter(Boolean).join("\n") : "- " + t("暂无统计发现"),
+      "",
+      "## " + t("三、透视配置"),
+      "- **" + t("行") + "**: " + (unifiedChartSpec.xDimensionLabel || (pivotConfig?.rows?.map(r=>r.field||r).join(" / ")) || t("无")),
+      "- **" + t("列") + "**: " + (colSummary || t("无")),
+      "- **" + t("值") + "**: " + (pivotConfig?.values?.length > 0 ? pivotConfig.values.map((v) => v.field + " (" + t(v.agg || "sum") + ")").join(", ") : unifiedChartSpec.primarySeriesKey),
+      "- **" + t("图表") + "**: " + t(VISUAL_CHART_TYPES.find((item) => item.value === chartType)?.label || chartType),
+    ];
+    copyTextToClipboard?.(reportLines.join("\n"), t("已复制分析报告 Markdown"));
+  };
 
   const handleCopyConclusion = () => {
     soundEngine?.playClick?.(560);
@@ -238,426 +385,171 @@ export function ChartStudio({
     copyTextToClipboard?.(lines.join('\n'), t('已复制当前透视图分析笔记与结论摘要'));
   };
 
-  const handleDrillTopLeader = () => {
-    if (!insight?.topRowKey) return;
-    soundEngine?.playTransitionChord ? soundEngine.playTransitionChord() : soundEngine?.playClick(560);
-    const topItem = unifiedChartSpec.items?.find((it) => it.rowKey === insight.topRowKey);
-    if (topItem) {
-      handleChartPointClick(topItem);
-    }
-  };
-
-  const handleSwapRowDimension = (newFieldName) => {
-    if (isReadOnly || !setPivotConfig) return;
-    soundEngine?.playClick?.(540);
-    const fMeta = (currentDataset?.fields || []).find((f) => f.name === newFieldName);
-    setPivotConfig((prev) => ({
-      ...prev,
-      rows: [{
-        id: `r_${Date.now()}`,
-        field: newFieldName,
-        sort: 'none',
-        dateGranularity: fMeta?.type === 'date' ? 'year' : 'raw',
-        excludedValues: [],
-      }],
-      collapsedRowKeys: {},
-      collapsedColKeys: {},
-    }));
-    setActiveRecipePopover(null);
-    showToast?.(`已将主分析维度切换为「${newFieldName}」`);
-  };
-
-  const handleSwapPrimaryMeasure = (newFieldName) => {
-    if (isReadOnly || !setPivotConfig) return;
-    soundEngine?.playClick?.(540);
-    const fMeta = (currentDataset?.fields || []).find((f) => f.name === newFieldName);
-    const defaults = getMeasureDefaults(fMeta);
-    setPivotConfig((prev) => {
-      const existing = (prev.values || []).filter((v) => v.field !== newFieldName);
-      return {
-        ...prev,
-        values: [
-          {
-            id: `v_${Date.now()}`,
-            field: newFieldName,
-            showAs: 'normal',
-            ...defaults,
-          },
-          ...existing,
-        ],
-      };
-    });
-    setActiveRecipePopover(null);
-    showToast?.(`已将主度量指标切换为「${newFieldName}」`);
-  };
-
-  const handleAddColGroup = (newFieldName) => {
-    if (isReadOnly) return;
-    soundEngine?.playClick?.(540);
-    addFieldToZone?.('columns', newFieldName);
-    setActiveRecipePopover(null);
-    showToast?.(`已添加「${newFieldName}」为对比图例分组`);
-  };
-
-  const handleRemoveColGroup = (fieldOrId) => {
-    if (isReadOnly || !setPivotConfig) return;
-    soundEngine?.playClick?.(440);
-    setPivotConfig((prev) => ({
-      ...prev,
-      columns: (prev.columns || []).filter((c) => c.id !== fieldOrId && c.field !== fieldOrId),
-      collapsedColKeys: {},
-    }));
-    setActiveRecipePopover(null);
-    showToast?.(`已移除列对比分组`);
-  };
-
-  // Smart Context-Aware Next-Step Analytical Recommendations
-  const smartSuggestions = React.useMemo(() => {
-    const suggestions = [];
-    if (insight?.topName && insight?.topRowKey) {
-      suggestions.push({
-        id: 'drill_leader',
-        icon: Search,
-        label: `${t("穿透明细:")}「${insight.topName}」`,
-        title: t("一键穿透查看领跑项底层原始订单明细"),
-        action: handleDrillTopLeader,
-      });
-    }
-    if (chartSpecConfig.sortMode === 'none' && (unifiedChartSpec.items?.length || 0) > 2) {
-      suggestions.push({
-        id: 'sort_desc',
-        icon: ArrowDown,
-        label: t("一键帕累托降序"),
-        title: t("按主指标从高到低排列，快速识别头部高价值分组"),
-        action: () => {
-          soundEngine?.playClick?.(520);
-          setChartSpecConfig((p) => ({ ...p, sortMode: 'desc' }));
-          showToast?.(t("已按主指标降序排列图表"));
-        },
-      });
-    }
-    if ((unifiedChartSpec?.availableGroupCount || 0) > 5 && !chartSpecConfig.topN) {
-      suggestions.push({
-        id: 'focus_top5',
-        icon: Sparkles,
-        label: t("聚焦 Top 5 核心分组"),
-        title: t("截断长尾分组，聚焦展示排名前 5 的核心主体"),
-        action: () => {
-          soundEngine?.playClick?.(500);
-          setChartSpecConfig((p) => ({ ...p, topN: 5 }));
-          showToast?.(t("已聚焦展示 Top 5 核心分组"));
-        },
-      });
-    }
-    const xLabel = (unifiedChartSpec?.xDimensionLabel || '').toLowerCase();
-    const isTemporal = /date|time|year|month|day|quarter|年|月|日|季|期/.test(xLabel);
-    if (isTemporal && chartType !== 'line') {
-      suggestions.push({
-        id: 'switch_line',
-        icon: TrendingUp,
-        label: t("切换时序趋势折线图"),
-        title: t("当前维度为时间序列，折线图更能直观呈现增速与拐点"),
-        action: () => {
-          soundEngine?.playClick?.(540);
-          setChartType('line');
-          showToast?.(t("已切换为趋势折线图"));
-        },
-      });
-    }
-    if (unusedMeasureFields.length > 0 && chartType !== 'combo' && chartType !== 'scatter') {
-      const candidate = unusedMeasureFields[0];
-      suggestions.push({
-        id: 'add_measure',
-        icon: Plus,
-        label: `${t("对比指标:")}「${candidate.name}」`,
-        title: `${t("添加指标")}「${candidate.name}」${t("形成多指标同屏对比")}`,
-        action: () => {
-          if (onAddMeasure) onAddMeasure(candidate.name);
-        },
-      });
-    }
-    if (!chartSpecConfig.showAvgReferenceLine && hasValidMean) {
-      suggestions.push({
-        id: 'show_avg',
-        icon: TrendingUp,
-        label: t("开启全图均值基准线"),
-        title: t("在图表中添加一条橙色均值虚线，直观衡量哪些分组高于或低于均值"),
-        action: () => {
-          soundEngine?.playClick?.(520);
-          setChartSpecConfig((p) => ({ ...p, showAvgReferenceLine: true }));
-          showToast?.(t("已开启均值基准线"));
-        },
-      });
-    }
-    return suggestions.slice(0, 4);
-  }, [insight, chartSpecConfig, unifiedChartSpec, chartType, unusedMeasureFields, hasValidMean, onAddMeasure, setChartType, setChartSpecConfig, showToast, soundEngine, handleDrillTopLeader]);
-
-  const configRows = pivotConfig?.rows || [];
-  const configCols = pivotConfig?.columns || pivotConfig?.cols || [];
-  const configValues = pivotConfig?.values || [];
-  const rowSummary = unifiedChartSpec.xDimensionLabel || configRows.map((r) => r.field || r).join(' / ') || t('无');
-  const colSummary = configCols.map((c) => c.field || c).join(' / ');
-  const valSummary = configValues.length > 0
-    ? configValues.map((v) => `${v.field === '__COUNT__' ? t('记录数') : v.field}(${t(v.agg || 'sum')})`).join(', ')
-    : unifiedChartSpec.primarySeriesKey;
+  const optSelectClass =
+    'w-full px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8]/80 dark:border-[#49483E] text-[11px] text-[#272822] dark:text-[#F8F8F2] focus:outline-none focus:border-[#66D9EF] [color-scheme:light] dark:[color-scheme:dark]';
 
   return (
     <div data-highlighted-row={highlightedRowKey || ''} className="flex-1 flex flex-col h-full min-h-0">
-      {/* Chart Subpage Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div>
-          <h2 className="text-xs font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2] flex flex-wrap items-center gap-2 apple-font-mono">
-            <BarChart3 className="w-4 h-4 text-ink-pink" />
-            <span>{t(VISUAL_CHART_TYPES.find((type) => type.value === chartType)?.label || chartType)}</span>
-            {chartType === recommendedChartType ? (
-              <span className="px-1.5 py-0.5 rounded bg-[#A6E22E]/15 text-ink-green border border-[#A6E22E]/30 text-[9px] font-semibold" title={t("根据当前维度与度量特征推荐的最佳图表类型")}>
-                ★ {t("最适图表")}
-              </span>
-            ) : methodGuide?.intent ? (
-              <span className="px-1.5 py-0.5 rounded bg-[#66D9EF]/15 text-ink-cyan border border-[#66D9EF]/30 text-[9px] font-semibold">
-                {t(methodGuide.intent)}
-              </span>
-            ) : null}
-            {chartType !== recommendedChartType && (
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine?.playClick?.(540);
-                  setChartType(recommendedChartType);
-                  showToast?.(`已切换为最适图表「${t(VISUAL_CHART_TYPES.find((item) => item.value === recommendedChartType)?.label || recommendedChartType)}」`);
-                }}
-                className="px-1.5 py-0.5 rounded bg-[#A6E22E]/15 text-ink-green border border-[#A6E22E]/35 text-[9px] font-semibold hover:bg-[#A6E22E]/25 transition flex items-center gap-1 cursor-pointer"
-                title={t("一键切换为根据当前字段特征推荐的最适图表类型")}
+      {/* Encoding + type + tools — one quiet row (compact in split: shelves own the fields) */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3.5 pb-3 border-b border-[#D6D4C8]/45 dark:border-[#3E3D32]/50">
+        {showEncodingEditors ? (
+          <div className="inline-flex flex-wrap items-center gap-x-1 gap-y-1 min-w-0 h-auto min-h-8 px-1.5 rounded-xl bg-[#EFECE1]/55 dark:bg-[#1E1F1C]/65 ring-1 ring-[#D6D4C8]/40 dark:ring-[#3E3D32]/50">
+            <label className="inline-flex items-center gap-1 h-8 pl-2 pr-1.5 min-w-0">
+              <span className="text-[10px] text-ink-muted shrink-0 select-none">{t('行')}</span>
+              <select
+                aria-label={t('行字段')}
+                disabled={isReadOnly || !candidateDimensionFields.length}
+                value={primaryRowField}
+                onChange={(e) => handleSetRowField(e.target.value)}
+                className={fieldSelectClass}
+                title={primaryRowField || t('选择字段')}
               >
-                <span>💡 {t("推荐:")} {t(VISUAL_CHART_TYPES.find((item) => item.value === recommendedChartType)?.short || recommendedChartType)}</span>
-              </button>
-            )}
-            {unifiedChartSpec.derivedSeriesKey && (
-              chartType === 'line' ? (
-                <span className="px-1.5 py-0.5 rounded bg-[#AE81FF]/20 text-ink-purple text-[9px]">
-                  +{unifiedChartSpec.derivedSeriesKey}
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setChartType('line')}
-                  title={t("衍生分析序列仅在趋势折线图中绘制，点击切换至折线图")}
-                  className="px-1.5 py-0.5 rounded bg-[#AE81FF]/15 text-ink-purple border border-[#AE81FF]/35 text-[9px] hover:border-[#AE81FF]"
-                >
-                  +{unifiedChartSpec.derivedSeriesKey} ({t("切至折线图生效")})
-                </button>
-              )
-            )}
-          </h2>
-          <p className="text-[10px] text-ink-muted mt-0.5 apple-font-mono flex flex-wrap items-center gap-2">
-            <span>
-              {t("维度：")}{unifiedChartSpec.xDimensionLabel}
-              {' ' + t("· 指标：")}{unifiedChartSpec.primarySeriesKey}
-              {showSecondaryMetricInSubtitle ? ` × ${unifiedChartSpec.secondarySeriesKey}` : ''}
-            </span>
-            {chartSpecConfig.sortMode !== 'none' && (
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine?.playClick(500);
-                  setChartSpecConfig((p) => ({ ...p, sortMode: 'none' }));
-                }}
-                className="px-1.5 py-0.2 rounded bg-[#A6E22E]/15 text-ink-green border border-[#A6E22E]/30 text-[9px] font-semibold hover:bg-[#A6E22E]/25 inline-flex items-center gap-0.5 cursor-pointer"
-                title={t("点击清除排序并恢复默认透视表顺序")}
-              >
-                <span>{chartSpecConfig.sortMode === 'desc' ? t('降序') : t('升序')}</span>
-                <span className="text-[8px] opacity-70">✕</span>
-              </button>
-            )}
-            {(chartSpecConfig.topN || 0) > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine?.playClick(500);
-                  setChartSpecConfig((p) => ({ ...p, topN: 0 }));
-                }}
-                className="px-1.5 py-0.2 rounded bg-action/15 text-action border border-action/30 text-[9px] font-semibold hover:bg-action/25 inline-flex items-center gap-0.5 cursor-pointer"
-                title={t("点击取消 TopN 限制并显示全部分组")}
-              >
-                <span>Top {chartSpecConfig.topN}</span>
-                <span className="text-[8px] opacity-70">✕</span>
-              </button>
-            )}
-            {chartSpecConfig.derivedSeries && chartSpecConfig.derivedSeries !== 'none' && (
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine?.playClick(500);
-                  setChartSpecConfig((p) => ({ ...p, derivedSeries: 'none' }));
-                }}
-                className="px-1.5 py-0.2 rounded bg-[#AE81FF]/15 text-ink-purple border border-[#AE81FF]/30 text-[9px] font-semibold hover:bg-[#AE81FF]/25 inline-flex items-center gap-0.5 cursor-pointer"
-                title={t("点击取消衍生分析序列")}
-              >
-                <span>+{chartSpecConfig.derivedSeries}</span>
-                <span className="text-[8px] opacity-70">✕</span>
-              </button>
-            )}
-            {!unifiedChartSpec.canStack && (chartType === 'stacked_bar' || chartType === 'stacked_area') && (
-              <span className="px-1.5 py-0.2 rounded bg-[#FD971F]/15 text-ink-orange border border-[#FD971F]/30 text-[9px]">{' ' + t("量纲不同已自动按分组呈现") + ' '}</span>
-            )}
-            {highlightedRowKey && onClearHighlight && (
-              <button
-                type="button"
-                onClick={() => onClearHighlight()}
-                className="px-1.5 py-0.5 rounded bg-[#FD971F]/15 text-ink-orange border border-[#FD971F]/40 text-[9px] font-semibold hover:bg-[#FD971F]/25"
-              >
-                {t("已聚焦:")} {formatAxisTickLabel(highlightedRowKey.replace(/\|\|/g, '/'), 12)} ×
-              </button>
-            )}
-          </p>
-          {unifiedChartSpec.scope && <p role="status" className="text-[10px] text-ink-muted mt-1 break-words">
-            {t("图表范围：")}{unifiedChartSpec.scope.shown} / {unifiedChartSpec.scope.total} {t("组；表格和 KPI 保持全量。")}
-          </p>}
-          {unifiedChartSpec.histogramStats && <p role="status" className="text-[10px] text-ink-muted mt-1 break-words">
-            {t("有效数值：")}{unifiedChartSpec.histogramStats.valid.toLocaleString()} / {unifiedChartSpec.histogramStats.records.toLocaleString()} {t("行；空值和非数值不参与频数。")}
-          </p>}
-        </div>
+                {!primaryRowField && <option value="" className={optionClass}>{t('选择字段')}</option>}
+                {candidateDimensionFields.map((f) => (
+                  <option key={f.name} value={f.name} className={optionClass}>{f.name}</option>
+                ))}
+              </select>
+            </label>
 
-        {/* Action Controls Cluster */}
-        <div className="flex flex-wrap items-center gap-1.5 relative apple-font-mono">
-          {/* Quick Sort Toggle */}
+            <button
+              type="button"
+              disabled={isReadOnly}
+              onClick={handleSwapRowsCols}
+              title={t('互换行与列')}
+              aria-label={t('互换行与列')}
+              className="h-7 w-6 inline-flex items-center justify-center rounded-md text-[#75715E] dark:text-[#908E80] hover:text-ink-cyan transition disabled:opacity-40"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+            </button>
+
+            <label className="inline-flex items-center gap-1 h-8 pl-1 pr-1.5 min-w-0">
+              <span className="text-[10px] text-ink-muted shrink-0 select-none">{t('列')}</span>
+              <select
+                aria-label={t('列字段')}
+                disabled={isReadOnly || !candidateDimensionFields.length}
+                value={primaryColField}
+                onChange={(e) => handleSetColField(e.target.value)}
+                className={fieldSelectClass}
+                title={primaryColField || t('无')}
+              >
+                <option value="" className={optionClass}>{t('无')}</option>
+                {candidateDimensionFields.map((f) => (
+                  <option key={f.name} value={f.name} className={optionClass}>{f.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <span className="text-[#D6D4C8] dark:text-[#3E3D32] select-none text-[11px] px-0.5" aria-hidden>→</span>
+
+            <label className="inline-flex items-center gap-1 h-8 pl-1 pr-2 min-w-0">
+              <span className="text-[10px] text-ink-muted shrink-0 select-none">{t('值')}</span>
+              <select
+                aria-label={t('值字段')}
+                disabled={isReadOnly}
+                value={primaryValueField}
+                onChange={(e) => handleSetValueField(e.target.value)}
+                className={fieldSelectClass}
+                title={primaryValueField || t('选择字段')}
+              >
+                {!primaryValueField && <option value="" className={optionClass}>{t('选择字段')}</option>}
+                {candidateMeasureFields.map((f) => (
+                  <option key={f.name} value={f.name} className={optionClass}>{f.name}</option>
+                ))}
+                {!candidateMeasureFields.some((f) => f.name === '__COUNT__') && (
+                  <option value="__COUNT__" className={optionClass}>{t('记录数')}</option>
+                )}
+                {primaryValueField
+                  && primaryValueField !== '__COUNT__'
+                  && !candidateMeasureFields.some((f) => f.name === primaryValueField) && (
+                  <option value={primaryValueField} className={optionClass}>{primaryValueField}</option>
+                )}
+              </select>
+            </label>
+
+            {preferCompactEncoding && !encodingIncomplete && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine?.playClick?.(480);
+                  setEncodingExpanded(false);
+                }}
+                className="h-7 px-1.5 mr-0.5 rounded-md text-[10px] text-ink-muted hover:text-ink-cyan transition"
+                title={t('收起字段调整（也可在左侧拖放）')}
+              >
+                {t('收起')}
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine?.playClick?.(500);
+              setEncodingExpanded(true);
+            }}
+            className="inline-flex items-center gap-1.5 h-8 max-w-full min-w-0 pl-2.5 pr-2 rounded-xl bg-[#EFECE1]/45 dark:bg-[#1E1F1C]/55 ring-1 ring-[#D6D4C8]/35 dark:ring-[#3E3D32]/45 text-left hover:ring-[#66D9EF]/50 transition"
+            title={t('在此快速改字段，或继续用左侧拖放')}
+            aria-label={`${t('调整图表字段')}: ${encodingRecipe}`}
+          >
+            <span className="text-[10px] text-ink-muted shrink-0 select-none">{t('字段')}</span>
+            <span className="text-[12px] font-medium text-[#272822] dark:text-[#F8F8F2] truncate">{encodingRecipe}</span>
+            <ChevronDown className="w-3.5 h-3.5 text-ink-muted shrink-0" aria-hidden="true" />
+          </button>
+        )}
+
+        {highlightedRowKey && onClearHighlight && (
+          <button
+            type="button"
+            onClick={() => onClearHighlight()}
+            className="h-8 px-2 rounded-lg text-[11px] text-ink-orange hover:bg-[#FD971F]/12 transition"
+            title={t('清除聚焦')}
+          >
+            {formatAxisTickLabel(highlightedRowKey.replace(/\|\|/g, '/'), 10)} ×
+          </button>
+        )}
+
+        <div className="relative flex items-center gap-0.5 ml-auto shrink-0">
+          <select
+            ref={chartTypeSelectRef}
+            aria-label={t('选择图表类型')}
+            value={chartType}
+            onChange={(e) => {
+              soundEngine?.playClick?.(560);
+              setChartType(e.target.value);
+            }}
+            className="h-8 max-w-[7.5rem] pl-2.5 pr-6 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] text-[12px] font-medium text-[#272822] dark:text-[#F8F8F2] focus:outline-none hover:brightness-[0.98] dark:hover:brightness-110 cursor-pointer appearance-none [color-scheme:light] dark:[color-scheme:dark]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2375715E' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 0.4rem center',
+            }}
+            title={
+              chartType === recommendedChartType
+                ? `${t(VISUAL_CHART_TYPES.find((ct) => ct.value === chartType)?.label || chartType)} (${t('最适推荐')})`
+                : t(VISUAL_CHART_TYPES.find((ct) => ct.value === chartType)?.label || chartType)
+            }
+          >
+            {VISUAL_CHART_TYPES.map((ct) => (
+              <option key={ct.value} value={ct.value} className={optionClass}>
+                {t(ct.short)}
+              </option>
+            ))}
+          </select>
+
           <button
             type="button"
             onClick={() => {
               soundEngine?.playClick(520);
               const nextSort = chartSpecConfig.sortMode === 'none' ? 'desc' : chartSpecConfig.sortMode === 'desc' ? 'asc' : 'none';
               setChartSpecConfig((p) => ({ ...p, sortMode: nextSort }));
-              showToast?.(nextSort === 'desc' ? t('已按主指标降序排列图表') : nextSort === 'asc' ? t('已按主指标升序排列图表') : t('图表已恢复默认顺序'));
             }}
-            title={t("一键切换图表内主指标排序（默认 / 降序 / 升序）")}
+            title={t("按主指标排序：默认 → 降序 → 升序")}
             aria-label={t("图表排序")}
-            className={`px-2 py-1 rounded-md text-[10px] font-semibold border flex items-center gap-1 transition ${
-              chartSpecConfig.sortMode !== 'none'
-                ? 'bg-[#A6E22E]/15 text-ink-green border-[#A6E22E]/40'
-                : 'bg-[#EFECE1] dark:bg-[#1E1F1C] text-ink-muted border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]'
-            }`}
+            className={iconBtn(chartSpecConfig.sortMode !== 'none')}
           >
-            {chartSpecConfig.sortMode === 'desc' ? (
-              <>
-                <ArrowDown className="w-3 h-3 text-ink-pink" />
-                <span>{t("降序")}</span>
-              </>
-            ) : chartSpecConfig.sortMode === 'asc' ? (
-              <>
-                <ArrowUp className="w-3 h-3 text-ink-green" />
-                <span>{t("升序")}</span>
-              </>
-            ) : (
-              <>
-                <ArrowUpDown className="w-3 h-3 opacity-60" />
-                <span>{t("排序")}</span>
-              </>
-            )}
+            {chartSpecConfig.sortMode === 'desc' ? <ArrowDown className="w-4 h-4" /> : chartSpecConfig.sortMode === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowUpDown className="w-4 h-4" />}
           </button>
 
-          {/* Quick TopN focus chip (when group count > 5) */}
-          {(unifiedChartSpec?.availableGroupCount || 0) > 5 && (
-            <div className="hidden sm:inline-flex items-center rounded-md p-0.5 bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[9.5px]">
-              {[
-                { n: 0, label: '全部' },
-                { n: 5, label: 'Top5' },
-                { n: 10, label: 'Top10' },
-              ].map((item) => (
-                <button
-                  key={item.n}
-                  type="button"
-                  onClick={() => {
-                    soundEngine?.playClick(500);
-                    setChartSpecConfig((p) => ({ ...p, topN: item.n }));
-                    showToast?.(item.n ? `图表已聚焦展示 ${item.label}` : '图表已展示全部分组');
-                  }}
-                  aria-pressed={(chartSpecConfig.topN || 0) === item.n}
-                  className={`px-1.5 py-0.5 rounded font-semibold transition ${
-                    (chartSpecConfig.topN || 0) === item.n
-                      ? 'bg-action text-[#F8F8F2] shadow-2xs'
-                      : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-                  }`}
-                >
-                  {t(item.label)}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Quick Data Labels Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine?.playClick?.(520);
-              setChartSpecConfig((p) => ({ ...p, showDataLabels: !p.showDataLabels }));
-              showToast?.(chartSpecConfig.showDataLabels ? t('已隐藏数值标签') : t('已显示数值标签'));
-            }}
-            title={t("一键开启/隐藏图表柱体与节点上的数值标签")}
-            className={`px-2 py-1 rounded-md text-[10px] font-semibold border flex items-center gap-1 transition ${
-              chartSpecConfig.showDataLabels
-                ? 'bg-[#66D9EF]/15 text-ink-cyan border-[#66D9EF]/45'
-                : 'bg-[#EFECE1] dark:bg-[#1E1F1C] text-ink-muted border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]'
-            }`}
-          >
-            <Tag className="w-3 h-3" />
-            <span>{chartSpecConfig.showDataLabels ? t("数值开") : t("数值")}</span>
-          </button>
-
-          {/* Quick Avg Reference Line Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine?.playClick?.(520);
-              setChartSpecConfig((p) => ({ ...p, showAvgReferenceLine: !p.showAvgReferenceLine }));
-              showToast?.(chartSpecConfig.showAvgReferenceLine ? t('已隐藏均值参考线') : t('已显示均值参考线'));
-            }}
-            title={t("一键开启/隐藏图中全局均值参考基准线 (AVG)")}
-            className={`px-2 py-1 rounded-md text-[10px] font-semibold border flex items-center gap-1 transition ${
-              chartSpecConfig.showAvgReferenceLine
-                ? 'bg-[#FD971F]/15 text-ink-orange border-[#FD971F]/45'
-                : 'bg-[#EFECE1] dark:bg-[#1E1F1C] text-ink-muted border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F]'
-            }`}
-          >
-            <TrendingUp className="w-3 h-3" />
-            <span>{chartSpecConfig.showAvgReferenceLine ? t("均值开") : t("均值线")}</span>
-          </button>
-
-          {/* Chart Types Drawer Toggle */}
-          <button
-            ref={chartTypeToggleRef}
-            type="button"
-            aria-controls="pivot-chart-types"
-            aria-expanded={showChartTypes}
-            onClick={() => setShowChartTypes((open) => !open)}
-            className={`px-2.5 py-1 rounded-md border text-[10.5px] font-semibold transition flex items-center gap-1 ${
-              showChartTypes
-                ? 'bg-action text-[#F8F8F2] border-action'
-                : 'bg-[#EFECE1] dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]'
-            }`}
-          >
-            <span>{t("图表类型") + ' '}{showChartTypes ? t("收起") : t("展开")}</span><ChevronDown className={`w-3 h-3 transition-transform ${showChartTypes ? 'rotate-180' : ''}`} />
-          </button>
-
-          {/* Click Link Mode Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEngine?.playClick(560);
-              setChartSpecConfig((p) => ({ ...p, clickLinkMode: p.clickLinkMode === 'filter' ? 'drill' : 'filter' }));
-              showToast?.(chartSpecConfig.clickLinkMode === 'filter' ? t('图表点击已切换为穿透查看明细') : t('图表点击已切换为全局联动筛选'));
-            }}
-            title={chartSpecConfig.clickLinkMode === 'filter' ? t("当前模式：点击柱体将触发全局筛选；点击可切换为穿透查看明细") : t("当前模式：点击柱体将穿透查看底层明细；点击可切换为全局联动筛选")}
-            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold border flex items-center gap-1 transition ${
-              chartSpecConfig.clickLinkMode === 'filter'
-                ? 'bg-[#FD971F]/15 text-ink-orange border-[#FD971F]/40'
-                : 'bg-[#EFECE1] dark:bg-[#1E1F1C] text-ink-muted border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]'
-            }`}
-          >
-            {chartSpecConfig.clickLinkMode === 'filter' ? <Filter className="w-3 h-3 text-ink-orange" /> : <Search className="w-3 h-3 text-ink-cyan" />}
-            <span>{chartSpecConfig.clickLinkMode === 'filter' ? t("联动:筛选") : t("联动:下钻")}</span>
-          </button>
-
-          {/* Chart Specification Tuning Popover Button */}
           <button
             type="button"
             onClick={(e) => {
@@ -668,48 +560,13 @@ export function ChartStudio({
               setPopoverPlacement(spaceBelow < 340 && spaceAbove > spaceBelow ? 'top' : 'bottom');
               setShowChartStudioPopover((p) => !p);
             }}
-            className="px-2.5 py-1 rounded-md bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-[10px] font-semibold flex items-center gap-1 transition"
-            title={t("图表规格微调 (TopN / 衍生序列 / 缺失值 / 标签)")}
+            title={t("图表选项")}
+            aria-label={t("图表选项")}
+            className={iconBtn(showChartStudioPopover || (chartSpecConfig.topN || 0) > 0)}
           >
-            <Sliders className="w-3 h-3 text-ink-cyan" />
-            <span>{t("规格")}</span>
+            <Sliders className="w-4 h-4" />
           </button>
 
-          {/* Direct Image Export */}
-          {(onExportPNG || onExportSVG) && (
-            <div className="flex items-center rounded-md p-0.5 bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32]">
-              {onExportPNG && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine?.playClick(620);
-                    onExportPNG();
-                  }}
-                  title={t("直接导出当前高清图表为 PNG 图片")}
-                  className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-ink-muted hover:text-ink-pink hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-0.5"
-                >
-                  <Download className="w-2.5 h-2.5" />
-                  <span>PNG</span>
-                </button>
-              )}
-              {onExportSVG && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine?.playClick(620);
-                    onExportSVG();
-                  }}
-                  title={t("直接导出当前矢量图表为 SVG 文件")}
-                  className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-ink-muted hover:text-ink-green hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-0.5"
-                >
-                  <Download className="w-2.5 h-2.5" />
-                  <span>SVG</span>
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Fullscreen Toggle */}
           <button
             type="button"
             data-chart-fullscreen-toggle
@@ -717,25 +574,46 @@ export function ChartStudio({
               soundEngine?.playClick(600);
               setIsChartFullscreen((prev) => !prev);
             }}
-            className="p-1.5 rounded-md bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:text-[#F92672] text-ink-muted"
+            className={iconBtn(isChartFullscreen)}
             title={t("全屏切换")}
             aria-label={isChartFullscreen ? "退出图表全屏" : "图表全屏"}
           >
-            {isChartFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            {isChartFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
 
-          {/* Chart Specification Tuning Popover Content */}
           {showChartStudioPopover && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setShowChartStudioPopover(false)} />
-              <div className={`absolute right-0 ${popoverPlacement === 'top' ? 'bottom-full mb-2' : 'top-9'} z-40 w-[min(21rem,calc(100vw-2rem))] max-h-[min(400px,calc(100vh-5rem))] overflow-y-auto p-4 rounded-xl bg-[#FFFDF7]/95 dark:bg-[#1E1F1C]/95 backdrop-blur-2xl border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl space-y-3 text-xs animate-apple-modal`}>
-                <div className="flex items-center justify-between border-b border-[#3E3D32]/50 pb-2">
-                  <span className="font-bold text-[11px] text-ink-pink flex items-center gap-1.5">
-                    <Sliders className="w-3.5 h-3.5 text-ink-pink" />
-                    <span>{t("图表规格与高级衍生分析")}</span>
-                  </span>
-                  <button onClick={() => setShowChartStudioPopover(false)} aria-label={t("关闭图表规格面板")} className="p-1 rounded hover:bg-white/10 text-ink-muted">
+              <div className={`absolute right-0 ${popoverPlacement === 'top' ? 'bottom-full mb-2' : 'top-10'} z-40 w-[min(17.5rem,calc(100vw-2rem))] max-h-[min(380px,calc(100vh-5rem))] overflow-y-auto p-3 rounded-xl bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] shadow-xl space-y-3 text-xs`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-[#272822] dark:text-[#F8F8F2]">{t("图表选项")}</span>
+                  <button type="button" onClick={() => setShowChartStudioPopover(false)} aria-label={t("关闭图表选项")} className="p-1 rounded-md text-ink-muted hover:bg-black/5 dark:hover:bg-white/5">
                     <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { key: 'showDataLabels', label: t('标签'), on: chartSpecConfig.showDataLabels },
+                    { key: 'showAvgReferenceLine', label: t('均值'), on: chartSpecConfig.showAvgReferenceLine },
+                  ].map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => setChartSpecConfig((p) => ({ ...p, [chip.key]: !p[chip.key] }))}
+                      className={`px-2 py-1 rounded-md text-[11px] transition ${chip.on ? 'bg-[#66D9EF]/15 text-ink-cyan' : 'text-ink-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'}`}
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    aria-pressed={chartSpecConfig.clickLinkMode === 'filter'}
+                    title={chartSpecConfig.clickLinkMode === 'filter' ? t('点击图表：筛选该分组') : t('点击图表：查看明细')}
+                    onClick={() => setChartSpecConfig((p) => ({ ...p, clickLinkMode: p.clickLinkMode === 'filter' ? 'drill' : 'filter' }))}
+                    className={`px-2 py-1 rounded-md text-[11px] transition ${chartSpecConfig.clickLinkMode === 'filter' ? 'bg-[#FD971F]/15 text-ink-orange' : 'text-ink-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'}`}
+                  >
+                    {chartSpecConfig.clickLinkMode === 'filter' ? t('筛选') : t('明细')}
                   </button>
                 </div>
 
@@ -747,10 +625,10 @@ export function ChartStudio({
                         aria-label={t("主指标绑定:")}
                         value={chartSpecConfig.primaryValueId || pivotResult.valConfigs[0]?.id || ''}
                         onChange={(e) => setChartSpecConfig((p) => ({ ...p, primaryValueId: e.target.value }))}
-                        className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
+                        className={optSelectClass}
                       >
                         {pivotResult.valConfigs.map((vc) => (
-                          <option key={vc.id} value={vc.id}>{vc.field} ({vc.agg})</option>
+                          <option key={vc.id} value={vc.id} className={optionClass}>{vc.field} ({vc.agg})</option>
                         ))}
                       </select>
                     </div>
@@ -760,73 +638,58 @@ export function ChartStudio({
                         aria-label={t("次轴/Y轴指标:")}
                         value={chartSpecConfig.secondaryValueId || pivotResult.valConfigs[1]?.id || ''}
                         onChange={(e) => setChartSpecConfig((p) => ({ ...p, secondaryValueId: e.target.value }))}
-                        className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
+                        className={optSelectClass}
                       >
                         {pivotResult.valConfigs.map((vc) => (
-                          <option key={vc.id} value={vc.id}>{vc.field} ({vc.agg})</option>
+                          <option key={vc.id} value={vc.id} className={optionClass}>{vc.field} ({vc.agg})</option>
                         ))}
                       </select>
                     </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] text-ink-muted mb-1">{t("图表内排序:")}</label>
-                    <select
-                      aria-label={t("图表内排序:")}
-                      value={chartSpecConfig.sortMode}
-                      onChange={(e) => setChartSpecConfig((p) => ({ ...p, sortMode: e.target.value }))}
-                      className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
-                    >
-                      <option value="none">{t("保持透视表顺序")}</option>
-                      <option value="desc">{t("按主指标降序")}</option>
-                      <option value="asc">{t("按主指标升序")}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-ink-muted mb-1">{t("TopN 焦点截断:")}</label>
-                    <select
-                      aria-label={t("TopN 焦点截断:")}
-                      value={chartSpecConfig.topN}
-                      onChange={(e) => setChartSpecConfig((p) => ({ ...p, topN: Number(e.target.value) }))}
-                      className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
-                    >
-                      <option value={0}>{t("显示全部")}</option>
-                      <option value={3}>Top 3</option>
-                      <option value={5}>Top 5</option>
-                      <option value={8}>Top 8</option>
-                      <option value={10}>Top 10</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-[10px] text-ink-muted mb-1">{t("只显示前 N 组:")}</label>
+                  <select
+                    aria-label={t("只显示前 N 组:")}
+                    value={chartSpecConfig.topN}
+                    onChange={(e) => setChartSpecConfig((p) => ({ ...p, topN: Number(e.target.value) }))}
+                    className={optSelectClass}
+                  >
+                    <option value={0} className={optionClass}>{t("显示全部")}</option>
+                    <option value={3} className={optionClass}>Top 3</option>
+                    <option value={5} className={optionClass}>Top 5</option>
+                    <option value={8} className={optionClass}>Top 8</option>
+                    <option value={10} className={optionClass}>Top 10</option>
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] text-ink-muted mb-1">{t("衍生分析序列:")}</label>
+                    <label className="block text-[10px] text-ink-muted mb-1">{t("衍生线:")}</label>
                     <select
-                      aria-label={t("衍生分析序列:")}
+                      aria-label={t("衍生线:")}
                       value={chartSpecConfig.lineDerivedMetric}
                       onChange={(e) => setChartSpecConfig((p) => ({ ...p, lineDerivedMetric: e.target.value }))}
-                      className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
+                      className={optSelectClass}
                     >
-                      <option value="none">{t("无衍生线")}</option>
-                      <option value="cumulative">{t("累计运行总和")}</option>
-                      <option value="ma3">{t("3期移动平均线")}</option>
-                      <option value="mom_pct">{t("环比增长率(%)")}</option>
+                      <option value="none" className={optionClass}>{t("无衍生线")}</option>
+                      <option value="cumulative" className={optionClass}>{t("累计运行总和")}</option>
+                      <option value="ma3" className={optionClass}>{t("3期移动平均线")}</option>
+                      <option value="mom_pct" className={optionClass}>{t("环比增长率(%)")}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] text-ink-muted mb-1">{t("缺失值处理策略:")}</label>
+                    <label className="block text-[10px] text-ink-muted mb-1">{t("缺失值:")}</label>
                     <select
-                      aria-label={t("缺失值处理策略:")}
+                      aria-label={t("缺失值:")}
                       value={chartSpecConfig.missingValueMode}
                       onChange={(e) => setChartSpecConfig((p) => ({ ...p, missingValueMode: e.target.value }))}
-                      className="w-full px-2 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
+                      className={optSelectClass}
                     >
-                      <option value="zero">{t("按 0 补齐 (Zero)")}</option>
-                      <option value="connect">{t("断开连线 (Null)")}</option>
-                      <option value="prev">{t("前值填充 (Prev)")}</option>
+                      <option value="zero" className={optionClass}>{t("按 0 补齐")}</option>
+                      <option value="connect" className={optionClass}>{t("断开连线")}</option>
+                      <option value="prev" className={optionClass}>{t("沿用前值")}</option>
                     </select>
                   </div>
                 </div>
@@ -838,85 +701,44 @@ export function ChartStudio({
                       aria-label={t("直方图分箱数量 (Bins):")}
                       value={chartSpecConfig.histogramBins}
                       onChange={(e) => setChartSpecConfig((p) => ({ ...p, histogramBins: Number(e.target.value) }))}
-                      className="w-full px-2.5 py-1 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[11px]"
+                      className={optSelectClass}
                     >
-                      <option value={0}>{t("自动分箱 (Sturges公式)")}</option>
-                      <option value={4}>{t("4 个区间")}</option>
-                      <option value={6}>{t("6 个区间")}</option>
-                      <option value={8}>{t("8 个区间")}</option>
-                      <option value={10}>{t("10 个区间")}</option>
+                      <option value={0} className={optionClass}>{t("自动分箱 (Sturges公式)")}</option>
+                      <option value={4} className={optionClass}>{t("4 个区间")}</option>
+                      <option value={6} className={optionClass}>{t("6 个区间")}</option>
+                      <option value={8} className={optionClass}>{t("8 个区间")}</option>
+                      <option value={10} className={optionClass}>{t("10 个区间")}</option>
                     </select>
                   </div>
                 )}
 
-                <label className="flex items-center justify-between pt-1 cursor-pointer text-[11px]">
-                  <span className="text-ink-muted">{t("显示柱体/节点数值标签")}</span>
-                  <input
-                    type="checkbox"
-                    checked={chartSpecConfig.showDataLabels}
-                    onChange={(e) => setChartSpecConfig((p) => ({ ...p, showDataLabels: e.target.checked }))}
-                    className="rounded accent-[#F92672]"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between pt-1 cursor-pointer text-[11px]">
-                  <span className="text-ink-muted">{t("显示全局均值参考线 (Avg)")}</span>
-                  <input
-                    type="checkbox"
-                    checked={chartSpecConfig.showAvgReferenceLine}
-                    onChange={(e) => setChartSpecConfig((p) => ({ ...p, showAvgReferenceLine: e.target.checked }))}
-                    className="rounded accent-[#F92672]"
-                  />
-                </label>
+                {(onExportPNG || onExportSVG) && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-[#D6D4C8]/60 dark:border-[#3E3D32]">
+                    {onExportPNG && (
+                      <button
+                        type="button"
+                        onClick={() => { soundEngine?.playClick(620); onExportPNG(); setShowChartStudioPopover(false); }}
+                        className="px-2.5 py-1 rounded-md text-[11px] text-ink-muted hover:text-ink-cyan hover:bg-[#66D9EF]/10 transition"
+                      >
+                        PNG
+                      </button>
+                    )}
+                    {onExportSVG && (
+                      <button
+                        type="button"
+                        onClick={() => { soundEngine?.playClick(620); onExportSVG(); setShowChartStudioPopover(false); }}
+                        className="px-2.5 py-1 rounded-md text-[11px] text-ink-muted hover:text-ink-cyan hover:bg-[#66D9EF]/10 transition"
+                      >
+                        SVG
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
         </div>
       </div>
-
-      {/* Categorized Intent-Driven Chart Switcher Strip */}
-      {showChartTypes && (
-        <div
-          id="pivot-chart-types"
-          className="flex flex-wrap items-center gap-x-2 gap-y-1.5 pb-2 mb-2 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 apple-font-mono shrink-0 animate-fadeIn"
-        >
-          {CHART_INTENT_GROUPS.map((group) => (
-            <div key={group.id} className="inline-flex items-center gap-1 bg-[#EFECE1]/45 dark:bg-[#1E1F1C]/60 px-1.5 py-0.5 rounded-lg border border-[#D6D4C8]/70 dark:border-[#3E3D32]">
-              <span className="text-[9px] font-bold text-ink-cyan px-1 select-none" title={t(group.desc)}>
-                {t(group.label)}:
-              </span>
-              {group.types.map((typeVal) => {
-                const ct = VISUAL_CHART_TYPES.find((item) => item.value === typeVal);
-                if (!ct) return null;
-                const isRecommended = typeVal === recommendedChartType;
-                return (
-                  <button
-                    key={ct.value}
-                    type="button"
-                    onClick={() => {
-                      soundEngine?.playWhoosh ? soundEngine.playWhoosh() : soundEngine?.playClick(540);
-                      setChartType(ct.value);
-                    }}
-                    title={`${t(ct.label)} — ${t(CHART_METHOD_GUIDES[ct.value]?.purpose || '')}${isRecommended ? ` (${t("最适推荐")})` : ''}`}
-                    className={`tactile-btn px-2 py-0.5 rounded text-[9.5px] font-semibold whitespace-nowrap transition inline-flex items-center gap-1 ${
-                      chartType === ct.value
-                        ? 'bg-action text-[#F8F8F2]'
-                        : isRecommended
-                        ? 'bg-[#A6E22E]/15 text-ink-green border border-[#A6E22E]/40 hover:bg-[#A6E22E]/25'
-                        : 'bg-[#FFFDF7] dark:bg-[#272822] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-                    }`}
-                  >
-                    <span>{t(ct.short)}</span>
-                    {isRecommended && chartType !== ct.value && (
-                      <span className="text-[8px] font-bold text-ink-green">★</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* Disclaimers & Context Warnings */}
       {chartType === 'histogram' && unifiedChartSpec.histogramSummary && (
@@ -925,7 +747,7 @@ export function ChartStudio({
         </p>
       )}
       {!['histogram', 'heatmap'].includes(chartType) && unifiedChartSpec.availableGroupCount > unifiedChartSpec.items.length && (
-        <p data-testid="chart-scope" className="text-xs leading-5 mb-2 text-ink-muted [overflow-wrap:anywhere]">
+        <p role="status" data-testid="chart-scope" className="text-xs leading-5 mb-2 text-ink-muted [overflow-wrap:anywhere]">
           {t('按当前排序展示')} {unifiedChartSpec.items.length}/{unifiedChartSpec.availableGroupCount} {t('个分组；占比以图中分组合计为分母。表格和总计仍包含全部筛选结果。')}
         </p>
       )}
@@ -935,135 +757,51 @@ export function ChartStudio({
         </p>
       )}
       {chartType === 'combo' && !unifiedChartSpec.hasDualAxis && (
-        <div data-testid="combo-guidance" className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 mb-2 rounded-lg bg-[#A6E22E]/10 border border-[#A6E22E]/30 text-[10.5px] text-ink-green apple-font-mono shrink-0">
-          <span className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-ink-orange shrink-0" />
-            <span>{t("双轴复合图需两个指标形成对比（左轴看柱体，右轴看折线）。当前仅绑定 1 个主指标。")}</span>
-          </span>
-          <div className="flex items-center gap-2">
-            {onAddMeasure && (
-              <button
-                type="button"
-                disabled={isReadOnly}
-                onClick={() => {
-                  soundEngine?.playClick(560);
-                  onAddMeasure(unusedMeasureFields[0]?.name || '__COUNT__');
-                }}
-                className="px-2 py-0.5 rounded bg-[#A6E22E] text-[#1E1F1C] font-bold text-[9.5px] hover:opacity-90 transition"
-              >
-                + {t("补充右轴指标")}「{unusedMeasureFields[0]?.name || t("记录数")}」
-              </button>
-            )}
+        <div data-testid="combo-guidance" className="flex flex-wrap items-center gap-2 mb-2 text-[11px] text-ink-muted shrink-0">
+          <span>{t("双轴图需要两个指标。当前仅有一个。")}</span>
+          {onAddMeasure && (
             <button
               type="button"
-              onClick={() => setChartType('bar')}
-              className="px-2 py-0.5 rounded border border-[#A6E22E]/50 text-ink-green text-[9.5px] hover:bg-[#A6E22E]/20 transition"
+              disabled={isReadOnly}
+              onClick={() => {
+                soundEngine?.playClick(560);
+                onAddMeasure(unusedMeasureFields[0]?.name || '__COUNT__');
+              }}
+              className="px-2 py-0.5 rounded-md text-ink-cyan hover:bg-[#66D9EF]/12 transition"
             >
-              {t("切换普通柱图")}
+              + {unusedMeasureFields[0]?.name || t("记录数")}
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Executive KPI Summary Strip (Cockpit Top-Line Metrics in Chart Mode / Fullscreen) */}
-      {(viewMode === 'chart' || isChartFullscreen) && unifiedChartSpec.hasValues && unifiedChartSpec.items.length > 0 && !unifiedChartSpec.chartIssue && (
-        <div className="flex flex-wrap items-center gap-1.5 mb-2.5 apple-font-mono shrink-0">
-          {/* Card 1: Primary Grand Total */}
-          <div
-            className="px-2.5 py-1 rounded-lg bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border border-[#D6D4C8] dark:border-[#3E3D32] flex items-center gap-2 text-[10px] shadow-2xs"
-            title={t("当前图表主指标汇总总额")}
+          )}
+          <button
+            type="button"
+            onClick={() => setChartType('bar')}
+            className="px-2 py-0.5 rounded-md hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition"
           >
-            <span className="w-2 h-2 rounded-full bg-ink-pink shrink-0" />
-            <span className="text-ink-muted">{unifiedChartSpec.primarySeriesKey}:</span>
-            <strong className="text-[#272822] dark:text-[#F8F8F2] font-mono">
-              {UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.total, unifiedChartSpec.primaryValCfg, { compact: false })}
-            </strong>
-          </div>
-
-          {/* Secondary Metric Cards (if multiple) */}
-          {pivotResult.valConfigs.length > 1 &&
-            pivotResult.valConfigs
-              .filter((vc) => vc.id !== (chartSpecConfig.primaryValueId || pivotResult.valConfigs[0]?.id))
-              .slice(0, 2)
-              .map((vc) => {
-                const grandVal = pivotResult.displayMatrix[`__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? null;
-                const aggLabel = vc.isCalculated ? t('公式') : (AGG_METHODS.find((m) => m.value === vc.agg)?.short || vc.agg);
-                return (
-                  <button
-                    key={vc.id}
-                    type="button"
-                    onClick={() => {
-                      soundEngine?.playClick?.(540);
-                      setChartSpecConfig((p) => ({ ...p, primaryValueId: vc.id }));
-                      showToast?.(`已将主图指标切换为「${vc.field}」`);
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-[#EFECE1]/40 dark:bg-[#1E1F1C]/60 hover:bg-[#EFECE1] dark:hover:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-ink-cyan flex items-center gap-1.5 text-[10px] transition cursor-pointer shadow-2xs"
-                    title={`${t("点击将主图切换为展示此指标：")}${vc.field}`}
-                  >
-                    <span className="text-ink-muted">{vc.field} ({aggLabel}):</span>
-                    <strong className="text-ink-cyan font-mono">
-                      {UnifiedFormatter.formatValue(grandVal, vc, { compact: false })}
-                    </strong>
-                    <span className="text-[8px] px-1 py-0.2 rounded bg-ink-cyan/15 text-ink-cyan font-bold">{t("切为主图")}</span>
-                  </button>
-                );
-              })}
-
-          {/* Leader Card (if insight exists) */}
-          {insight?.topName && (
-            <button
-              type="button"
-              onClick={handleDrillTopLeader}
-              className="px-2.5 py-1 rounded-lg bg-[#A6E22E]/10 hover:bg-[#A6E22E]/20 border border-[#A6E22E]/35 flex items-center gap-1.5 text-[10px] transition cursor-pointer shadow-2xs"
-              title={t("领跑分组 · 点击直接穿透查看原始订单明细")}
-            >
-              <Sparkles className="w-3 h-3 text-ink-green shrink-0" />
-              <span className="text-ink-muted">{t("首位领跑:")}</span>
-              <strong className="text-ink-green">{insight.topName}</strong>
-              <span className="text-ink-muted font-mono">
-                ({insight.topFormatted}{insight.topSharePct ? ` · ${insight.topSharePct}%` : ''})
-              </span>
-              <Search className="w-2.5 h-2.5 text-ink-green opacity-70" />
-            </button>
-          )}
-
-          {/* Benchmark Average Card */}
-          {hasValidMean && (
-            <div
-              className="px-2.5 py-1 rounded-lg bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/80 border border-[#D6D4C8] dark:border-[#3E3D32] flex items-center gap-1.5 text-[10px] shadow-2xs"
-              title={t("全部分组计算的算术平均值基准")}
-            >
-              <TrendingUp className="w-3 h-3 text-ink-orange shrink-0" />
-              <span className="text-ink-muted">{t("组均值:")}</span>
-              <strong className="text-ink-orange font-mono">
-                {insight?.meanFormatted || UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: false })}
-              </strong>
-              {insight?.aboveMeanCount !== undefined && (
-                <span className="text-ink-muted">({insight.aboveMeanCount}/{insight.groupCount || unifiedChartSpec.items.length} {t("组高于均值")})</span>
-              )}
-            </div>
-          )}
+            {t("切换普通柱图")}
+          </button>
         </div>
       )}
 
       {/* Main Chart Canvas */}
-      <div className="flex-1 w-full min-h-[260px] flex items-center justify-center overflow-hidden">
+      <div className="flex-1 w-full min-h-[280px] flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-transparent to-[#EFECE1]/25 dark:to-[#1E1F1C]/35">
         {unifiedChartSpec.renderLimit ? (
           <div role="status" className="p-6 max-w-lg text-center space-y-3">
             <h4 className="text-sm font-semibold">{t("图表分组过多")}</h4>
-            <p className="text-xs text-ink-muted">{unifiedChartSpec.renderLimit.groupCount.toLocaleString()} {t("个分组超过当前图表上限：")}{unifiedChartSpec.renderLimit.maximum.toLocaleString()}{t("；表格和 KPI 保持全量。请筛选、减少维度或设置 TopN。")}</p>
+            <p className="text-xs text-ink-muted">{unifiedChartSpec.renderLimit.groupCount.toLocaleString()} {t("组超过上限")} {unifiedChartSpec.renderLimit.maximum.toLocaleString()}{t("。表格数据仍完整，可先筛选或只看 Top 10。")}</p>
             <button className="px-3 py-2 rounded-lg bg-action text-[#F8F8F2] text-xs" onClick={(event) => { restoreScopeFocusRef.current = document.activeElement === event.currentTarget; setChartSpecConfig((prev) => ({ ...prev, topN: 10, sortMode: 'desc' })); }}>{t("按主指标显示 Top 10")}</button>
           </div>
         ) : !unifiedChartSpec.hasValues ? (
-          <div className="flex flex-col items-center justify-center p-8 text-center apple-font-mono animate-fadeIn">
-            <div className="w-12 h-12 rounded-2xl bg-[#FD971F]/10 border border-[#FD971F]/30 flex items-center justify-center mb-3 text-ink-orange shadow-sm">
-              <Sliders className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-semibold text-[#272822] dark:text-[#F8F8F2] mb-1.5">{' ' + t("未配置度量指标 (Values)") + ' '}</h3>
-            <p className="text-xs text-ink-muted max-w-sm leading-relaxed mb-4">{' ' + t("当前透视配置中缺少度量值。请在左侧字段架中点击或拖拽数值字段至【指标 / 值 (Values)】区域以生成图表。") + ' '}</p>
+          <div className="flex flex-col items-center justify-center p-8 text-center">
+            <h3 className="text-sm font-semibold text-[#272822] dark:text-[#F8F8F2] mb-1.5">{t("尚未添加数值指标")}</h3>
+            <p className="text-xs text-ink-muted max-w-sm leading-relaxed mb-4">
+              {viewMode === 'split'
+                ? t("可先在上方表格区添加指标；图表会随之出现。")
+                : t("请在左侧把金额、数量等字段加到「值」区域，图表才会出现。")}
+            </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {viewMode === 'chart' && (
-                <button type="button" disabled={isReadOnly} onClick={onAddRecordCount} className="px-3 py-2 rounded-md bg-action text-white text-xs font-semibold">
+              {/* Avoid duplicating the table's primary CTA while both panes are visible. */}
+              {viewMode !== 'split' && typeof onAddRecordCount === 'function' && (
+                <button type="button" disabled={isReadOnly} onClick={onAddRecordCount} className="px-3 py-1.5 rounded-lg bg-action text-white text-xs font-medium">
                   {t('统计记录数')}
                 </button>
               )}
@@ -1073,9 +811,9 @@ export function ChartStudio({
                   type="button"
                   disabled={isReadOnly}
                   onClick={() => onAddMeasure(mf.name)}
-                  className="px-3 py-2 rounded-md border border-[#66D9EF]/50 bg-[#66D9EF]/10 text-ink-cyan text-xs font-semibold hover:bg-[#66D9EF]/20"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-ink-cyan hover:bg-[#66D9EF]/12 transition"
                 >
-                  + {t('添加')}「{mf.name}」
+                  + {mf.name}
                 </button>
               ))}
             </div>
@@ -1121,18 +859,18 @@ export function ChartStudio({
                 <svg data-chart-svg="true" role="group" aria-label={t("矩阵热力图")} width={Math.max(500, 160 + groups.length * 110)} height={Math.max(180, 60 + shownRows.length * 38)}>
                   {groups.map((group, index) => {
                     const colText = group.pathLabels?.join(' / ') || group.label || '总计';
-                    return <text key={group.key} x={165 + index * 110} y={22} fill={darkMode ? '#F8F8F2' : '#272822'} fontSize="11">{formatAxisTickLabel(colText, 12)}</text>;
+                    return <text key={group.key} x={165 + index * 110} y={22} fill={inkFill} fontSize={CV.typography.tickHeat}>{formatAxisTickLabel(colText, 12)}</text>;
                   })}
                   {shownRows.map((row, r) => <g key={row.rowKey}>
-                    <text x="4" y={58 + r * 38} fill={darkMode ? '#F8F8F2' : '#272822'} fontSize="11">{row.label.slice(0, 18)}</text>
+                    <text x="4" y={58 + r * 38} fill={inkFill} fontSize={CV.typography.tickHeat}>{row.label.slice(0, 18)}</text>
                     {groups.map((group, c) => {
                       const cell = pivotResult.displayMatrix[`${row.rowKey}@@${group.key}@@${metric.id}`];
                       const formatted = formatCellNumber(cell, metric);
                       return <g key={group.key} role="button" tabIndex={0} aria-label={`${row.label} / ${group.label}: ${formatted}`} data-highlighted={highlightedRowKey === row.rowKey}
                         onClick={() => handleChartPointClick({ rowKey: row.rowKey, colKey: group.key, name: (!rows.length && group.pathLabels?.join(' / ')) || group.label || row.label, formattedValue: formatted })}
                         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleChartPointClick({ rowKey: row.rowKey, colKey: group.key, name: row.label, formattedValue: formatted }); } }}>
-                        <rect x={160 + c * 110} y={34 + r * 38} width="106" height="34" rx="3" fill={cell?.display < 0 ? '#F92672' : '#66D9EF'} fillOpacity={0.2 + 0.8 * Math.abs(cell?.display || 0) / magnitude} stroke={highlightedRowKey === row.rowKey ? '#FD971F' : 'transparent'} strokeWidth="3" />
-                        <text x={168 + c * 110} y={56 + r * 38} fontSize="11" fill={darkMode ? '#F8F8F2' : '#272822'}>{formatted}</text>
+                        <rect x={160 + c * 110} y={34 + r * 38} width="106" height="34" rx={CV.heatmap.cellRx} fill={cell?.display < 0 ? CV.heatmap.neg : CV.heatmap.pos} fillOpacity={CV.heatmap.opacityMin + CV.heatmap.opacitySpan * Math.abs(cell?.display || 0) / magnitude} stroke={highlightedRowKey === row.rowKey ? CV.semantic.highlight : 'transparent'} strokeWidth={CV.stroke.highlight} />
+                        <text x={168 + c * 110} y={56 + r * 38} fontSize={CV.typography.tickHeat} fill={inkFill}>{formatted}</text>
                       </g>;
                     })}
                   </g>)}
@@ -1167,31 +905,31 @@ export function ChartStudio({
                     tabIndex={0}
                     aria-label={`${item.name}: ${item.formattedValue}`}
                   >
-                    <text x="8" y={y + 24} fontSize="12" fill={darkMode ? '#F8F8F2' : '#272822'}>{formatAxisTickLabel(item.name, 16)}</text>
-                    {width > 0 && <polygon points={`${x},${y + 22} ${x + width},${y + 22} ${x + width - Math.min(8, width / 2)},${y + 42} ${x + Math.min(8, width / 2)},${y + 42}`} fill={item.fill} stroke={highlightedRowKey === item.rowKey ? '#FD971F' : 'none'} strokeWidth="3" />}
-                    <text x="180" y={y + 14} fontSize="12" fill={darkMode ? '#F8F8F2' : '#272822'}>{item.formattedValue} · {item.conversionFormatted}</text>
+                    <text x="8" y={y + 24} fontSize={CV.typography.tickFunnel} fill={inkFill}>{formatAxisTickLabel(item.name, 16)}</text>
+                    {width > 0 && <polygon points={`${x},${y + 22} ${x + width},${y + 22} ${x + width - Math.min(8, width / 2)},${y + 42} ${x + Math.min(8, width / 2)},${y + 42}`} fill={item.fill} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'} strokeWidth={CV.stroke.highlight} />}
+                    <text x="180" y={y + 14} fontSize={CV.typography.tickFunnel} fill={inkFill}>{item.formattedValue} · {item.conversionFormatted}</text>
                   </g>
                 );
               })}
             </svg>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%" minHeight={260}>
+          <ResponsiveContainer width="100%" height="100%" minHeight={280}>
             {chartType === 'line' ? (
-              <LineChart data={unifiedChartSpec.items} margin={{ top: 24, right: 24, left: 10, bottom: shouldRotateTicks ? (compactAxis ? 52 : 58) : 24 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
+              <LineChart data={unifiedChartSpec.items} margin={cartesianMargin}>
+                <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
                 <XAxis
                   dataKey="name"
                   interval={generalTickInterval}
                   height={shouldRotateTicks ? (compactAxis ? 64 : 72) : 28}
                   tick={renderCategoryAxisTick}
                 />
-                <YAxis yAxisId="left" tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
+                <YAxis yAxisId="left" tick={valueTick} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                 {(unifiedChartSpec.hasDualAxis || unifiedChartSpec.derivedSeriesKey) && (
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 10, fill: '#A6E22E' }}
+                    tick={valueTick}
                     tickFormatter={(v) => {
                       if (unifiedChartSpec.hasDualAxis) {
                         return UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true });
@@ -1207,13 +945,13 @@ export function ChartStudio({
                   <ReferenceLine
                     yAxisId="left"
                     y={unifiedChartSpec.primaryStats.mean}
-                    stroke="#FD971F"
-                    strokeDasharray="4 4"
-                    label={{ value: `AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, position: 'insideTopRight', fontSize: 9, fill: '#FD971F' }}
+                    stroke={CV.semantic.mean}
+                    strokeDasharray={CV.refDash.avg}
+                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
                   />
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
                   <Line isAnimationActive={false}
                     key={sm.key}
@@ -1222,12 +960,12 @@ export function ChartStudio({
                     type="monotone"
                     dataKey={sm.key}
                     stroke={sm.color}
-                    strokeWidth={2.6}
-                    dot={({ cx, cy, payload }) => <circle cx={cx} cy={cy} r={highlightedRowKey === payload?.rowKey ? 7 : 4} fill={highlightedRowKey === payload?.rowKey ? '#FD971F' : sm.color} data-highlighted={highlightedRowKey === payload?.rowKey} onClick={() => handleChartPointClick({ ...payload, colKey: sm.colKey })} />}
-                    activeDot={{ r: 6, onClick: (_, payload) => handleChartPointClick({ ...payload?.payload, colKey: sm.colKey }) }}
+                    strokeWidth={CV.stroke.series}
+                    dot={({ cx, cy, payload }) => <circle cx={cx} cy={cy} r={highlightedRowKey === payload?.rowKey ? CV.dot.highlight : CV.dot.base} fill={highlightedRowKey === payload?.rowKey ? CV.semantic.highlight : sm.color} data-highlighted={highlightedRowKey === payload?.rowKey} onClick={() => handleChartPointClick({ ...payload, colKey: sm.colKey })} />}
+                    activeDot={{ r: CV.dot.active, onClick: (_, payload) => handleChartPointClick({ ...payload?.payload, colKey: sm.colKey }) }}
                   >
                     {chartSpecConfig.showDataLabels && idx === 0 && unifiedChartSpec.items.length <= 24 && (
-                      <LabelList dataKey="_compactPrimaryLabel" position="top" style={{ fontSize: 9, fontWeight: 600, fill: darkMode ? '#F8F8F2' : '#272822' }} />
+                      <LabelList dataKey="_compactPrimaryLabel" position="top" style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill }} />
                     )}
                   </Line>
                 ))}
@@ -1236,24 +974,24 @@ export function ChartStudio({
                     yAxisId="right"
                     type="monotone"
                     dataKey={unifiedChartSpec.derivedSeriesKey}
-                    stroke="#E6DB74"
-                    strokeWidth={2}
-                    strokeDasharray="5 3"
-                    dot={{ r: 3, fill: '#E6DB74' }}
+                    stroke={CV.semantic.derived}
+                    strokeWidth={CV.stroke.derived}
+                    strokeDasharray={CV.refDash.derived}
+                    dot={{ r: CV.dot.derived, fill: CV.semantic.derived }}
                   />
                 )}
               </LineChart>
             ) : chartType === 'area' || chartType === 'stacked_area' || chartType === 'pct_area' ? (
-              <AreaChart data={unifiedChartSpec.items} margin={{ top: 24, right: 24, left: 10, bottom: shouldRotateTicks ? (compactAxis ? 52 : 58) : 24 }}>
+              <AreaChart data={unifiedChartSpec.items} margin={cartesianMargin}>
                 <defs>
                   {CHART_COLORS.map((c, idx) => (
                     <linearGradient key={`areaGrad_${idx}`} id={`appleAreaGrad_${idx}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={c} stopOpacity={0.6} />
-                      <stop offset="95%" stopColor={c} stopOpacity={0.05} />
+                      <stop offset="5%" stopColor={c} stopOpacity={CV.fill.areaGradFrom} />
+                      <stop offset="95%" stopColor={c} stopOpacity={CV.fill.areaGradTo} />
                     </linearGradient>
                   ))}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
+                <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
                 <XAxis
                   dataKey="name"
                   interval={generalTickInterval}
@@ -1262,19 +1000,19 @@ export function ChartStudio({
                 />
                 <YAxis
                   domain={chartType === 'pct_area' ? [0, 100] : zeroBaselineDomain} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)}
-                  tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }}
+                  tick={valueTick}
                   tickFormatter={(v) => (chartType === 'pct_area' ? `${v}%` : UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true }))}
                 />
                 {chartSpecConfig.showAvgReferenceLine && chartType === 'area' && hasValidMean && (
                   <ReferenceLine
                     y={unifiedChartSpec.primaryStats.mean}
-                    stroke="#FD971F"
-                    strokeDasharray="4 4"
-                    label={{ value: `AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, position: 'insideTopRight', fontSize: 9, fill: '#FD971F' }}
+                    stroke={CV.semantic.mean}
+                    strokeDasharray={CV.refDash.avg}
+                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
                   />
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
                   <Area isAnimationActive={false}
                     key={sm.key}
@@ -1282,53 +1020,53 @@ export function ChartStudio({
                     dataKey={sm.key}
                     stackId={chartType === 'area' || (!unifiedChartSpec.canStack && chartType !== 'pct_area') ? undefined : 'stack_1'}
                     stroke={sm.color}
-                    strokeWidth={2}
+                    strokeWidth={CV.stroke.series}
                     fill={`url(#appleAreaGrad_${idx % CHART_COLORS.length})`}
-                    activeDot={{ r: 5, onClick: (_, payload) => handleChartPointClick(payload?.payload || payload) }}
+                    activeDot={{ r: CV.dot.areaActive, onClick: (_, payload) => handleChartPointClick(payload?.payload || payload) }}
                   />
                 ))}
               </AreaChart>
             ) : chartType === 'combo' ? (
-              <ComposedChart data={unifiedChartSpec.items} margin={{ top: 24, right: 28, left: 10, bottom: shouldRotateTicks ? (compactAxis ? 52 : 58) : 24 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
+              <ComposedChart data={unifiedChartSpec.items} margin={dualMargin}>
+                <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
                 <XAxis
                   dataKey="name"
                   interval={generalTickInterval}
                   height={shouldRotateTicks ? (compactAxis ? 64 : 72) : 28}
                   tick={renderCategoryAxisTick}
                 />
-                <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#F92672' }} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
+                <YAxis yAxisId="left" tick={valueTick} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                 {unifiedChartSpec.hasDualAxis && (
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#A6E22E' }} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true })} />
+                  <YAxis yAxisId="right" orientation="right" tick={valueTick} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true })} />
                 )}
                 {chartSpecConfig.showAvgReferenceLine && hasValidMean && (
                   <ReferenceLine
                     yAxisId="left"
                     y={unifiedChartSpec.primaryStats.mean}
-                    stroke="#FD971F"
-                    strokeDasharray="4 4"
-                    label={{ value: `AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, position: 'insideTopRight', fontSize: 9, fill: '#FD971F' }}
+                    stroke={CV.semantic.mean}
+                    strokeDasharray={CV.refDash.avg}
+                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
                   />
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
                 <Bar isAnimationActive={false}
                   yAxisId="left"
                   dataKey={unifiedChartSpec.primarySeriesKey}
                   name={`${unifiedChartSpec.primarySeriesKey} [左轴]`}
-                  fill="#F92672"
-                  radius={[5, 5, 0, 0]}
+                  fill={seriesColor(0)}
+                  radius={CV.radius.bar}
                   cursor="pointer"
                   onClick={(d) => handleChartPointClick(d)}
                 >
                   {unifiedChartSpec.items.map((item) => (
                     <Cell
                       key={item.rowKey}
-                      data-highlighted={highlightedRowKey === item.rowKey}
-                      fill="#F92672"
-                      stroke={highlightedRowKey === item.rowKey ? '#FD971F' : 'none'}
-                      strokeWidth={3}
-                      fillOpacity={highlightedRowKey && highlightedRowKey !== item.rowKey ? 0.35 : 1}
+                      data-highlighted={highlightedRowKey === item.rowKey || (highlightedRowKey && typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(item.rowKey + '||'))}
+                      fill={seriesColor(0)}
+                      stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'}
+                      strokeWidth={CV.stroke.highlight}
+                      fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== item.rowKey))}
                     />
                   ))}
                   {chartSpecConfig.showDataLabels && (
@@ -1341,17 +1079,17 @@ export function ChartStudio({
                     type="monotone"
                     dataKey={unifiedChartSpec.secondarySeriesKey}
                     name={`${unifiedChartSpec.secondarySeriesKey} [右轴]`}
-                    stroke="#A6E22E"
-                    strokeWidth={2.8}
-                    dot={{ r: 4, fill: '#A6E22E', style: { pointerEvents: 'none' } }}
-                    activeDot={{ r: 6, onClick: (_, payload) => handleChartPointClick(payload?.payload || payload) }}
+                    stroke={seriesColor(1)}
+                    strokeWidth={CV.stroke.series}
+                    dot={{ r: CV.dot.base, fill: seriesColor(1), style: { pointerEvents: 'none' } }}
+                    activeDot={{ r: CV.dot.active, onClick: (_, payload) => handleChartPointClick(payload?.payload || payload) }}
                   />
                 )}
               </ComposedChart>
             ) : chartType === 'pie' || chartType === 'donut' ? (
               <PieChart>
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
                 <Pie isAnimationActive={false}
                   data={unifiedChartSpec.pieItems}
                   dataKey="value"
@@ -1365,21 +1103,30 @@ export function ChartStudio({
                   labelLine={false}
                   onClick={(d) => handleChartPointClick(d)}
                 >
-                  {unifiedChartSpec.pieItems.map((entry, idx) => (
+                  {unifiedChartSpec.pieItems.map((entry, idx) => {
+                    const isHi = Boolean(highlightedRowKey)
+                      && (highlightedRowKey === entry.rowKey
+                        || (typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(`${entry.rowKey}||`)));
+                    return (
                     <Cell
                       key={`pie_c_${idx}`}
-                      data-highlighted={highlightedRowKey === entry.rowKey}
+                      data-highlighted={isHi}
                       fill={entry.fill}
-                      stroke={highlightedRowKey === entry.rowKey ? '#FD971F' : (darkMode ? '#272822' : '#FFFDF7')}
-                      strokeWidth={highlightedRowKey === entry.rowKey ? 3 : 1}
-                      fillOpacity={highlightedRowKey && highlightedRowKey !== entry.rowKey ? 0.38 : 1}
+                      stroke={isHi ? CV.semantic.highlight : paperFill}
+                      strokeWidth={isHi ? CV.stroke.highlight : CV.stroke.cell}
+                      fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && !isHi))}
                       cursor="pointer"
                     />
-                  ))}
+                    );
+                  })}
                 </Pie>
                 {chartType === 'donut' && (() => {
+                  const matchesHighlight = (rowKey) =>
+                    Boolean(highlightedRowKey)
+                    && (highlightedRowKey === rowKey
+                      || (typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(`${rowKey}||`)));
                   const highlightedSlice = highlightedRowKey
-                    ? unifiedChartSpec.pieItems.find((item) => item.rowKey === highlightedRowKey)
+                    ? unifiedChartSpec.pieItems.find((item) => matchesHighlight(item.rowKey))
                     : null;
                   const topLabel = highlightedSlice
                     ? formatAxisTickLabel(highlightedSlice.name, 10)
@@ -1389,14 +1136,14 @@ export function ChartStudio({
                     : UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.total, unifiedChartSpec.primaryValCfg, { compact: true });
                   return (
                     <g>
-                      <text x="50%" y="42%" textAnchor="middle" fill={darkMode ? '#908E80' : '#75715E'} fontSize={9.5} className="apple-font-mono">
+                      <text x="50%" y="42%" textAnchor="middle" fill={mutedFill} fontSize={CV.typography.dataLabel + 0.5} className="apple-font-mono">
                         {topLabel}
                       </text>
-                      <text x="50%" y="50%" textAnchor="middle" fill={darkMode ? '#E6DB74' : '#272822'} fontSize={12} fontWeight={700} className="apple-font-mono">
+                      <text x="50%" y="50%" textAnchor="middle" fill={inkFill} fontSize={CV.typography.tickFunnel + 0.5} fontWeight={700} className="apple-font-mono">
                         {centerVal}
                       </text>
                       {highlightedSlice && (
-                        <text x="50%" y="57%" textAnchor="middle" fill="#FD971F" fontSize={9} fontWeight={600} className="apple-font-mono">
+                        <text x="50%" y="57%" textAnchor="middle" fill={CV.semantic.highlight} fontSize={CV.typography.dataLabel} fontWeight={600} className="apple-font-mono">
                           {highlightedSlice.pct}%
                         </text>
                       )}
@@ -1405,63 +1152,63 @@ export function ChartStudio({
                 })()}
               </PieChart>
             ) : chartType === 'waterfall' ? (
-              <BarChart data={unifiedChartSpec.waterfallItems} margin={{ top: 24, right: 20, left: 10, bottom: 24 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} tickFormatter={(v) => formatAxisTickLabel(v, 10)} />
-                <YAxis tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
-                <ReferenceLine y={0} stroke="#75715E" />
+              <BarChart data={unifiedChartSpec.waterfallItems} margin={cartesianMargin}>
+                <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
+                <XAxis dataKey="name" tick={valueTick} tickFormatter={(v) => formatAxisTickLabel(v, 10)} />
+                <YAxis tick={valueTick} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
+                <ReferenceLine y={0} stroke={CV.semantic.zero} strokeWidth={CV.stroke.zero} />
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Bar isAnimationActive={false} dataKey="range" name="增减桥接区间" radius={[4, 4, 4, 4]} cursor="pointer" onClick={(d) => handleChartPointClick(d)}>
+                <Bar isAnimationActive={false} dataKey="range" name="增减桥接区间" radius={CV.radius.waterfall} cursor="pointer" onClick={(d) => handleChartPointClick(d)}>
                   {unifiedChartSpec.waterfallItems.map((entry, idx) => (
                     <Cell
                       key={`wf_${idx}`}
                       data-highlighted={highlightedRowKey === entry.rowKey}
                       fill={entry.fill}
-                      stroke={highlightedRowKey === entry.rowKey ? '#FD971F' : 'none'}
-                      strokeWidth={highlightedRowKey === entry.rowKey ? 3 : 0}
-                      fillOpacity={highlightedRowKey && highlightedRowKey !== entry.rowKey ? 0.4 : 1}
+                      stroke={highlightedRowKey === entry.rowKey ? CV.semantic.highlight : 'none'}
+                      strokeWidth={highlightedRowKey === entry.rowKey ? CV.stroke.highlight : 0}
+                      fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== entry.rowKey))}
                     />
                   ))}
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="formattedDelta" position="top" style={{ fontSize: 9, fontWeight: 700, fill: darkMode ? '#F8F8F2' : '#272822' }} />
+                    <LabelList dataKey="formattedDelta" position="top" style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill }} />
                   )}
                 </Bar>
               </BarChart>
             ) : chartType === 'scatter' ? (
-              <ScatterChart margin={{ top: 24, right: 24, left: 10, bottom: 24 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
+              <ScatterChart margin={cartesianMargin}>
+                <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
                 <XAxis
                   type="number"
                   dataKey="x"
                   name={unifiedChartSpec.primarySeriesKey}
-                  tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }}
+                  tick={valueTick}
                   allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })}
                 />
                 <YAxis
                   type="number"
                   dataKey="y"
                   name={unifiedChartSpec.secondarySeriesKey}
-                  tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }}
+                  tick={valueTick}
                   tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true })}
                 />
                 <ZAxis type="number" dataKey="z" range={[70, 320]} />
                 {Number.isFinite(unifiedChartSpec.scatterMeanX) && unifiedChartSpec.scatterPoints.length > 1 && (
-                  <ReferenceLine x={unifiedChartSpec.scatterMeanX} stroke="#66D9EF" strokeDasharray="3 3" />
+                  <ReferenceLine x={unifiedChartSpec.scatterMeanX} stroke={CV.semantic.scatterMean} strokeDasharray={CV.refDash.mean} />
                 )}
                 {Number.isFinite(unifiedChartSpec.scatterMeanY) && unifiedChartSpec.scatterPoints.length > 1 && (
-                  <ReferenceLine y={unifiedChartSpec.scatterMeanY} stroke="#66D9EF" strokeDasharray="3 3" />
+                  <ReferenceLine y={unifiedChartSpec.scatterMeanY} stroke={CV.semantic.scatterMean} strokeDasharray={CV.refDash.mean} />
                 )}
                 {unifiedChartSpec.scatterRegressionSegment && (
                   <ReferenceLine
                     segment={unifiedChartSpec.scatterRegressionSegment}
-                    stroke="#A6E22E"
-                    strokeWidth={2}
-                    strokeDasharray="6 3"
-                    label={{ value: 'OLS 拟合趋势线', position: 'insideTopLeft', fontSize: 9, fill: '#A6E22E' }}
+                    stroke={CV.semantic.ols}
+                    strokeWidth={CV.stroke.series}
+                    strokeDasharray={CV.refDash.ols}
+                    label={{ value: 'OLS 拟合趋势线', position: 'insideTopLeft', fontSize: CV.typography.avgLabel, fill: CV.semantic.ols }}
                   />
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
                 <Scatter isAnimationActive={false}
                   name={`${unifiedChartSpec.primarySeriesKey} × ${unifiedChartSpec.secondarySeriesKey}`}
                   data={unifiedChartSpec.scatterPoints}
@@ -1473,33 +1220,33 @@ export function ChartStudio({
                       key={`sc_${idx}`}
                       data-highlighted={highlightedRowKey === pt.rowKey}
                       fill={pt.fill}
-                      stroke={highlightedRowKey === pt.rowKey ? '#FD971F' : pt.isOutlier ? '#F8F8F2' : 'none'}
-                      strokeWidth={highlightedRowKey === pt.rowKey ? 3 : pt.isOutlier ? 2 : 0}
+                      stroke={highlightedRowKey === pt.rowKey ? CV.semantic.highlight : pt.isOutlier ? CV.semantic.negative : 'none'}
+                      strokeWidth={highlightedRowKey === pt.rowKey ? CV.stroke.highlight : pt.isOutlier ? CV.stroke.series : 0}
                     />
                   ))}
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="name" position="top" style={{ fontSize: 9, fontWeight: 600, fill: darkMode ? '#F8F8F2' : '#272822' }} />
+                    <LabelList dataKey="name" position="top" style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill }} />
                   )}
                 </Scatter>
               </ScatterChart>
             ) : chartType === 'histogram' ? (
-              <BarChart data={unifiedChartSpec.histogramItems} margin={{ top: 24, right: 20, left: 10, bottom: 24 }}>
+              <BarChart data={unifiedChartSpec.histogramItems} margin={cartesianMargin}>
                 <defs>
                   <linearGradient id="monokaiHistGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#66D9EF" stopOpacity={0.92} />
-                    <stop offset="100%" stopColor="#AE81FF" stopOpacity={0.65} />
+                    <stop offset="0%" stopColor={CV.histogram.from} stopOpacity={CV.histogram.opacityFrom} />
+                    <stop offset="100%" stopColor={CV.histogram.to} stopOpacity={CV.histogram.opacityTo} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
-                <XAxis dataKey="name" tick={{ fontSize: 9.5, fill: darkMode ? '#908E80' : '#75715E' }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} />
+                <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
+                <XAxis dataKey="name" tick={{ fontSize: CV.typography.tickCategory, fill: mutedFill }} />
+                <YAxis allowDecimals={false} tick={valueTick} />
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
                 <Bar isAnimationActive={false}
                   dataKey="count"
                   name={`${t('频数分布')} (${unifiedChartSpec.primaryValCfg.field} · ${t('点击柱体下钻明细')})`}
                   fill="url(#monokaiHistGrad)"
-                  radius={[5, 5, 0, 0]}
+                  radius={CV.radius.bar}
                   cursor="pointer"
                   onClick={(d) => {
                     soundEngine?.playTransitionChord ? soundEngine.playTransitionChord() : soundEngine?.playClick(560);
@@ -1508,7 +1255,7 @@ export function ChartStudio({
                   }}
                 >
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="count" position="top" formatter={(v) => `${v}笔`} style={{ fontSize: 9, fontWeight: 700, fill: darkMode ? '#F8F8F2' : '#272822' }} />
+                    <LabelList dataKey="count" position="top" formatter={(v) => `${v}笔`} style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill }} />
                   )}
                 </Bar>
               </BarChart>
@@ -1516,31 +1263,26 @@ export function ChartStudio({
               <BarChart
                 data={unifiedChartSpec.items}
                 layout={chartType === 'horizontal_bar' ? 'vertical' : 'horizontal'}
-                margin={{
-                  top: 24,
-                  right: 28,
-                  left: chartType === 'horizontal_bar' ? 36 : 10,
-                  bottom: chartType === 'horizontal_bar' ? 24 : (shouldRotateTicks ? (compactAxis ? 52 : 58) : 24)
-                }}
+                margin={chartType === 'horizontal_bar' ? hbarMargin : cartesianMargin}
               >
                 <defs>
                   {CHART_COLORS.map((c, idx) => (
                     <linearGradient key={`barGrad_${idx}`} id={`appleGrad_${idx}`} x1="0" y1="0" x2={chartType === 'horizontal_bar' ? '1' : '0'} y2={chartType === 'horizontal_bar' ? '0' : '1'}>
-                      <stop offset="0%" stopColor={c} stopOpacity={0.95} />
-                      <stop offset="100%" stopColor={c} stopOpacity={0.68} />
+                      <stop offset="0%" stopColor={c} stopOpacity={CV.fill.barGradFrom} />
+                      <stop offset="100%" stopColor={c} stopOpacity={CV.fill.barGradTo} />
                     </linearGradient>
                   ))}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? '#3E3D32' : '#DFDDD2'} />
+                <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
                 {chartType === 'horizontal_bar' ? (
                   <>
-                    <XAxis type="number" domain={zeroBaselineDomain} tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
+                    <XAxis type="number" domain={zeroBaselineDomain} tick={valueTick} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                     <YAxis
                       type="category"
                       dataKey="name"
                       reversed={true}
                       width={compactAxis ? 96 : 130}
-                      tick={{ fontSize: 9.5, fill: darkMode ? '#F8F8F2' : '#272822' }}
+                      tick={{ fontSize: CV.typography.tickCategory, fill: inkFill }}
                       tickFormatter={(v) => formatAxisTickLabel(v, compactAxis ? 10 : 18)}
                     />
                   </>
@@ -1554,31 +1296,33 @@ export function ChartStudio({
                     />
                     <YAxis
                       domain={chartType === 'pct_stacked_bar' ? [0, 100] : zeroBaselineDomain} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)}
-                      tick={{ fontSize: 10, fill: darkMode ? '#908E80' : '#75715E' }}
+                      tick={valueTick}
                       tickFormatter={(v) => (chartType === 'pct_stacked_bar' ? `${v}%` : UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true }))}
                     />
                   </>
                 )}
-                {chartType === 'horizontal_bar' ? <ReferenceLine x={0} stroke="#75715E" /> : <ReferenceLine y={0} stroke="#75715E" />}
+                {chartType === 'horizontal_bar'
+                  ? <ReferenceLine x={0} stroke={CV.semantic.zero} strokeWidth={CV.stroke.zero} />
+                  : <ReferenceLine y={0} stroke={CV.semantic.zero} strokeWidth={CV.stroke.zero} />}
                 {chartSpecConfig.showAvgReferenceLine && (chartType === 'bar' || chartType === 'horizontal_bar') && hasValidMean && (
                   chartType === 'horizontal_bar' ? (
                     <ReferenceLine
                       x={unifiedChartSpec.primaryStats.mean}
-                      stroke="#FD971F"
-                      strokeDasharray="4 4"
-                      label={{ value: `AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, position: 'insideTopRight', fontSize: 9, fill: '#FD971F' }}
+                      stroke={CV.semantic.mean}
+                      strokeDasharray={CV.refDash.avg}
+                      label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
                     />
                   ) : (
                     <ReferenceLine
                       y={unifiedChartSpec.primaryStats.mean}
-                      stroke="#FD971F"
-                      strokeDasharray="4 4"
-                      label={{ value: `AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, position: 'insideTopRight', fontSize: 9, fill: '#FD971F' }}
+                      stroke={CV.semantic.mean}
+                      strokeDasharray={CV.refDash.avg}
+                      label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
                     />
                   )
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => {
                   const isStacked = (chartType === 'stacked_bar' || chartType === 'pct_stacked_bar') && (unifiedChartSpec.canStack || chartType === 'pct_stacked_bar');
                   return (
@@ -1587,11 +1331,15 @@ export function ChartStudio({
                       dataKey={sm.key}
                       stackId={isStacked ? 'stack_bar' : undefined}
                       fill={`url(#${sm.gradId})`}
-                      radius={isStacked ? [0, 0, 0, 0] : chartType === 'horizontal_bar' ? [0, 5, 5, 0] : [5, 5, 0, 0]}
+                      radius={isStacked ? CV.radius.stacked : chartBarRadius(chartType === 'stacked_bar' ? 'bar' : chartType)}
                       cursor="pointer"
-                      onClick={(d) => handleChartPointClick({ ...d, colKey: sm.colKey })}
+                      onClick={(d) => {
+                        const payload = d?.payload || d;
+                        const targetRowKey = payload?._seriesRowKeys?.[sm.key] || payload?.rowKey || d?.rowKey;
+                        handleChartPointClick({ ...d, rowKey: targetRowKey, colKey: sm.colKey, seriesKey: sm.key });
+                      }}
                     >
-                      {unifiedChartSpec.items.map((item) => <Cell key={item.rowKey} data-highlighted={highlightedRowKey === item.rowKey} stroke={highlightedRowKey === item.rowKey ? '#FD971F' : 'none'} strokeWidth={3} fillOpacity={highlightedRowKey && highlightedRowKey !== item.rowKey ? 0.35 : 1} />)}
+                      {unifiedChartSpec.items.map((item) => <Cell key={item.rowKey} data-highlighted={highlightedRowKey === item.rowKey || (highlightedRowKey && typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(item.rowKey + '||'))} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'} strokeWidth={CV.stroke.highlight} fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== item.rowKey))} />)}
                       {chartSpecConfig.showDataLabels && (idx === 0 || !isStacked) && unifiedChartSpec.seriesMetaList.length <= 3 && (
                         <LabelList
                           dataKey={idx === 0 && !isStacked ? '_compactPrimaryLabel' : sm.key}
@@ -1607,514 +1355,87 @@ export function ChartStudio({
         )}
       </div>
 
-      {/* Analysis Presets Strip & Beginner Chart Reading / Note Workbench */}
-      <div className="mt-2 pt-2 border-t border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 flex flex-col gap-2 text-[10px] apple-font-mono shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              aria-expanded={showLensPresets}
-              aria-controls="pivot-lens-presets"
-              onClick={() => setShowLensPresets((open) => !open)}
-              className={`font-semibold px-2 py-1 rounded border transition ${showLensPresets ? 'bg-ink-cyan/15 text-ink-cyan border-ink-cyan/45' : 'text-ink-cyan border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF]'}`}
-            >
-              {t("分析视角") + ' '}{showLensPresets ? t("收起") : t("展开")}
-            </button>
-            <button
-              type="button"
-              aria-expanded={isGuideOpen}
-              aria-controls="pivot-chart-guide-note"
-              onClick={toggleGuide}
-              className={`font-semibold px-2 py-1 rounded border inline-flex items-center gap-1 transition ${isGuideOpen ? 'bg-[#AE81FF]/15 text-ink-purple border-[#AE81FF]/45' : 'text-ink-purple border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#AE81FF]'}`}
-            >
-              <BookOpen className="w-3 h-3" />
-              <span>{t("读图指南与笔记") + ' '}{isGuideOpen ? t("收起") : t("展开")}</span>
-            </button>
-          </div>
-          <span className="text-ink-muted dark:text-[#B8B5A8] hidden sm:inline">{' ' + t("单击图表查看明细；单击表格高亮，双击查看明细") + ' '}</span>
+      {/* Notes — quiet footer, no competing chrome */}
+      <div className="mt-1.5 pt-1.5 flex flex-col gap-1.5 text-[10px] shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-expanded={isGuideOpen}
+            aria-controls="pivot-chart-guide-note"
+            onClick={toggleGuide}
+            className={`px-2 py-1 rounded-lg inline-flex items-center gap-1.5 text-[11px] font-medium transition ${isGuideOpen ? 'text-ink-purple bg-[#AE81FF]/10' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'}`}
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>{t("阅读提示")}</span>
+            <ChevronDown className={`w-3 h-3 opacity-60 transition-transform ${isGuideOpen ? 'rotate-180' : ''}`} />
+          </button>
         </div>
 
-        {/* Storyboard Preset Shots Bar */}
-        {showLensPresets && (
-          <div id="pivot-lens-presets" className="flex items-center gap-1.5 overflow-x-auto pb-1 animate-fadeIn">
-            {analysisShots.map((shot, idx) => (
-              <button
-                key={shot.id}
-                disabled={isReadOnly}
-                onClick={() => applyKeynoteShot(idx)}
-                className={`px-2 py-1 rounded border transition shrink-0 ${keynoteShotIdx === idx ? 'bg-[#A6E22E]/20 border-[#A6E22E]/50 text-ink-green font-bold' : 'bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
-                title={shot.title}
-              >
-                {shot.number}·{shot.title}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* The Analytical Guide, Insights & Notes Center */}
         {isGuideOpen && (
           <div
             id="pivot-chart-guide-note"
             data-testid="chart-guide-note"
-            className="flex flex-col gap-2.5 p-3 rounded-xl bg-[#EFECE1]/55 dark:bg-[#1E1F1C]/85 border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] leading-relaxed shadow-xs"
+            className="flex flex-col gap-3 p-3 rounded-xl bg-[#EFECE1]/40 dark:bg-[#1E1F1C]/70 text-[11px] leading-relaxed"
           >
-            {/* Exploration Status Bar: Shows when user alters view away from the active shot */}
-            {isModifiedFromShot && (
-              <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-[#FD971F]/10 border border-[#FD971F]/30 text-ink-orange text-[10.5px]">
-                <div className="flex items-center gap-1.5 font-semibold">
-                  <Sparkles className="w-3.5 h-3.5 text-ink-orange animate-pulse shrink-0" />
-                  <span>{t("已在当前笔记基础上自由探索（图表类型或透视字段已变更）")}</span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundEngine?.playClick?.(520);
-                      applyKeynoteShot(keynoteShotIdx);
-                    }}
-                    className="px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#FD971F]/40 text-ink-orange text-[10px] font-semibold hover:border-[#FD971F] flex items-center gap-1 shadow-2xs"
-                    title={t("一键还原回当前分析笔记预设的透视维度与图表")}
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                    <span>{t("还原笔记预设")}</span>
-                  </button>
-                  {onSaveCurrentViewAsShot && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundEngine?.playClick?.(540);
-                        setNewNoteForm({
-                          title: `${unifiedChartSpec.xDimensionLabel || '自定义'} · ${unifiedChartSpec.primarySeriesKey || ''}`,
-                          subtitle: insight
-                            ? `首位「${insight.topName}」(${insight.topFormatted}${insight.topSharePct ? `，占 ${insight.topSharePct}%` : ''})，共 ${insight.groupCount} 个分组`
-                            : '基于探索视图保存的分析笔记',
-                        });
-                        setIsSavingNewNote(true);
-                      }}
-                      className="px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#AE81FF]/45 text-ink-purple text-[10px] font-semibold hover:border-[#AE81FF] flex items-center gap-1 shadow-2xs"
-                      title={t("将您当前探索的新视图保存为新的一则分析笔记")}
-                    >
-                      <Plus className="w-2.5 h-2.5" />
-                      <span>{t("存为新笔记")}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 2-Column Responsive Analysis Matrix */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {/* Left Column: Active Shot Note, Real-time Data Insights & Smart Action Steps */}
-              <div className="flex flex-col justify-between gap-2.5 pr-0 lg:pr-3 lg:border-r border-[#D6D4C8]/70 dark:border-[#3E3D32]">
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-1.5">
-                    <div className="flex items-center gap-1.5 font-bold text-[#272822] dark:text-[#F8F8F2]">
-                      <Sparkles className="w-3.5 h-3.5 text-ink-orange shrink-0" />
-                      <span>[{t("笔记")} {activeShot?.number || '01'}] {activeShot?.title}</span>
-                      <div className="inline-flex items-center gap-0.5 ml-1">
-                        <button
-                          type="button"
-                          disabled={keynoteShotIdx <= 0}
-                          onClick={() => {
-                            soundEngine?.playClick?.(500);
-                            applyKeynoteShot(Math.max(0, keynoteShotIdx - 1));
-                          }}
-                          className={`p-0.5 rounded border min-w-[20px] min-h-[20px] flex items-center justify-center transition ${
-                            keynoteShotIdx <= 0
-                              ? 'opacity-30 cursor-not-allowed border-transparent'
-                              : 'border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-                          }`}
-                          title={t("上一则分析笔记")}
-                          aria-label={t("上一则分析笔记")}
-                        >
-                          <ChevronLeft className="w-3 h-3" />
-                        </button>
-                        <span className="text-[9.5px] font-mono font-semibold px-1 text-ink-muted select-none">
-                          {keynoteShotIdx + 1}/{analysisShots.length}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={keynoteShotIdx >= analysisShots.length - 1}
-                          onClick={() => {
-                            soundEngine?.playClick?.(500);
-                            applyKeynoteShot(Math.min(analysisShots.length - 1, keynoteShotIdx + 1));
-                          }}
-                          className={`p-0.5 rounded border min-w-[20px] min-h-[20px] flex items-center justify-center transition ${
-                            keynoteShotIdx >= analysisShots.length - 1
-                              ? 'opacity-30 cursor-not-allowed border-transparent'
-                              : 'border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-                          }`}
-                          title={t("下一则分析笔记")}
-                          aria-label={t("下一则分析笔记")}
-                        >
-                          <ChevronRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1">
-                      {onUpdateStoryShot && (
-                        <button
-                          type="button"
-                          disabled={isReadOnly}
-                          onClick={() => {
-                            soundEngine?.playClick?.(540);
-                            setEditNoteForm({ title: activeShot?.title || '', subtitle: activeShot?.subtitle || '' });
-                            setIsEditingNote(true);
-                          }}
-                          className="px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-ink-cyan hover:border-[#66D9EF] inline-flex items-center gap-1 text-[10px] font-semibold"
-                          title={t("修改当前分析笔记的标题与业务结论")}
-                        >
-                          <Pencil className="w-2.5 h-2.5" />
-                          <span>{t("编辑笔记")}</span>
-                        </button>
-                      )}
-                      {onSaveCurrentViewAsShot && (
-                        <button
-                          type="button"
-                          disabled={isReadOnly}
-                          onClick={() => {
-                            soundEngine?.playClick?.(540);
-                            setNewNoteForm({
-                              title: `${unifiedChartSpec.xDimensionLabel} · ${unifiedChartSpec.primarySeriesKey}`,
-                              subtitle: insight
-                                ? `首位「${insight.topName}」(${insight.topFormatted}${insight.topSharePct ? `，占 ${insight.topSharePct}%` : ''})，共 ${insight.groupCount} 个分组参与对比`
-                                : '自定义透视图分析笔记',
-                            });
-                            setIsSavingNewNote(true);
-                          }}
-                          className="px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#AE81FF]/45 text-ink-purple hover:border-[#AE81FF] inline-flex items-center gap-1 text-[10px] font-semibold"
-                          title={t("将当前透视图配置与发现存为一条新的分析笔记")}
-                        >
-                          <Plus className="w-2.5 h-2.5" />
-                          <span>{t("保存新笔记")}</span>
-                        </button>
-                      )}
-                      {onDeleteStoryShot && analysisShots.length > 1 && (
-                        <button
-                          type="button"
-                          disabled={isReadOnly}
-                          onClick={() => {
-                            if (typeof window !== 'undefined' && window.confirm?.(`确定要删除分析笔记「${activeShot?.title || ''}」吗？`)) {
-                              onDeleteStoryShot(keynoteShotIdx);
-                            }
-                          }}
-                          className="px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-ink-muted hover:text-ink-pink hover:border-ink-pink inline-flex items-center gap-1 text-[10px] font-semibold"
-                          title={t("删除当前分析笔记")}
-                          aria-label={t("删除当前分析笔记")}
-                        >
-                          <Trash2 className="w-2.5 h-2.5" />
-                          <span>{t("删除笔记")}</span>
-                        </button>
-                      )}
-                      {hasCustomStoryShots && onResetStoryShots && (
-                        <button
-                          type="button"
-                          disabled={isReadOnly}
-                          onClick={onResetStoryShots}
-                          className="px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-ink-muted hover:text-ink-cyan hover:border-ink-cyan inline-flex items-center gap-1 text-[10px] font-semibold"
-                          title={t("恢复推荐笔记库")}
-                          aria-label={t("恢复推荐笔记库")}
-                        >
-                          <RotateCcw className="w-2.5 h-2.5" />
-                          <span>{t("重置笔记库")}</span>
-                        </button>
-                      )}
-                      {copyTextToClipboard && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2 pr-0 md:pr-3 md:border-r border-[#D6D4C8]/50 dark:border-[#3E3D32]/60">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-[#272822] dark:text-[#F8F8F2]">
+                    {t("我的结论")}
+                  </span>
+                  <div className="flex items-center gap-0.5">
+                    {onUpdateStoryShot && (
+                      <button
+                        type="button"
+                        disabled={isReadOnly}
+                        onClick={() => {
+                          soundEngine?.playClick?.(540);
+                          setEditNoteForm({ title: activeShot?.title || '', subtitle: activeShot?.subtitle || '' });
+                          setIsEditingNote(true);
+                        }}
+                        className="px-2 py-0.5 rounded-md text-[10px] text-ink-muted hover:text-ink-cyan hover:bg-[#66D9EF]/10 inline-flex items-center gap-1 transition"
+                        title={t("编辑结论")}
+                      >
+                        <Pencil className="w-2.5 h-2.5" />
+                        <span>{t("编辑")}</span>
+                      </button>
+                    )}
+                    {copyTextToClipboard && (
+                      <>
                         <button
                           type="button"
                           onClick={handleCopyConclusion}
-                          className="px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] inline-flex items-center gap-1 text-[10px] font-semibold"
-                          title={t("一键复制分析笔记与数据结论到剪贴板")}
+                          className="px-2 py-0.5 rounded-md text-[10px] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-black/[0.04] dark:hover:bg-white/[0.05] inline-flex items-center gap-1 transition"
+                          title={t("复制结论")}
                         >
                           <Copy className="w-2.5 h-2.5" />
-                          <span>{t("复制结论")}</span>
+                          <span>{t("复制")}</span>
                         </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <p className="text-ink-muted">
-                    {activeShot?.subtitle || t("可点击上方「分析视角」切换预设分析思路，或编辑当前笔记记录您的业务发现。")}
-                  </p>
-                </div>
-
-                {/* Live Real-time Executive Insights */}
-                {insight && (
-                  <div className="pt-2 border-t border-[#D6D4C8]/50 dark:border-[#3E3D32]/60 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px]">
-                    <span className="flex items-center gap-1">
-                      <strong className="text-ink-green">{t("首位领跑:")}</strong>
-                      <span>{insight.topName} ({insight.topFormatted}{insight.topSharePct ? ` · ${insight.topSharePct}%` : ''})</span>
-                    </span>
-                    {insight.groupCount > 1 && (
-                      <span>
-                        <strong className="text-ink-orange">{t("末位分组:")}</strong>{' '}
-                        {insight.bottomName} ({insight.bottomFormatted})
-                      </span>
-                    )}
-                    {insight.top3SharePct && insight.groupCount >= 3 && (
-                      <span>
-                        <strong className="text-ink-cyan">{t("CR3集中度:")}</strong>{' '}
-                        Top3 {t("合计占")} {insight.top3SharePct}%
-                      </span>
-                    )}
-                    {insight.groupCount > 1 && (
-                      <span>
-                        <strong className="text-ink-purple">{t("均值对比:")}</strong>{' '}
-                        {t("均值")} {insight.meanFormatted} ({t("高于均值")} {insight.aboveMeanCount}/{insight.groupCount} {t("组")})
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Smart Actionable Analytical Recommendations */}
-                {smartSuggestions.length > 0 && (
-                  <div className="pt-2 border-t border-[#D6D4C8]/50 dark:border-[#3E3D32]/60 flex flex-wrap items-center gap-1.5 text-[10px]">
-                    <span className="font-bold text-ink-yellow flex items-center gap-1 select-none">
-                      <Lightbulb className="w-3 h-3 text-ink-yellow shrink-0" />
-                      <span>{t("下一步行动建议:")}</span>
-                    </span>
-                    {smartSuggestions.map((sug) => {
-                      const Icon = sug.icon;
-                      return (
                         <button
-                          key={sug.id}
                           type="button"
-                          onClick={sug.action}
-                          title={sug.title}
-                          className="px-2 py-0.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-ink-yellow text-[#272822] dark:text-[#F8F8F2] hover:text-ink-yellow transition flex items-center gap-1 shadow-2xs cursor-pointer font-medium"
+                          onClick={handleExportFullReport}
+                          className="px-2 py-0.5 rounded-md text-[10px] text-ink-muted hover:text-ink-cyan hover:bg-[#66D9EF]/10 inline-flex items-center gap-1 transition"
+                          title={t("导出 Markdown 报告")}
                         >
-                          <Icon className="w-2.5 h-2.5 text-ink-yellow" />
-                          <span>{sug.label}</span>
+                          <Download className="w-2.5 h-2.5" />
+                          <span>{t("导出")}</span>
                         </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Interactive Pivot Recipe: Direct Tuning from Chart */}
-                <div className="pt-2 border-t border-[#D6D4C8]/50 dark:border-[#3E3D32]/60 flex flex-wrap items-center gap-2 text-[10px] relative">
-                  <span className="font-bold text-ink-muted select-none flex items-center gap-1">
-                    <Layers className="w-3 h-3 text-ink-purple" />
-                    <span>{t("透视配方:")}</span>
-                  </span>
-
-                  {/* Row Dimension Badge with Quick Swap Popover */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setActiveRecipePopover((cur) => (cur === 'row' ? null : 'row'))}
-                      className="px-2 py-0.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-ink-cyan text-ink-cyan transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                      title={t("分类主维度(X轴/行) · 点击快速切换维度")}
-                    >
-                      <strong>{t("行/轴")}:</strong>
-                      <span>{rowSummary}</span>
-                      <ChevronDown className="w-2.5 h-2.5 opacity-60" />
-                    </button>
-                    {activeRecipePopover === 'row' && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setActiveRecipePopover(null)} />
-                        <div className="absolute left-0 bottom-full mb-1.5 z-40 w-52 p-2 rounded-xl bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] shadow-xl space-y-1 animate-apple-modal">
-                          <div className="text-[10px] font-bold text-ink-cyan px-1.5 py-0.5 flex items-center justify-between">
-                            <span>{t("切换主分类维度 (X轴)")}</span>
-                            <X className="w-3 h-3 cursor-pointer text-ink-muted hover:text-ink-pink" onClick={() => setActiveRecipePopover(null)} />
-                          </div>
-                          <div className="max-h-48 overflow-y-auto space-y-0.5">
-                            {candidateDimensionFields.map((df) => {
-                              const isCur = configRows.some((r) => r.field === df.name);
-                              return (
-                                <button
-                                  key={df.name}
-                                  type="button"
-                                  onClick={() => handleSwapRowDimension(df.name)}
-                                  className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between transition ${
-                                    isCur
-                                      ? 'bg-ink-cyan/15 text-ink-cyan font-bold'
-                                      : 'hover:bg-black/5 dark:hover:bg-white/5 text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-                                  }`}
-                                >
-                                  <span>{df.name}</span>
-                                  {isCur && <Check className="w-3 h-3 text-ink-cyan" />}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
                       </>
                     )}
                   </div>
-
-                  {/* Column Grouping Badge with Quick Add/Swap Popover */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setActiveRecipePopover((cur) => (cur === 'col' ? null : 'col'))}
-                      className={`px-2 py-0.5 rounded-lg border transition flex items-center gap-1 shadow-2xs cursor-pointer ${
-                        configCols.length > 0
-                          ? 'bg-[#FFFDF7] dark:bg-[#272822] border-[#D6D4C8] dark:border-[#3E3D32] hover:border-ink-purple text-ink-purple'
-                          : 'bg-[#FFFDF7]/60 dark:bg-[#272822]/60 border-dashed border-[#D6D4C8] dark:border-[#3E3D32] hover:border-ink-purple text-ink-muted'
-                      }`}
-                      title={t("对比分组(图例/列) · 点击添加或切换交叉透视分组")}
-                    >
-                      <strong>{t("列/组")}:</strong>
-                      <span>{configCols.length > 0 ? colSummary : t("无 (点击添加交叉分组)")}</span>
-                      <ChevronDown className="w-2.5 h-2.5 opacity-60" />
-                    </button>
-                    {activeRecipePopover === 'col' && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setActiveRecipePopover(null)} />
-                        <div className="absolute left-0 bottom-full mb-1.5 z-40 w-52 p-2 rounded-xl bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] shadow-xl space-y-1 animate-apple-modal">
-                          <div className="text-[10px] font-bold text-ink-purple px-1.5 py-0.5 flex items-center justify-between">
-                            <span>{t("交叉对比分组 (图例/列)")}</span>
-                            <X className="w-3 h-3 cursor-pointer text-ink-muted hover:text-ink-pink" onClick={() => setActiveRecipePopover(null)} />
-                          </div>
-                          <div className="max-h-48 overflow-y-auto space-y-0.5">
-                            {configCols.length > 0 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveColGroup(configCols[0]?.id || configCols[0]?.field)}
-                                className="w-full text-left px-2 py-1 rounded text-[10px] text-ink-pink hover:bg-ink-pink/10 font-semibold mb-1 border-b border-[#D6D4C8]/40 dark:border-[#3E3D32]/50 flex items-center justify-between"
-                              >
-                                <span>{t("移除当前列分组")}</span>
-                                <Trash2 className="w-2.5 h-2.5" />
-                              </button>
-                            )}
-                            {candidateDimensionFields
-                              .filter((df) => !configRows.some((r) => r.field === df.name))
-                              .map((df) => {
-                                const isCur = configCols.some((c) => c.field === df.name);
-                                return (
-                                  <button
-                                    key={df.name}
-                                    type="button"
-                                    onClick={() => handleAddColGroup(df.name)}
-                                    className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between transition ${
-                                      isCur
-                                        ? 'bg-ink-purple/15 text-ink-purple font-bold'
-                                        : 'hover:bg-black/5 dark:hover:bg-white/5 text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-                                    }`}
-                                  >
-                                    <span>{df.name}</span>
-                                    {isCur && <Check className="w-3 h-3 text-ink-purple" />}
-                                  </button>
-                                );
-                              })}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Metric Badge with Quick Swap Popover */}
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setActiveRecipePopover((cur) => (cur === 'val' ? null : 'val'))}
-                      className="px-2 py-0.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-ink-green text-ink-green transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                      title={t("度量指标与聚合算法 · 点击快速切换主度量")}
-                    >
-                      <strong>{t("度量")}:</strong>
-                      <span>{valSummary}</span>
-                      <ChevronDown className="w-2.5 h-2.5 opacity-60" />
-                    </button>
-                    {activeRecipePopover === 'val' && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setActiveRecipePopover(null)} />
-                        <div className="absolute left-0 bottom-full mb-1.5 z-40 w-52 p-2 rounded-xl bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#49483E] shadow-xl space-y-1 animate-apple-modal">
-                          <div className="text-[10px] font-bold text-ink-green px-1.5 py-0.5 flex items-center justify-between">
-                            <span>{t("切换主度量指标")}</span>
-                            <X className="w-3 h-3 cursor-pointer text-ink-muted hover:text-ink-pink" onClick={() => setActiveRecipePopover(null)} />
-                          </div>
-                          <div className="max-h-48 overflow-y-auto space-y-0.5">
-                            {candidateMeasureFields.map((mf) => {
-                              const isCur = configValues.some((v) => v.field === mf.name);
-                              return (
-                                <button
-                                  key={mf.name}
-                                  type="button"
-                                  onClick={() => handleSwapPrimaryMeasure(mf.name)}
-                                  className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between transition ${
-                                    isCur
-                                      ? 'bg-ink-green/15 text-ink-green font-bold'
-                                      : 'hover:bg-black/5 dark:hover:bg-white/5 text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-                                  }`}
-                                >
-                                  <span>{mf.name}</span>
-                                  {isCur && <Check className="w-3 h-3 text-ink-green" />}
-                                </button>
-                              );
-                            })}
-                            <button
-                              type="button"
-                              onClick={() => handleSwapPrimaryMeasure('__COUNT__')}
-                              className={`w-full text-left px-2 py-1 rounded text-[10px] flex items-center justify-between transition ${
-                                configValues.some((v) => v.field === '__COUNT__')
-                                  ? 'bg-ink-green/15 text-ink-green font-bold'
-                                  : 'hover:bg-black/5 dark:hover:bg-white/5 text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
-                              }`}
-                            >
-                              <span>{t("记录数 (Count)")}</span>
-                              {configValues.some((v) => v.field === '__COUNT__') && <Check className="w-3 h-3 text-ink-green" />}
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Chart Type Badge */}
-                  <button
-                    type="button"
-                    onClick={() => setShowChartTypes((o) => !o)}
-                    className="px-2 py-0.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-ink-orange text-ink-orange transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                    title={t("当前图表展现形式 · 点击展开图表选择面板")}
-                  >
-                    <strong>{t("图表")}:</strong>
-                    <span>{t(VISUAL_CHART_TYPES.find((item) => item.value === chartType)?.label || chartType)}</span>
-                    <ChevronDown className="w-2.5 h-2.5 opacity-60" />
-                  </button>
                 </div>
+                <p className="text-[#272822] dark:text-[#F8F8F2] leading-relaxed">
+                  {activeShot?.subtitle || t("写下你从图中读到的结论，例如：谁最高、差多少、下一步查什么。")}
+                </p>
               </div>
 
-              {/* Right Column: Beginner Chart Reading & Method Guide */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/70 pb-1.5">
-                  <span className="font-bold text-ink-purple flex items-center gap-1.5">
-                    <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                    <span>{t("零基础读图与分析方法指南")}</span>
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-[#66D9EF]/15 text-ink-cyan text-[9.5px] font-semibold">
-                    {t("当前意图：")}{t(methodGuide?.intent || '对比排行')}
-                  </span>
-                </div>
-                <p className="text-[#272822] dark:text-[#F8F8F2]">
-                  <strong className="text-ink-cyan">{t("适用场景：")}</strong>
-                  {t(methodGuide?.purpose || '')}
-                </p>
-                <p className="text-ink-muted">
-                  <strong className="text-ink-green">{t("怎么看图：")}</strong>
-                  {t(methodGuide?.howToRead || '')}
-                </p>
-                <p className="text-ink-muted">
-                  <strong className="text-ink-orange">{t("下一步行动：")}</strong>
-                  {t(methodGuide?.actionTip || '')}
-                </p>
-                {/* Method Legend Tip for zero-basis learners */}
-                <div className="p-2 rounded-lg bg-[#EFECE1]/40 dark:bg-[#272822]/60 border border-[#D6D4C8]/50 dark:border-[#3E3D32]/60 flex items-center justify-between gap-2 text-[10px] text-ink-muted">
-                  <span className="flex items-center gap-1">
-                    <Compass className="w-3 h-3 text-ink-yellow" />
-                    <span>{t("提示：悬停数据节点可查看明细占比；点击可直接穿透明细记录。")}</span>
-                  </span>
-                  {chartType !== recommendedChartType && (
-                    <button
-                      type="button"
-                      onClick={() => setChartType(recommendedChartType)}
-                      className="text-ink-green hover:underline font-semibold"
-                    >
-                      {t("换推荐图表")} →
-                    </button>
-                  )}
-                </div>
+              <div className="space-y-1.5">
+                <span className="font-semibold text-[#272822] dark:text-[#F8F8F2] flex items-center gap-1.5">
+                  <Lightbulb className="w-3.5 h-3.5 shrink-0 text-ink-muted" />
+                  {t("怎么读这张图")}
+                </span>
+                <p className="text-ink-muted leading-relaxed">{t(methodGuide?.purpose || '')}</p>
+                <p className="text-ink-muted leading-relaxed">{t(methodGuide?.howToRead || '')}</p>
               </div>
             </div>
           </div>
@@ -2127,6 +1448,8 @@ export function ChartStudio({
         number={activeShot?.number || '01'}
         form={isEditingNote ? editNoteForm : newNoteForm}
         setForm={isEditingNote ? setEditNoteForm : setNewNoteForm}
+        currentInsight={insight}
+        unifiedChartSpec={unifiedChartSpec}
         onClose={() => { setIsEditingNote(false); setIsSavingNewNote(false); }}
         onSubmit={() => {
           if (isEditingNote) {

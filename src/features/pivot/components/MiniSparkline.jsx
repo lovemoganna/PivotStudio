@@ -1,7 +1,8 @@
 import React from 'react';
+import { CV } from '../../../constants/chartVisual';
 
-export function MiniSparkline({ values = [], color = '#F92672' }) {
-  if (!values || values.length < 2 || values.some(value => !Number.isFinite(value))) return null;
+export function MiniSparkline({ values = [], color = CV.series[0] }) {
+  if (!values || values.length < 2 || values.some((value) => !Number.isFinite(value))) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
@@ -20,14 +21,21 @@ export function MiniSparkline({ values = [], color = '#F92672' }) {
     <svg width={w} height={h} className="overflow-visible shrink-0 opacity-95">
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          <stop offset="0%" stopColor={color} stopOpacity={CV.fill.areaGradFrom * 0.65} />
+          <stop offset="100%" stopColor={color} stopOpacity={CV.fill.areaGradTo} />
         </linearGradient>
       </defs>
       <polygon points={areaPts} fill={`url(#${gradId})`} />
-      <polyline fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" points={pts.join(' ')} />
-      <circle cx={lastPt[0]} cy={lastPt[1]} r="2.4" fill={color} />
-      <circle cx={lastPt[0]} cy={lastPt[1]} r="4.2" fill={color} fillOpacity="0.25" />
+      <polyline
+        fill="none"
+        stroke={color}
+        strokeWidth={CV.stroke.derived}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={pts.join(' ')}
+      />
+      <circle cx={lastPt[0]} cy={lastPt[1]} r={CV.dot.derived - 0.4} fill={color} />
+      <circle cx={lastPt[0]} cy={lastPt[1]} r={CV.dot.base} fill={color} fillOpacity="0.22" />
     </svg>
   );
 }

@@ -436,3 +436,48 @@ test('duration is not a ratio and source fractions format as percentages once',(
   assert.equal(UnifiedFormatter.formatValue(2.68666074,{showAs:'pct_grand',format:{isPercent:true}}),'2.7%');
   assert.equal(UnifiedFormatter.formatValue(.0268666074,{field:'BounceRates',format:{isPercent:false,decimals:4}}),'0.0269');
 });
+
+
+test('multi-level row dimensions group into clustered series instead of flat string concatenation', () => {
+  const ds = {
+    fields: [
+      { name: 'region', type: 'text' },
+      { name: 'category', type: 'text' },
+      { name: 'sales', type: 'number' },
+    ],
+    rows: [
+      { region: 'East', category: 'Elec', sales: 100 },
+      { region: 'East', category: 'Cloth', sales: 50 },
+      { region: 'West', category: 'Elec', sales: 80 },
+      { region: 'West', category: 'Cloth', sales: 60 },
+    ],
+  };
+  const p = calculatePivot(ds, {
+    rows: [{ field: 'region' }, { field: 'category' }],
+    columns: [],
+    values: [{ id: 'v1', field: 'sales', agg: 'sum' }],
+  });
+  
+  // 1. Default grouped mode
+  const chart = buildUnifiedChartSpec(ds, p, 'bar', {});
+  assert.equal(chart.isGroupedView, true);
+  assert.equal(chart.xDimensionLabel, 'region');
+  assert.deepEqual(chart.items.map((it) => it.name), ['East', 'West']);
+  assert.deepEqual(chart.seriesMetaList.map((sm) => sm.key), ['Elec', 'Cloth']);
+  assert.equal(chart.items[0]['Elec'], 100);
+  assert.equal(chart.items[0]['Cloth'], 50);
+  assert.equal(chart.items[1]['Elec'], 80);
+  assert.equal(chart.items[1]['Cloth'], 60);
+  assert.ok(chart.items[0]._seriesRowKeys['Elec']);
+
+  // 2. Pie chart in grouped mode uses primary group totals
+  const pie = buildUnifiedChartSpec(ds, p, 'pie', {});
+  assert.deepEqual(pie.pieItems.map((pi) => pi.name), ['East', 'West']);
+  assert.equal(pie.pieItems[0].value, 150);
+  assert.equal(pie.pieItems[1].value, 140);
+
+  // 3. Explicit detailed mode preserves legacy flat items
+  const detailed = buildUnifiedChartSpec(ds, p, 'bar', { groupingMode: 'detailed' });
+  assert.equal(detailed.isGroupedView, false);
+  assert.deepEqual(detailed.items.map((it) => it.name), ['East / Elec', 'East / Cloth', 'West / Elec', 'West / Cloth']);
+});

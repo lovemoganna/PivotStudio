@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import {encodeView} from '../../src/utils/viewConfig.js';
 import {readFile} from 'node:fs/promises';
 import * as XLSX from 'xlsx';
+import {clickExport} from './_toolbar.js';
 
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 const upload=async(page,csv,recommend=false)=>{
@@ -58,7 +59,7 @@ test('learning: manual rate is averaged, count has no percent and undo restores 
   await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('30.0%');
   await page.getByLabel('切换聚合口径',{exact:true}).selectOption('count');await ready(page);
   await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('3 笔');
-  const download=page.waitForEvent('download');await page.getByRole('button',{name:'.XLSX',exact:true}).click();
+  const download=page.waitForEvent('download');await clickExport(page,'.XLSX');
   const book=XLSX.read(await readFile(await (await download).path()),{cellNF:true});
   const rows=XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],{header:1,raw:false});
   expect(rows[0][1]).not.toContain('[%]');expect(rows.at(-1)[1]).toBe('3 笔');

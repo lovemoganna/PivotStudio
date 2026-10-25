@@ -1,5 +1,6 @@
 import React from 'react';
 import { UnifiedFormatter, formatAxisTickLabel } from '../../../utils/formatters';
+import { CV, chartInk, seriesColor } from '../../../constants/chartVisual';
 
 export function renderSmartPieLabel(props, primaryValCfg, darkMode) {
   const { cx, cy, midAngle, innerRadius, outerRadius, value, percent, name, fill } = props;
@@ -7,6 +8,7 @@ export function renderSmartPieLabel(props, primaryValCfg, darkMode) {
   const RADIAN = Math.PI / 180;
   const formattedVal = UnifiedFormatter.formatValue(value, primaryValCfg, { compact: true });
   const pctStr = `${(percent * 100).toFixed(1)}%`;
+  const leaderInk = chartInk(darkMode);
 
   const sin = Math.sin(-RADIAN * midAngle);
   const cos = Math.cos(-RADIAN * midAngle);
@@ -22,6 +24,7 @@ export function renderSmartPieLabel(props, primaryValCfg, darkMode) {
     const midR = outerRadius * 0.62;
     const ix = cx + midR * cos;
     const iy = cy + midR * sin;
+    // Neon Monokai fills stay bright — dark ink remains readable on-slice.
     return (
       <g>
         <text x={ix} y={iy - 5} fill="#1E1F1C" textAnchor="middle" dominantBaseline="central" fontSize={9.5} fontWeight={700}>
@@ -36,12 +39,12 @@ export function renderSmartPieLabel(props, primaryValCfg, darkMode) {
 
   return (
     <g>
-      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill || '#F92672'} strokeWidth={1.2} fill="none" opacity={0.85} />
-      <circle cx={ex} cy={ey} r={2} fill={fill || '#F92672'} />
+      <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill || seriesColor(0)} strokeWidth={CV.stroke.leader} fill="none" opacity={0.85} />
+      <circle cx={ex} cy={ey} r={2} fill={fill || seriesColor(0)} />
       <text
         x={ex + (cos >= 0 ? 5 : -5)}
         y={ey}
-        fill={darkMode ? '#F8F8F2' : '#272822'}
+        fill={leaderInk}
         textAnchor={textAnchor}
         dominantBaseline="central"
         fontSize={9.5}
@@ -59,6 +62,8 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false) {
   if (value === null || value === undefined || value === '' || value === '0' || value === '¥0') return null;
   const textStr = String(value);
   const isNeg = textStr.startsWith('-');
+  const labelSize = CV.typography.dataLabel;
+  const outsideInk = chartInk(darkMode);
 
   if (isHorizontal) {
     if (Math.abs(height) < 12) return null;
@@ -70,7 +75,7 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false) {
           fill="#1E1F1C"
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={9}
+          fontSize={labelSize}
           fontWeight={700}
           className="apple-font-mono"
         >
@@ -84,10 +89,10 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false) {
       <text
         x={tx}
         y={y + height / 2}
-        fill={placeInside ? '#1E1F1C' : (darkMode ? '#F8F8F2' : '#272822')}
+        fill={placeInside ? '#1E1F1C' : outsideInk}
         textAnchor={placeInside ? 'end' : 'start'}
         dominantBaseline="central"
-        fontSize={9}
+        fontSize={labelSize}
         fontWeight={700}
         className="apple-font-mono"
       >
@@ -100,7 +105,7 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false) {
   if (isNeg && Math.abs(height) < 18) return null;
   const nearTopEdge = y < 18;
   const ty = isNeg ? Math.max(y, y + height) - 9 : nearTopEdge ? y + 12 : y - 6;
-  const fillCol = isNeg || nearTopEdge ? '#1E1F1C' : (darkMode ? '#F8F8F2' : '#272822');
+  const fillCol = isNeg || nearTopEdge ? '#1E1F1C' : outsideInk;
 
   return (
     <text
@@ -109,7 +114,7 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false) {
       fill={fillCol}
       textAnchor="middle"
       dominantBaseline="central"
-      fontSize={9}
+      fontSize={labelSize}
       fontWeight={700}
       className="apple-font-mono"
     >

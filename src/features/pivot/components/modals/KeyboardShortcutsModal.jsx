@@ -17,24 +17,27 @@ const SHORTCUT_GROUPS = [
     category: '多维透视与分析 (Pivot Analysis)',
     items: [
       { keys: ['R'], desc: '行列维度快速交叉转置 (Transpose)', isCommon: true, tip: '一键对调行与列的横纵视角' },
-      { keys: ['Enter'], desc: '在单元格或图表点上快速打开下钻明细', isCommon: true, tip: '穿透查看背后的真实原始记录' },
+      { keys: ['双击单元格', 'Enter'], desc: '打开单元格或图表点对应的明细行', isCommon: true, tip: '核对汇总背后的原始记录' },
+      { keys: ['Alt + 单击'], desc: '复制单个单元格数值到剪贴板', isCommon: true, tip: '快速取数' },
+      { keys: ['拖选 + ⌘C', 'Ctrl+C'], desc: '框选区域复制为 TSV，可粘贴到表格软件', isCommon: true, tip: '批量取数' },
+      { keys: ['双击列边框'], desc: '自适应调整单列列宽 (Auto-Fit)', tip: '内容自适应防止文字截断' },
       { keys: ['Click'], desc: '聚焦单元格并在图表中高亮对应序列', isCommon: true, tip: '表图联动高亮聚焦' },
     ],
   },
   {
-    category: '叙事演播与沉浸舞台 (Presentation & Theater)',
+    category: '演示',
     items: [
-      { keys: ['T'], desc: '切换纯净剧院舞台模式 (Cinema Mode)', isCommon: true, tip: '隐藏工具栏与侧栏全屏汇报' },
-      { keys: ['Space'], desc: '播放 / 暂停 96 BPM Keynote 自动分镜运镜', isCommon: true, tip: '节奏感演播汇报' },
-      { keys: ['['], desc: '切换至上一个叙事分镜 (Prev Shot)', tip: '向上回溯业务故事' },
-      { keys: [']'], desc: '切换至下一个叙事分镜 (Next Shot)', tip: '步进推进分析结论' },
+      { keys: ['T'], desc: '切换演示舞台模式', isCommon: true, tip: '隐藏侧栏，聚焦表图' },
+      { keys: ['Space'], desc: '播放 / 暂停演示', isCommon: true },
+      { keys: ['['], desc: '上一场景' },
+      { keys: [']'], desc: '下一场景' },
     ],
   },
   {
-    category: '数据枢纽与输出 (Data & Export)',
+    category: '导出',
     items: [
-      { keys: ['⌘P', 'Ctrl+P'], desc: '浏览器打印；完整报表请用工具栏 .PDF', tip: '生成报表打印流' },
-      { keys: ['Click'], desc: '一键导出标准 Excel (.xlsx) / CSV / 矢量图', isCommon: true, tip: '免插件下载分析报表' },
+      { keys: ['⌘P', 'Ctrl+P'], desc: '浏览器打印；完整报表请用工具栏 .PDF' },
+      { keys: ['Click'], desc: '导出 Excel / CSV / 图表', isCommon: true },
     ],
   },
 ];

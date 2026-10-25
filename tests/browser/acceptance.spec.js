@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 import { encodeView } from '../../src/utils/viewConfig.js';
 import { parseCSVRecords } from '../../src/utils/csvParser.js';
+import { clickExport, clickMoreItem } from './_toolbar.js';
 test.beforeEach(async ({page}) => { await page.route('https://fonts.googleapis.com/**',route=>route.abort()); await page.route('https://fonts.gstatic.com/**',route=>route.abort()); });
 const upload = (page, buffer, name='data.csv') => page.locator('input[type=file]').first().setInputFiles({name,mimeType:'text/csv',buffer:Buffer.isBuffer(buffer)?buffer:Buffer.from(buffer)});
 const preview = page => page.getByRole('dialog',{name:'文件数据预览与类型校准',exact:true});
@@ -137,7 +138,7 @@ test('R4 chart drilldown, table highlight and four chart types',async({page})=>{
 test('R5 local named views, last deletion and data-free share restore',async({page,context})=>{
   await page.goto('/?demo=retail'); await ready(page);
   await page.getByLabel('切换聚合口径',{exact:true}).first().selectOption('avg'); await ready(page);
-  await page.getByRole('button',{name:/工作区 ·/}).click();
+  await clickMoreItem(page,/工作区/);
   await page.getByPlaceholder('输入新工作区快照名称...').fill('本机视图');
   await page.getByRole('button',{name:'保存快照',exact:true}).click();
   const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('pivotstudio_workspaces_v1')));
@@ -167,10 +168,10 @@ test('R6 filtered sorted formatted CSV/XLSX and real PNG/SVG downloads',async({p
   await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
   await expect(page.locator('[role=status]').filter({hasText:/2 \/ 3 行/}).first()).toBeVisible(); await ready(page);
   const expected=await page.getByTestId('pivot-value-cell').allTextContents();
-  const csvPromise=page.waitForEvent('download'); await page.getByRole('button',{name:'.CSV',exact:true}).click();
+  const csvPromise=page.waitForEvent('download'); await clickExport(page,'.CSV');
   const csv=parseCSVRecords(await readFile(await (await csvPromise).path(),'utf8'));
   expect(csv.slice(1,-1).map(row=>row[1])).toEqual(expected.map(value=>value.trim()));
-  const xlsxPromise=page.waitForEvent('download'); await page.getByRole('button',{name:'.XLSX',exact:true}).click();
+  const xlsxPromise=page.waitForEvent('download'); await clickExport(page,'.XLSX');
   const book=XLSX.read(await readFile(await (await xlsxPromise).path()),{cellNF:true});
   const sheet=book.Sheets[book.SheetNames[0]];
   expect(XLSX.utils.sheet_to_json(sheet,{header:1,raw:false}).slice(1,-1).map(row=>row[1])).toEqual(csv.slice(1,-1).map(row=>row[1]));
@@ -185,7 +186,7 @@ test('R6 filtered sorted formatted CSV/XLSX and real PNG/SVG downloads',async({p
     // Recharts animations are visual only; wait for the final geometry before image export.
     await page.waitForTimeout(1600);
     for(const format of ['SVG','PNG']) {
-      const promise=page.waitForEvent('download'); await page.getByRole('button',{name:'.'+format,exact:true}).click();
+      const promise=page.waitForEvent('download'); await clickExport(page,'.'+format);
       const download=await promise; const bytes=await readFile(await download.path());
       expect(download.suggestedFilename()).toMatch(new RegExp('\\.'+format.toLowerCase()+'$'));
       if(format==='PNG') expect([...bytes.subarray(0,8)]).toEqual([137,80,78,71,13,10,26,10]);
@@ -255,7 +256,7 @@ test('R8 memory guard gives advice, blocks stale exports and recovers after conf
   await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
   await expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','failed');
   await expect(page.getByRole('alert').filter({hasText:'内存不足'})).toBeVisible();
-  await page.getByRole('button',{name:'.CSV',exact:true}).click();
+  await clickExport(page,'.CSV');
   await expect(page.locator('[role=status]').filter({hasText:'没有可导出'})).toBeVisible();
   await page.getByTestId('zone-columns').getByRole('button',{name:'移除字段',exact:true}).click();
   await ready(page);
@@ -300,7 +301,7 @@ test('review: Excel currency percentages dates and text IDs retain underlying va
   await page.getByRole('button',{name:'仅导入数据（清空当前透视）',exact:true}).click(); await ready(page);
   await page.getByTestId('field-Region').dragTo(page.getByTestId('zone-rows')); await ready(page);
   await page.getByTestId('field-Amount').dragTo(page.getByTestId('zone-values')); await ready(page);
-  const csvPromise=page.waitForEvent('download'); await page.getByRole('button',{name:'.CSV',exact:true}).click();
+  const csvPromise=page.waitForEvent('download'); await clickExport(page,'.CSV');
   const csv=parseCSVRecords(await readFile(await (await csvPromise).path(),'utf8'));
   expect(csv.flat().map(value=>value.replace(/^[¥$]/,''))).toEqual(expect.arrayContaining(['1,235','2,000','3,235']));
   await page.getByTestId('field-Rate').dragTo(page.getByTestId('zone-values')); await ready(page);
@@ -309,7 +310,7 @@ test('review: Excel currency percentages dates and text IDs retain underlying va
   await page.getByRole('button',{name:'格式与数值',exact:true}).click();
   await page.getByLabel('Rate · 小数位数',{exact:true}).selectOption('2');
   await page.keyboard.press('Escape'); await ready(page);
-  const rateDownload=page.waitForEvent('download'); await page.getByRole('button',{name:'.XLSX',exact:true}).click();
+  const rateDownload=page.waitForEvent('download'); await clickExport(page,'.XLSX');
   const rateBook=XLSX.read(await readFile(await (await rateDownload).path()));
   const rateRows=XLSX.utils.sheet_to_json(rateBook.Sheets[rateBook.SheetNames[0]],{header:1});
   expect(rateRows.at(-1).at(-1)).toBe(.1875);
@@ -341,12 +342,12 @@ test('review: saving recovers malformed local workspace storage across reload',a
   });
   await page.goto('/?demo=retail'); await ready(page);
   await expect(page.locator('[role=status]').filter({hasText:'本机视图无法读取'})).toBeVisible();
-  await page.getByRole('button',{name:/工作区 ·/}).click();
+  await clickMoreItem(page,/工作区/);
   await page.getByPlaceholder('输入新工作区快照名称...').fill('Recovered');
   await page.getByRole('button',{name:'保存快照',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('pivotstudio_workspaces_v1'))[0]?.name)).toBe('Recovered');
   await page.reload(); await ready(page);
-  await page.getByRole('button',{name:/工作区 ·/}).click();
+  await clickMoreItem(page,/工作区/);
   await expect(page.getByRole('dialog')).toContainText('Recovered');
 });
 

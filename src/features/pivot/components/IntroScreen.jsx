@@ -1,7 +1,7 @@
 import { t } from '../../../i18n.js';
 import React, { useState, useRef } from 'react';
 import { useDialogFocus } from '../../../utils/useDialogFocus';
-import { Upload, ShieldCheck, ClipboardPaste, FileSpreadsheet, X, Sparkles, TrendingUp, Cpu, Flame, Layers } from 'lucide-react';
+import { Upload, ShieldCheck, ClipboardPaste, FileSpreadsheet, X, ArrowRight } from 'lucide-react';
 import { ALL_BENCHMARK_PRESETS } from '../../../constants/benchmarkDatasets.js';
 
 export function IntroScreen({
@@ -96,7 +96,7 @@ export function IntroScreen({
           <p className="text-sm text-ink-muted">{t('导入表格，选择行、列与指标，开始分析。')}</p>
         </header>
 
-        {/* Hero Dropzone */}
+        {/* Dropzone */}
         <div
           role="button"
           tabIndex={isReadOnly ? -1 : 0}
@@ -155,16 +155,19 @@ export function IntroScreen({
           </button>
         </div>
 
-        {/* Privacy & Engine Guarantee */}
         <p className="flex items-start gap-2 text-xs text-ink-muted leading-5">
           <ShieldCheck aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0 text-ink-green" />
           <span>{t('文件解析与计算均在浏览器本地执行，原始数据不上传服务器。')}</span>
         </p>
 
-        {/* Presets Gallery Accordion */}
-        <details className="border-t border-[#D6D4C8] dark:border-[#3E3D32] pt-3 text-sm">
-          <summary className="cursor-pointer text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] transition">{t('更多示例')}</summary>
-          <div className="mt-2 space-y-1">
+        {/* Extra samples — collapsed; primary path is「加载示例数据」above */}
+        <details className="border-t border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 pt-2 text-xs apple-font-mono group/samples">
+          <summary className="cursor-pointer text-ink-muted hover:text-ink-cyan flex items-center gap-1.5 select-none py-1 list-none [&::-webkit-details-marker]:hidden">
+            <ArrowRight className="w-3 h-3 shrink-0 transition-transform group-open/samples:rotate-90" aria-hidden="true" />
+            <span>{t('更多示例数据集')}</span>
+            <span className="text-[10px] opacity-70">({ALL_BENCHMARK_PRESETS.length})</span>
+          </summary>
+          <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
             {ALL_BENCHMARK_PRESETS.map((preset) => (
               <button
                 key={preset.id}
@@ -175,9 +178,19 @@ export function IntroScreen({
                   if (onLoadPresetDataset) onLoadPresetDataset(preset);
                   else onLoadRetailDataset?.();
                 }}
-                className="tactile-btn block w-full text-left rounded-md px-3 py-2 leading-5 hover:bg-black/5 dark:hover:bg-white/5 [overflow-wrap:anywhere]"
+                className="tactile-btn text-left p-2.5 rounded-xl border border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 bg-[#FFFDF7] dark:bg-[#272822] hover:border-[#66D9EF] transition group cursor-pointer space-y-1"
               >
-                {preset.name}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-semibold text-[11px] text-[#272822] dark:text-[#F8F8F2] truncate group-hover:text-ink-cyan transition-colors">
+                    {preset.name}
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-ink-muted group-hover:text-ink-cyan shrink-0" aria-hidden="true" />
+                </div>
+                {preset.description && (
+                  <p className="text-[10px] text-ink-muted line-clamp-1 leading-relaxed">
+                    {preset.description}
+                  </p>
+                )}
               </button>
             ))}
           </div>

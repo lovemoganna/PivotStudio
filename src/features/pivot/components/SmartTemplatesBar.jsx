@@ -49,7 +49,7 @@ export function SmartTemplatesBar({
       showSubtotals: false,
     });
     setChartType?.('bar');
-    showToast?.(`已应用「Top-N 核心贡献排行与总计占比」智能模版`);
+    showToast?.(t('已应用：Top-N 排行与占比'));
   };
 
   // Template 2: Time Series & MoM Growth (时序双层同环比透视) or Multi-dim Cross Breakdown
@@ -73,7 +73,7 @@ export function SmartTemplatesBar({
         showSubtotals: true,
       });
       setChartType?.('line');
-      showToast?.(`已应用「时序分布与环比变动率 (% Growth)」智能模版`);
+      showToast?.(t('已应用：时序环比'));
     } else {
       const targetDim2 = dim2 !== dim1 ? dim2 : (candidateDimensions.find(f => f.name !== dim1)?.name || dim1);
       setPivotConfig({
@@ -90,7 +90,7 @@ export function SmartTemplatesBar({
         showSubtotals: true,
       });
       setChartType?.('bar');
-      showToast?.(`已应用「多维交叉分布与总计占比」推荐模版`);
+      showToast?.(t('已应用：多维分类占比'));
     }
   };
 
@@ -113,8 +113,8 @@ export function SmartTemplatesBar({
       showSubtotals: true,
     });
     setCondFormat?.((prev) => ({ ...prev, colorScale: 'green_yellow_red' }));
-    setChartType?.('bar');
-    showToast?.(`已应用「双维度交叉矩阵与热力色阶」智能模版`);
+    setChartType?.('heatmap');
+    showToast?.(t('已应用：交叉热力矩阵'));
   };
 
   // Template 4: Full Metrics Overview (多指标综合罗盘)
@@ -142,14 +142,14 @@ export function SmartTemplatesBar({
       showSubtotals: true,
     });
     setChartType?.('bar');
-    showToast?.(`已应用「多指标全景汇总」智能模版`);
+    showToast?.(t('已应用：多指标汇总'));
   };
 
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 text-[10px] apple-font-mono scrollbar-none">
       <span className="text-ink-cyan font-bold flex items-center gap-1 shrink-0 mr-1">
         <Sparkles className="w-3 h-3 text-ink-yellow" />
-        <span>{t("智能透视推荐:")}</span>
+        <span>{t("推荐配置:")}</span>
       </span>
 
       <button
@@ -190,10 +190,10 @@ export function SmartTemplatesBar({
         disabled={isReadOnly}
         onClick={applyFullMetrics}
         className="tactile-btn flex items-center gap-1 px-2 py-0.8 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#AE81FF] text-[#272822] dark:text-[#F8F8F2] hover:text-[#AE81FF] transition shrink-0 disabled:opacity-40"
-        title={t("快速将数据集中前4个数值度量并列聚合")}
+        title={t("将前几个数值字段一并加入「值」")}
       >
         <Layers className="w-3 h-3 text-ink-purple" />
-        <span>{t("全量度量罗盘")}</span>
+        <span>{t("多指标汇总")}</span>
       </button>
     </div>
   );

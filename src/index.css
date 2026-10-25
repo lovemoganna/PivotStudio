@@ -59,6 +59,27 @@ input, select, textarea, button, optgroup, option {
   font-family: inherit;
 }
 
+/* Native <select> popup: keep option list readable (Windows often paints white
+   panel while inheriting light dark-mode text → invisible). */
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+select option,
+select optgroup {
+  background-color: #FFFDF7;
+  color: #272822;
+}
+.dark select option,
+.dark select optgroup,
+.ps-dark-surface select option,
+.ps-dark-surface select optgroup {
+  background-color: #272822;
+  color: #F8F8F2;
+}
+
 /* 3. 表格与透视矩阵彻底应用 Noto Sans SC */
 table, thead, tbody, tfoot, tr, th, td {
   font-family: inherit;

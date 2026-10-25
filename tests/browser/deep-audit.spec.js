@@ -3,6 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import {readFile} from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 import {encodeView} from '../../src/utils/viewConfig.js';
+import {clickExport} from './_toolbar.js';
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 const preview=page=>page.getByRole('dialog',{name:'文件数据预览与类型校准',exact:true});
 const upload=async(page,csv)=>{await page.locator('input[type=file]').first().setInputFiles({name:'explicit-synthetic-deep-audit.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});await expect(preview(page)).toBeVisible();};
@@ -47,7 +48,7 @@ for(const width of [360,768,1280,1440])test(`deep: import, inspect unfamiliar fi
   await expect(page.getByText('当前没有可展示的有效数值。请检查筛选条件、字段类型和计算依据。',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'全部 (All)',exact:true}).click();await ready(page);
   await expect(page.getByTestId('pivot-value-cell')).toHaveText(['0','-','-']);
-  const xlsxPromise=page.waitForEvent('download');await page.getByRole('button',{name:'.XLSX',exact:true}).click();
+  const xlsxPromise=page.waitForEvent('download');await clickExport(page,'.XLSX');
   const book=XLSX.read(await readFile(await(await xlsxPromise).path()),{cellNF:true});
   const rows=XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]],{header:1,raw:false});
   expect(rows.slice(1,-1).map(r=>r[1])).toEqual(['0','-','-']);
@@ -74,7 +75,7 @@ test('deep: escaped hierarchy values retain distinct totals, exports and source 
   await expect(page.getByTestId('pivot-value-cell')).toHaveText(['10','20','5']);
   await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('35');
   await page.getByTestId('pivot-value-cell').first().press('Enter');await expect(drill(page)).toContainText('1 条记录)');await expect(drill(page)).toContainText('A||B');await expect(drill(page)).not.toContainText('B||C');await page.keyboard.press('Escape');
-  const csvPromise=page.waitForEvent('download');await page.getByRole('button',{name:'.CSV',exact:true}).click();const csv=await readFile(await(await csvPromise).path(),'utf8');
+  const csvPromise=page.waitForEvent('download');await clickExport(page,'.CSV');const csv=await readFile(await(await csvPromise).path(),'utf8');
   expect(csv).toContain('"A||B","C","10"');expect(csv).toContain('"A","B||C","20"');expect(csv).not.toContain('%7C');
 });
 
@@ -119,16 +120,20 @@ test('deep: switching datasets restores independent filters, measures and undo h
   await expect(page.getByRole('button',{name:/打开数据集：/})).toHaveCount(2);
 });
 
-test('deep: expanding analysis presets displays dynamic shots tailored to uploaded dataset', async({page}) => {
+test('deep: analysis notes adapt to uploaded dataset fields', async({page}) => {
   await page.goto('/');
   await upload(page, 'Department,Salary\nEngineering,100\nDesign,80\nMarketing,60');
   await confirm(page);
-  await page.getByRole('button', { name: /分析视角/ }).click();
-  const presets = page.locator('#pivot-lens-presets');
-  await expect(presets).toBeVisible();
-  await expect(presets).toContainText('Department');
-  await expect(presets).not.toContainText('大区概览');
-  await presets.locator('button').first().click();
+  await page.getByRole('button', { name: '仅图表', exact: true }).click();
+  await ready(page);
+  const guideToggle = page.getByRole('button', { name: '阅读提示', exact: true });
+  await guideToggle.click();
+  const guide = page.getByTestId('chart-guide-note');
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText('怎么读这张图');
+  await expect(page.getByLabel('选择图表类型', { exact: true })).toBeVisible();
+  await expect(page.locator('#pivot-main-html-table')).toHaveCount(0);
+  await page.getByRole('button', { name: '仅透视表', exact: true }).click();
   await ready(page);
   await expect(page.locator('#pivot-main-html-table')).toContainText('Department');
 });

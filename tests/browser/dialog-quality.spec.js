@@ -17,15 +17,16 @@ test('startup: selecting a file immediately after render survives effect replay'
   }
 });
 
-test('dialogs: design reference remains reachable in a short phone viewport',async({page},info)=>{
+test('dialogs: shortcuts guide remains reachable in a short phone viewport',async({page},info)=>{
   await page.setViewportSize({width:360,height:450});await page.goto('/');
-  await page.getByRole('button',{name:'设计规范',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'内部设计规范',exact:true});
-  await page.screenshot({path:info.outputPath('spec-short.png')});
+  await page.getByRole('button',{name:'快捷键指南',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await page.screenshot({path:info.outputPath('shortcuts-short.png')});
   const bounds=await dialog.boundingBox();
   expect(bounds.y).toBeGreaterThanOrEqual(0);
   expect(bounds.y+bounds.height).toBeLessThanOrEqual(450);
-  await dialog.getByRole('button',{name:/关闭/}).click();
+  await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
 });
 

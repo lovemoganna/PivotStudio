@@ -90,7 +90,7 @@ export function CommandPaletteModal({
             value={commandQuery}
             onChange={(e) => setCommandQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t("输入指令名称、图表类型或分镜动作... (↑↓ 选择，Enter 执行)")}
+            placeholder={t("搜索指令或图表类型... (↑↓ 选择，Enter 执行)")}
             className="flex-1 bg-transparent border-none text-xs apple-font-mono focus:outline-none text-[#272822] dark:text-[#F8F8F2] placeholder:text-ink-muted"
             aria-label={t("搜索快捷指令")}
             aria-autocomplete="list"
@@ -143,7 +143,7 @@ export function CommandPaletteModal({
           {displayedActions.length === 0 ? (
             <div className="p-8 text-center text-xs text-ink-muted apple-font-mono space-y-1">
               <div>{t("未找到匹配的快捷指令")}</div>
-              <div className="text-[10px] opacity-75">{t("尝试搜索「柱图」、「转置」、「导出」或「分镜」")}</div>
+              <div className="text-[10px] opacity-75">{t("尝试搜索「柱图」、「转置」或「导出」")}</div>
             </div>
           ) : (
             displayedActions.map((cmd, idx) => {
@@ -221,9 +221,6 @@ export function CommandPaletteModal({
               {t("关闭")}
             </span>
           </div>
-          <span className="hidden sm:inline text-[10px] text-ink-muted">
-            {t("智能指令匹配 · 极速直达")}
-          </span>
         </div>
       </div>
     </div>

@@ -3,14 +3,15 @@ import { t } from '../../../i18n.js';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   GripVertical, ArrowUp, ArrowDown,
-  ArrowUpDown, Filter, RotateCcw, Sparkles, Code2, X, ChevronUp, ChevronDown,
-  ChevronLeft, ChevronRight, Search, PanelLeft, Layers, Info, Calculator, Plus, Trash2, FunctionSquare, Edit3, Lightbulb, BookOpen, Check
+  ArrowUpDown, Filter, RotateCcw, X, ChevronDown,
+  ChevronLeft, ChevronRight, Search, PanelLeft, Layers, Info, Calculator, Plus, Trash2, FunctionSquare, Edit3, Check
 } from 'lucide-react';
-import { FIELD_TYPES, AGG_METHODS, VISUAL_CHART_TYPES, CHART_INTENT_GROUPS, SHOW_AS_MODES, buildDefaultPivotConfig } from '../../../constants/pivotConstants';
+import { FIELD_TYPES, AGG_METHODS, SHOW_AS_MODES, buildDefaultPivotConfig } from '../../../constants/pivotConstants';
 import { getDimDisplayLabel } from '../../../utils/formatters';
 import { isMeasureField } from '../../../utils/fieldSemantics.js';
 import { FieldProfilerModal } from './FieldProfilerModal';
 import { PivotConfigPanel } from './PivotConfigPanel';
+import { SmartTemplatesBar } from './SmartTemplatesBar';
 import { MetricCenterPanel } from './MetricCenterPanel';
 import { hasOpenDialog } from '../../../utils/useDialogFocus';
 
@@ -72,7 +73,6 @@ export function FieldShelf({
   const [showInsightsDeck, setShowInsightsDeck] = useState(false);
   const [fieldSearchQuery, setFieldSearchQuery] = useState('');
   const [fieldCategoryTab, setFieldCategoryTab] = useState('all'); // 'all' | 'dimension' | 'measure' | 'unused'
-  const [showNoviceGuide, setShowNoviceGuide] = useState(false);
   const searchInputRef = useRef(null);
   const [profilingField, setProfilingField] = useState(null);
 
@@ -476,7 +476,7 @@ export function FieldShelf({
                 <div className="flex items-center gap-1.5 min-w-0">
                   <Layers className="w-3.5 h-3.5 text-ink-cyan shrink-0" />
                   <span className="text-[11px] font-bold text-[#272822] dark:text-[#F8F8F2] apple-font-mono tracking-tight truncate">
-                    {t("数据模型与透视配置")}
+                    {t("字段与透视配置")}
                   </span>
                 </div>
 
@@ -588,50 +588,24 @@ export function FieldShelf({
                       <span className="text-[11px] font-bold tracking-tight apple-font-mono text-[#272822] dark:text-[#F8F8F2]">
                         {' ' + t("可用字段 (")}{filteredFields.length + filteredCustomMetrics.length}/{(currentDataset?.fields?.length || 0) + customMetricsCatalog.length})
                       </span>
-                      <button
-                        type="button"
-                        disabled={isReadOnly}
-                        onClick={() => {
-                          soundEngine?.playClick?.(540);
-                          openMetricCenter('studio', null);
-                        }}
-                        className="px-1.5 py-0.5 min-h-[24px] rounded bg-[#AE81FF]/15 hover:bg-[#AE81FF]/30 text-ink-purple text-[9px] font-bold apple-font-mono inline-flex items-center gap-0.5 transition disabled:opacity-40"
-                        title={t("打开指标中心新建自定义计算指标")}
-                      >
-                        <FunctionSquare className="w-2.5 h-2.5" />
-                        <span>{t("+ 新建指标")}</span>
-                      </button>
-                    </div>
-
-                    {/* Novice Guide Educational Collapsible Card */}
-                    {showNoviceGuide && (
-                      <div className="mb-2 p-2 rounded-lg bg-[#FFFBEA]/80 dark:bg-[#2A2B20] border border-[#E6DB74]/50 text-[10px] space-y-1.5 shrink-0 animate-apple-modal">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-ink-yellow flex items-center gap-1">
-                            <Lightbulb className="w-3 h-3 text-ink-yellow" />
-                            {t("零基础认知锦囊：维度 vs 度量")}
-                          </span>
+                      {(pivotConfig?.values?.length || 0) > 0 && (
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => setShowNoviceGuide(false)}
-                            className="p-0.5 text-ink-muted hover:text-[#F92672]"
+                            disabled={isReadOnly}
+                            onClick={() => {
+                              soundEngine?.playClick?.(540);
+                              openMetricCenter('studio', null);
+                            }}
+                            className="px-1.5 py-0.5 min-h-[24px] rounded bg-[#AE81FF]/15 hover:bg-[#AE81FF]/30 text-ink-purple text-[9px] font-bold inline-flex items-center gap-0.5 transition disabled:opacity-40"
+                            title={t("打开指标中心新建自定义计算指标")}
                           >
-                            <X className="w-2.5 h-2.5" />
+                            <FunctionSquare className="w-2.5 h-2.5" />
+                            <span>{t("+ 新建指标")}</span>
                           </button>
                         </div>
-                        <div className="space-y-1 text-ink-muted leading-relaxed">
-                          <p>
-                            <strong className="text-ink-cyan">🏷️ 维度 (Dimension)</strong>：事物分类或属性（如地区、品类、月份）。用来做【行】或【列】的<strong>切片分组与横纵对比</strong>。
-                          </p>
-                          <p>
-                            <strong className="text-ink-orange">🔢 度量 (Measure)</strong>：统计数值与指标（如销售额、利润、数量）。用来放进【值】进行<strong>求和、均值统计或计算</strong>。
-                          </p>
-                          <p className="text-[#272822] dark:text-[#F8F8F2] font-medium pt-0.5 border-t border-[#E6DB74]/30">
-                            💡 <strong>核心分析思路</strong>：“在 [某个维度] 的不同分类下，按 [某个度量] 计算并对比其总量或走势”。
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     {/* Field Search & Category Filter */}
                     <div className="space-y-1 mb-1 shrink-0">
@@ -862,16 +836,17 @@ export function FieldShelf({
                                 <Info className="w-3 h-3" />
                               </button>
                             </div>
-                            <div className="flex items-center gap-0.5 shrink-0 apple-font-mono text-[8.5px]">
+                            <div className="flex items-center gap-0.5 shrink-0 text-[8.5px]">
+                              {/* All four zones visible: novices must find columns/filters without opening a menu */}
                               <button
                                 type="button"
                                 disabled={isReadOnly}
                                 aria-label={`添加「${field.name}」到行分组`}
                                 onClick={(e) => { e.stopPropagation(); addFieldToZone('rows', field.name); }}
-                                className={`px-1 py-0.5 rounded font-semibold transition ${
+                                className={`px-1.5 py-0.5 min-h-[24px] rounded font-semibold transition ${
                                   !isMeasure
                                     ? 'bg-[#F92672]/15 text-ink-pink hover:bg-[#F92672] hover:text-[#FFFDF7]'
-                                    : 'bg-[#EFECE1] dark:bg-[#272822] opacity-75 hover:opacity-100 hover:bg-[#F92672] hover:text-[#FFFDF7]'
+                                    : 'bg-[#EFECE1] dark:bg-[#272822] text-ink-muted hover:bg-[#F92672]/20 hover:text-ink-pink'
                                 }`}
                                 title={t("添加到行维度")}
                               >
@@ -882,7 +857,11 @@ export function FieldShelf({
                                 disabled={isReadOnly}
                                 aria-label={`添加「${field.name}」到列比较`}
                                 onClick={(e) => { e.stopPropagation(); addFieldToZone('columns', field.name); }}
-                                className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] opacity-75 hover:opacity-100 hover:bg-[#66D9EF] hover:text-[#1E1F1C] font-semibold transition"
+                                className={`px-1.5 py-0.5 min-h-[24px] rounded font-semibold transition ${
+                                  !isMeasure
+                                    ? 'bg-[#66D9EF]/15 text-ink-cyan hover:bg-[#66D9EF] hover:text-[#1E1F1C]'
+                                    : 'bg-[#EFECE1] dark:bg-[#272822] text-ink-muted hover:bg-[#66D9EF]/20 hover:text-ink-cyan'
+                                }`}
                                 title={t("添加到列维度")}
                               >
                                 {t("+列")}
@@ -892,10 +871,10 @@ export function FieldShelf({
                                 disabled={isReadOnly}
                                 aria-label={`添加「${field.name}」到计算指标`}
                                 onClick={(e) => { e.stopPropagation(); addFieldToZone('values', field.name); }}
-                                className={`px-1 py-0.5 rounded font-semibold transition ${
+                                className={`px-1.5 py-0.5 min-h-[24px] rounded font-semibold transition ${
                                   isMeasure
                                     ? 'bg-[#FD971F]/15 text-ink-orange hover:bg-[#FD971F] hover:text-[#1E1F1C]'
-                                    : 'bg-[#EFECE1] dark:bg-[#272822] opacity-75 hover:opacity-100 hover:bg-[#FD971F] hover:text-[#1E1F1C]'
+                                    : 'bg-[#EFECE1] dark:bg-[#272822] text-ink-muted hover:bg-[#FD971F]/20 hover:text-ink-orange'
                                 }`}
                                 title={t("添加到数值指标")}
                               >
@@ -906,7 +885,7 @@ export function FieldShelf({
                                 disabled={isReadOnly}
                                 aria-label={`添加「${field.name}」到筛选`}
                                 onClick={(e) => { e.stopPropagation(); addFieldToZone('filters', field.name); }}
-                                className="px-1 py-0.5 rounded bg-[#EFECE1] dark:bg-[#272822] opacity-75 hover:opacity-100 hover:bg-[#A6E22E] hover:text-[#1E1F1C] font-semibold transition"
+                                className="px-1.5 py-0.5 min-h-[24px] rounded bg-[#A6E22E]/15 text-ink-green hover:bg-[#A6E22E] hover:text-[#1E1F1C] font-semibold transition"
                                 title={t("添加到筛选条件")}
                               >
                                 {t("+筛")}
@@ -959,6 +938,21 @@ export function FieldShelf({
                 )}
 
                 {/* Bottom Pane: Pivot Structure Dropzones (透视结构放置区) */}
+                {sidebarMode !== 'fields' && !isPrintingReport && (
+                  <div
+                    className="flex flex-col min-h-0 border-b border-[#D6D4C8]/60 dark:border-[#3E3D32]/60 pb-1 shrink-0 px-2"
+                  >
+                    <SmartTemplatesBar
+                      currentDataset={currentDataset}
+                      setPivotConfig={setPivotConfig}
+                      setChartType={setChartType}
+                      setCondFormat={setCondFormat}
+                      soundEngine={soundEngine}
+                      showToast={showToast}
+                      isReadOnly={isReadOnly}
+                    />
+                  </div>
+                )}
                 {sidebarMode !== 'fields' && !isPrintingReport && (
                   <div
                     className={`flex flex-col min-h-0 ${
@@ -1040,11 +1034,9 @@ export function FieldShelf({
 
         {/* Main Work Area: Full width when collapsed, 100% clean vertical space */}
         <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-visible md:overflow-hidden">
-          {/* Top Control Bar: View Mode, Chart Type, Display Preferences, Insights Toggle */}
-          <div className="bg-[#EFECE1]/75 dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-2 shrink-0 print:hidden">
-            {/* Left Functional Group: View Canvas & Visualization */}
+          {/* Work-area chrome: view mode + table prefs only (chart controls live in ChartStudio) */}
+          <div className="px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-2 shrink-0 border-b border-[#D6D4C8]/70 dark:border-[#3E3D32]/70 print:hidden">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Expand Sidebar Quick Button when collapsed */}
               {isSidebarCollapsed && !cinemaTheaterMode && (
                 <button
                   onClick={() => {
@@ -1052,17 +1044,15 @@ export function FieldShelf({
                     setIsSidebarCollapsed(false);
                     showToast?.('已展开左侧侧边栏 (⌘B)');
                   }}
-                  className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-xs font-semibold text-ink-cyan transition shadow-xs"
+                  className="hidden md:inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium text-ink-muted hover:text-ink-cyan hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition"
                   title={t("展开左侧模型与透视配置侧边栏 (快捷键: ⌘B / Ctrl+B)")}
                 >
                   <PanelLeft className="w-3.5 h-3.5" />
                   <span>{t("展开侧边栏")}</span>
-                  <span className="text-[10px] text-ink-muted apple-font-mono">⌘B</span>
                 </button>
               )}
 
-              {/* View Mode Toggle */}
-              <div className="inline-flex rounded-lg bg-[#D6D4C8]/60 dark:bg-[#1E1F1C] border border-transparent dark:border-[#3E3D32] p-0.5 apple-font-mono">
+              <div className="inline-flex rounded-lg bg-[#D6D4C8]/45 dark:bg-[#1E1F1C]/80 p-0.5">
                 {[
                   { id: 'table', label: '仅透视表' },
                   { id: 'split', label: '表图并列' },
@@ -1073,75 +1063,29 @@ export function FieldShelf({
                     onClick={() => { soundEngine?.playClick(520); setViewMode(m.id); }}
                     aria-pressed={viewMode === m.id}
                     title={m.id === 'chart' ? t("透视图 (独立图表与笔记模式)") : undefined}
-                    className={`px-3 py-1 rounded-md text-[10px] font-semibold transition ${viewMode === m.id ? 'bg-action text-[#F8F8F2] shadow-sm' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${viewMode === m.id ? 'bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2] shadow-sm' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
                   >
                     {t(m.label)}
                   </button>
                 ))}
               </div>
 
-              {/* Chart Type Selector */}
-              <select
-                aria-label={t("选择图表类型")}
-                value={chartType}
-                onChange={(e) => { soundEngine?.playClick(560); setChartType(e.target.value); }}
-                className="px-3 py-1 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-ink-cyan text-[10px] font-semibold apple-font-mono focus:outline-none focus:border-[#F92672]"
-              >
-                {CHART_INTENT_GROUPS.map((group) => (
-                  <optgroup key={group.id} label={`${t(group.label)} (${t(group.desc)})`}>
-                    {group.types.map((typeVal) => {
-                      const type = VISUAL_CHART_TYPES.find((item) => item.value === typeVal);
-                      if (!type) return null;
-                      return (
-                        <option key={type.value} value={type.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">
-                          {t(type.label)}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                ))}
-              </select>
             </div>
 
-            {/* Center Functional Group: Table / Chart Display Options & Insights Deck Trigger */}
-            <div className="flex flex-wrap items-center gap-2">
-              {viewMode === 'chart' ? (
-                <>
-                  <label className="inline-flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
-                    <input
-                      type="checkbox"
-                      aria-label={t("显示数值标签")}
-                      checked={chartSpecConfig.showDataLabels}
-                      onChange={(e) => setChartSpecConfig((p) => ({ ...p, showDataLabels: e.target.checked }))}
-                      className="rounded accent-[#F92672]"
-                    />
-                    <span>{t("数值标签")}</span>
-                  </label>
-                  <label className="inline-flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
-                    <input
-                      type="checkbox"
-                      aria-label={t("显示均值参考线")}
-                      checked={chartSpecConfig.showAvgReferenceLine}
-                      onChange={(e) => setChartSpecConfig((p) => ({ ...p, showAvgReferenceLine: e.target.checked }))}
-                      className="rounded accent-[#FD971F]"
-                    />
-                    <span>{t("均值参考线")}</span>
-                  </label>
-                </>
-              ) : (
-                <label className="inline-flex items-center gap-1.5 text-[10px] text-ink-muted cursor-pointer px-2 py-0.5 rounded hover:bg-black/[0.04] dark:hover:bg-[#3E3D32]/50">
-                  <input
-                    type="checkbox"
-                    aria-label={t("冻结行表头")}
-                    checked={chartSpecConfig.stickyRowHeaders}
-                    onChange={(e) => setChartSpecConfig((p) => ({ ...p, stickyRowHeaders: e.target.checked }))}
-                    className="rounded accent-[#F92672]"
-                  />
-                  <span>{t("冻结行表头")}</span>
-                </label>
+            <div className="flex items-center gap-1.5">
+              {highlightedRowKey && (
+                <button
+                  onClick={() => setHighlightedRowKey(null)}
+                  className="px-2 py-0.5 rounded-md text-[11px] text-ink-orange hover:bg-[#FD971F]/12 transition"
+                  title={t('清除聚焦')}
+                >
+                  {(() => {
+                    const label = highlightedRowKey.replace(/\|\|/g, ' / ');
+                    return label.length > 18 ? `${label.slice(0, 18)}…` : label;
+                  })()} ×
+                </button>
               )}
 
-              {/* Metric Center & Insights Toggle (Default Hidden) */}
               <button
                 type="button"
                 onClick={() => {
@@ -1149,52 +1093,19 @@ export function FieldShelf({
                   setShowInsightsDeck((prev) => !prev);
                 }}
                 aria-expanded={showInsightsDeck}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition ${
+                aria-label={t("指标中心")}
+                className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-lg text-[11px] transition ${
                   showInsightsDeck
-                    ? 'bg-[#AE81FF]/20 border-[#AE81FF]/50 text-ink-purple shadow-2xs'
-                    : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
+                    ? 'bg-[#AE81FF]/12 text-ink-purple font-medium'
+                    : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
                 }`}
                 title={showInsightsDeck ? t("收起指标中心与洞察面板") : t("展开指标中心（支持新建自定义指标、KPI 卡片与推荐模版）")}
               >
-                <Calculator className="w-3 h-3 text-ink-purple" />
-                <span>{t("指标中心")}</span>
+                <Calculator className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{t("指标中心")}</span>
                 {(pivotConfig?.values?.length || 0) > 0 && (
-                  <span className="px-1 py-0.2 rounded text-[8.5px] bg-black/5 dark:bg-white/10 apple-font-mono font-bold">
-                    {pivotConfig.values.length}
-                  </span>
+                  <span className="text-[10px] tabular-nums opacity-70">{pivotConfig.values.length}</span>
                 )}
-                {showInsightsDeck ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-            </div>
-
-            {/* Right Functional Group: Focus Status & Analytics Engine Tools */}
-            <div className="flex items-center gap-2">
-              {highlightedRowKey && (
-                <button
-                  onClick={() => setHighlightedRowKey(null)}
-                  className="px-2.5 py-0.5 rounded-md bg-[#AE81FF]/20 border border-[#AE81FF]/40 text-ink-purple text-[10px] font-semibold apple-font-mono"
-                >
-                  CLEAR_FOCUS: {highlightedRowKey.replace(/\|\|/g, ' / ')} ×
-                </button>
-              )}
-
-              {/* Inline Executive Insight Summary when Deck is Collapsed */}
-              {!showInsightsDeck && unifiedChartSpec?.executiveInsight && (
-                <div className="hidden xl:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#E6DB74]/15 border border-[#E6DB74]/30 text-ink-yellow text-[9.5px] apple-font-mono">
-                  <Sparkles className="w-2.5 h-2.5 text-ink-orange shrink-0" />
-                  <span className="truncate max-w-[200px]">
-                    {unifiedChartSpec.executiveInsight.topName} ({unifiedChartSpec.executiveInsight.topFormatted})
-                  </span>
-                </div>
-              )}
-
-              <button
-                onClick={() => { soundEngine?.playClick(550); setActiveDataSourceModal('bigdata'); }}
-                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[10.5px] text-ink-muted apple-font-mono transition"
-                title={t("查看 DuckDB SQL 模板（当前不执行）")}
-              >
-                <Code2 className="w-3 h-3 text-ink-green" />
-                <span>SQL/CUBE</span>
               </button>
             </div>
           </div>

@@ -62,7 +62,7 @@ export function DrillDownModal({
           <div className="min-w-0 w-full">
             <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex flex-wrap items-center gap-2">
               <Eye className="w-4 h-4 text-ink-cyan" />
-              <span>{t("DRILL_DOWN // 原始明细数据下钻")}</span>
+              <span>{t("明细下钻")}</span>
               <span className="px-2 py-0.5 rounded bg-[#F92672]/15 text-ink-pink text-[10px]">
                 {modalData.valueFormatted} ({modalData.records.length}{' ' + t("条记录)") + ' '}</span>
             </h3>
