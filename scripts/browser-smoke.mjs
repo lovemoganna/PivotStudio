@@ -161,7 +161,11 @@ try{
   console.log('CHART_TYPES_VERIFIED',JSON.stringify(kinds));
   await evaluate('(() => { const el=document.querySelector(\'select[aria-label="选择图表类型"]\');el.value="bar";el.dispatchEvent(new Event("change",{bubbles:true}));return true; })()');
   await sleep(130);
-  for(const [label,description] of [['格式与数值','数值与条件格式设置'],['内置校验','内置校验结果'],['工作区','本机工作区与配置分享']]){
+  // The older internal-verification action was retired from the user-facing toolbar.
+  // Assert its absence rather than resurrect a diagnostic entry just to satisfy an old smoke selector.
+  const diagnosticEntryVisible=await evaluate('Array.from(document.querySelectorAll("button")).some(b=>b.textContent.trim()==="内置校验")');
+  if(diagnosticEntryVisible)errors.push('retired internal diagnostic action reappeared in user UI');
+  for(const [label,description] of [['格式与数值','数值与条件格式设置'],['工作区','本机工作区与配置分享']]){
     assert.equal(await clickText(label),true,'open '+description);
     await sleep(130);
     const focused=await evaluate('(() => {const d=document.querySelector("[role=dialog]"); return d?{label:d.getAttribute("aria-label"),focused:d.contains(document.activeElement)}:null;})()');
