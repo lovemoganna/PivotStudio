@@ -1,8 +1,26 @@
 import {t} from '../../../i18n.js';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Info, RotateCcw, GripVertical, ArrowUp, ArrowDown, ArrowUpDown, Filter, X, Sparkles, Trash2} from 'lucide-react';
 import {AGG_METHODS, SHOW_AS_MODES, buildDefaultPivotConfig} from '../../../constants/pivotConstants';
 import {getDimDisplayLabel} from '../../../utils/formatters';
+
+function isPivotSetupEmpty(config) {
+  return (config?.rows?.length || 0) === 0 && (config?.values?.length || 0) === 0;
+}
+
+function buildMobileShelfSummary(config) {
+  const rows = config?.rows?.length || 0;
+  const cols = config?.columns?.length || 0;
+  const vals = config?.values?.length || 0;
+  const filters = config?.filters?.length || 0;
+  if (!rows && !cols && !vals && !filters) return t('尚未配置，点此展开添加');
+  const parts = [];
+  if (rows) parts.push(`${t('行')} ${rows}`);
+  if (cols) parts.push(`${t('列')} ${cols}`);
+  if (vals) parts.push(`${t('值')} ${vals}`);
+  if (filters) parts.push(`${t('筛')} ${filters}`);
+  return parts.join(' · ');
+}
 
 /** Plain-language gloss for non-obvious aggregation / showAs modes. Null when defaults need no teaching. */
 function getValueMeasureHint(item) {
@@ -25,8 +43,15 @@ function getValueMeasureHint(item) {
 
 // One analysis configuration surface, independent of table/chart display mode.
 export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, isReadOnly, draggingPayload, setDraggingPayload, dragOverZone, setDragOverZone, addFieldToZone, removeZoneItem, moveZoneItem, toggleDimensionSort, setHeaderFilterSearch, setActiveHeaderFilterModal, setBinFormState, setActiveBinModal, transposeRowsAndColumns, onOpenMetricCenter, onEditCustomMetric, soundEngine, showToast}) {
-  const [showMobileConfig,setShowMobileConfig]=useState(false);
-  const [showHelpGuide,setShowHelpGuide]=useState(false);
+  // Narrow viewports collapse shelves by default; open them when nothing is configured so first analysis is reachable.
+  const [showMobileConfig, setShowMobileConfig] = useState(() => isPivotSetupEmpty(pivotConfig));
+  const [showHelpGuide, setShowHelpGuide] = useState(false);
+  const setupEmpty = isPivotSetupEmpty(pivotConfig);
+  const mobileShelfSummary = buildMobileShelfSummary(pivotConfig);
+
+  useEffect(() => {
+    if (setupEmpty) setShowMobileConfig(true);
+  }, [setupEmpty]);
   const zoneConfigs = [
     { key: 'filters', label: '筛选（限定范围）', badgeColor: 'text-ink-green', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
     { key: 'columns', label: '列（横向对比）', badgeColor: 'text-ink-cyan', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
@@ -45,8 +70,11 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
             onClick={() => setShowMobileConfig((expanded) => !expanded)}
             className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 text-left text-[11px] font-semibold flex items-center justify-between"
           >
-            <span>{t("分析配置 · 行 / 列 / 值 / 筛选")}</span>
-            <span className="text-ink-cyan">{showMobileConfig ? t("收起") : t("展开")}</span>
+            <span className="min-w-0 truncate">
+              {t("分析配置")}
+              <span className="font-medium text-ink-muted"> · {mobileShelfSummary}</span>
+            </span>
+            <span className="text-ink-cyan shrink-0">{showMobileConfig ? t("收起") : t("展开")}</span>
           </button>
         </div>
 
@@ -268,12 +296,12 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                     {items.length === 0 ? (
                       <div className="py-1 px-1 border border-dashed border-[#D6D4C8]/70 dark:border-[#3E3D32]/70 rounded text-center select-none flex flex-col items-center justify-center gap-1">
                         <div className="space-y-0.5">
-                          <span className="text-[10px] text-ink-muted font-semibold block">
+                          <span className="text-[10px] text-ink-muted font-semibold block leading-snug">
                             {t({
-                              filters: '拖入或点击 +筛',
-                              columns: '拖入或点击 +列',
-                              rows: '拖入或点击 +行',
-                              values: '拖入或点击 +值',
+                              filters: '只分析哪些记录？从字段列表点击 +筛。',
+                              columns: '要并排比较什么？从字段列表点击 +列。',
+                              rows: '要按什么分组？从字段列表点击 +行。',
+                              values: '要计算什么？从字段列表点击 +值，或统计记录数。',
                             }[z.key])}
                           </span>
                           <span className="text-[8.5px] text-ink-muted/65 block">

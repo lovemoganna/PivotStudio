@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import * as XLSX from 'xlsx';
 import {encodeView} from '../../src/utils/viewConfig.js';
+import {ensureMobileShelves} from './_mobileShelves.js';
 
 test.beforeEach(async({page})=>{
   await page.route('https://fonts.googleapis.com/**',r=>r.abort());
@@ -19,7 +20,7 @@ for(const width of [360,768,1280,1440]) {
     await page.goto('/#share_token='+encodeURIComponent(encodeView(config)));
     await page.locator('input[type=file]').first().setInputFiles({name:'explicit-synthetic-config.csv',mimeType:'text/csv',buffer:Buffer.from(names.join(',')+'\n华东,制造业,业务一部,2026-10-21,120,30,2\n华南,服务业,业务二部,2026-10-20,80,20,4')});
     await preview(page).getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();await ready(page);
-    if(width<768)await page.getByRole('button',{name:/分析配置/}).click();
+    await ensureMobileShelves(page,width);
     const labels=page.getByTestId('configured-field-name');await expect(labels).toHaveCount(8);
     const boxes=await labels.evaluateAll(els=>els.map(el=>({text:el.textContent,overflow:el.scrollWidth-el.clientWidth,font:parseFloat(getComputedStyle(el).fontSize),ellipsis:getComputedStyle(el).textOverflow})));
     for(const box of boxes){expect(box.overflow).toBeLessThanOrEqual(1);expect(box.font).toBeGreaterThanOrEqual(12);expect(box.ellipsis).not.toBe('ellipsis');}

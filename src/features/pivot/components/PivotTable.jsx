@@ -9,6 +9,7 @@ import { AGG_METHODS, SHOW_AS_MODES, buildDefaultPivotConfig } from '../../../co
 import { decodeGroupPath } from '../../../utils/groupKeys.js';
 import { getColorScaleStyle, formatCellNumber, getDimDisplayLabel } from '../../../utils/formatters';
 import { calculateAutoFitColumnWidths, calculateSingleColumnAutoFit } from '../../../utils/tableAutoFit';
+import { buildResultQuestion } from '../../../utils/analysisReading.js';
 
 export function PivotTable({
   requestProfile,
@@ -493,6 +494,9 @@ export function PivotTable({
     right: 'justify-end',
   }[currentAlignment];
 
+  const resultQuestion =
+    (pivotConfig?.values?.length || 0) > 0 ? buildResultQuestion(pivotConfig) : '';
+
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden select-text relative">
       {pivotConfig?.values?.length === 0 && (
@@ -502,6 +506,17 @@ export function PivotTable({
           <button type="button" disabled={isReadOnly} onClick={onAddRecordCount} className="mt-2 px-3 py-1.5 rounded bg-action text-white font-semibold disabled:opacity-40">{t('统计记录数')}</button>
         </div>
       )}
+      {resultQuestion ? (
+        <div
+          data-testid="result-reading"
+          className="shrink-0 px-3 py-1.5 border-b border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 bg-[#FFFDF7]/90 dark:bg-[#22231E]/90 text-[11px] leading-5"
+        >
+          <p className="text-[#57584B] dark:text-[#C4C4B8] [overflow-wrap:anywhere]">
+            <span className="font-semibold text-[#272822] dark:text-[#F8F8F2]">{t('这张表：')}</span>
+            {resultQuestion}
+          </p>
+        </div>
+      ) : null}
       {pivotResult.filteredCount === 0 && (
         <div className="bg-[#FD971F]/15 border-b border-[#FD971F]/30 px-4 py-2 flex items-center justify-between text-xs shrink-0">
           <span className="text-ink-orange apple-font-mono">{t("当前筛选条件下匹配 0 条记录")}</span>

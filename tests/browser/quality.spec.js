@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { clickMoreItem } from './_toolbar.js';
+import { ensureMobileShelves } from './_mobileShelves.js';
 
 const ready = page => expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status', 'idle');
 test.beforeEach(async ({page}) => {
@@ -187,7 +188,7 @@ test.describe('touch controls',()=>{
   test('quality: touch targets have room for fingers',async({page})=>{
     await page.goto('/?demo=retail'); await ready(page);
     expect(await page.evaluate(()=>matchMedia('(pointer: coarse)').matches)).toBe(true);
-    await page.getByRole('button',{name:/字段列表/}).tap();
+    await ensureMobileShelves(page,360);
     const small=await page.locator('button:visible,select:visible').evaluateAll(els=>els.filter(el=>{const r=el.getBoundingClientRect();return r.width<32||r.height<32}).map(el=>el.outerHTML.slice(0,100)));
     expect(small).toEqual([]);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);

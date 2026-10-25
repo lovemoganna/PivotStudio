@@ -67,7 +67,13 @@ export function FieldShelf({
   setCondFormat,
   isPrintingReport,
 }) {
-  const [showMobileSchema, setShowMobileSchema] = useState(false);
+  const setupEmpty =
+    (pivotConfig?.rows?.length || 0) === 0 && (pivotConfig?.values?.length || 0) === 0;
+  // Narrow viewports hide the field list by default; open it when shelves are empty so +行/+值 stay reachable.
+  const [showMobileSchema, setShowMobileSchema] = useState(setupEmpty);
+  useEffect(() => {
+    if (setupEmpty) setShowMobileSchema(true);
+  }, [setupEmpty]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarMode, setSidebarMode] = useState('split'); // 'split' | 'fields' | 'zones'
   const [showInsightsDeck, setShowInsightsDeck] = useState(false);
@@ -560,8 +566,13 @@ export function FieldShelf({
                   onClick={() => setShowMobileSchema((expanded) => !expanded)}
                   className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 text-left text-[11px] font-semibold flex items-center justify-between"
                 >
-                  <span>{t("字段列表（")}{currentDataset?.fields?.length || 0}）</span>
-                  <span className="text-ink-cyan">{showMobileSchema ? t("收起") : t("展开")}</span>
+                  <span className="min-w-0 truncate">
+                    {t("字段列表（")}{currentDataset?.fields?.length || 0}）
+                    {setupEmpty ? (
+                      <span className="font-medium text-ink-muted"> · {t('点此展开并用 +行 / +值 开始')}</span>
+                    ) : null}
+                  </span>
+                  <span className="text-ink-cyan shrink-0">{showMobileSchema ? t("收起") : t("展开")}</span>
                 </button>
               </div>
 

@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 import {encodeView} from '../../src/utils/viewConfig.js';
 import {clickExport} from './_toolbar.js';
+import {ensureMobileShelves} from './_mobileShelves.js';
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 const preview=page=>page.getByRole('dialog',{name:'文件数据预览与类型校准',exact:true});
 const upload=async(page,csv)=>{await page.locator('input[type=file]').first().setInputFiles({name:'explicit-synthetic-deep-audit.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});await expect(preview(page)).toBeVisible();};
@@ -20,7 +21,7 @@ for(const width of [360,768,1280,1440])test(`deep: import, inspect unfamiliar fi
   await upload(page,`Region,${field}\nZero,0\nMissing,\nInvalid,error`);
   await preview(page).getByLabel(`${field} · 字段类型`,{exact:true}).selectOption('number');
   await page.screenshot({path:info.outputPath('01-import.png')});await confirm(page,false);
-  if(width<768)await page.getByRole('button',{name:/字段列表/}).click();
+  await ensureMobileShelves(page,width);
   await page.getByRole('button',{name:`${field} · 查看字段分布`,exact:true}).press('Enter');
   const profile=page.getByRole('dialog',{name:'字段健康度与分布透视',exact:true});
   await expect(profile.getByTestId('numeric-quality')).toContainText('有效数值：1');
