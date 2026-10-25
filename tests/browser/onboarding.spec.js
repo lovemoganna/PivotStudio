@@ -56,6 +56,9 @@ test('learning: overall rate is calculated from records, not by adding group ave
   await page.mouse.move(0,0);
   await page.getByRole('button',{name:'仅图表',exact:true}).click();
   await expect(page.getByTestId('overall-summary')).toContainText('30.0%');
+  await expect(page.getByTestId('result-reading')).toBeVisible();
+  await expect(page.getByTestId('result-reading')).toContainText('区域');
+  await expect(page.getByTestId('result-reading')).toContainText('转化率');
 });
 
 test('learning: manual rate is averaged, count has no percent and undo restores the rate',async({page})=>{

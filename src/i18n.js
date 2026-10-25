@@ -116,6 +116,7 @@ const english = {
   "汇总「{0}」": "Measures: {0}",
   "已筛选「{0}」": "Filtered: {0}",
   "这张表：": "This view: ",
+  "这张图：": "This chart: ",
   "比较不同「{0}」在各「{1}」下的「{2}」": "Compare “{2}” across “{0}” by “{1}”",
   "查看各「{0}」的「{1}」": "See “{1}” for each “{0}”",
   "并排比较各「{0}」的「{1}」": "Compare “{1}” side by side for each “{0}”",
