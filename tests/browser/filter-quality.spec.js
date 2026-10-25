@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { encodeView, decodeView } from '../../src/utils/viewConfig.js';
 import AxeBuilder from '@axe-core/playwright';
+import { ensureMobileShelves } from './_mobileShelves.js';
 
 const ready = page => expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status', 'idle');
 const field = 'RegionWithAnExtremelyLongBusinessFieldName';
@@ -15,9 +16,7 @@ async function start(page, width=1440, waitForValues=true) {
   await page.locator('input[type=file]').first().setInputFiles({name:'synthetic-filter.csv',mimeType:'text/csv',buffer:Buffer.from(`${field},Value\nEast,12\nWest,25`)});
   await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
   await ready(page);
-  if(width<768) {
-    await page.getByRole('button',{name:/分析配置/}).click();
-  }
+  await ensureMobileShelves(page, width);
   // Use the keyboard path when asserting keyboard focus return; WebKit pointer
   // clicks intentionally do not focus buttons on all platforms.
   await page.getByTestId('zone-filters').getByRole('button',{name:'全部',exact:true}).press('Enter');
@@ -41,7 +40,7 @@ test('filter: slow and failed profiles show feedback and recover on reopen',asyn
   });
   await start(page,360,false);
   await expect(filter(page).getByRole('status')).toContainText('正在读取筛选项');
-  await expect(filter(page).getByRole('button',{name:'全选重置',exact:true})).toBeDisabled();
+  await expect(filter(page).getByRole('button',{name:'全选',exact:true})).toBeDisabled();
   await expect(filter(page).getByRole('alert')).toContainText('筛选值读取失败');
   await page.evaluate(()=>{window.profileFault=false;});
   await page.keyboard.press('Escape');
@@ -61,7 +60,7 @@ test('filter: deselecting the last value yields zero rows and survives share res
   await expect(page.locator('[role=status]').filter({hasText:/0 \/ 2 行/}).first()).toBeVisible();
   await expect(page.getByTestId('zone-filters').getByRole('button',{name:'0项',exact:true})).toBeVisible();
   await page.getByTestId('zone-filters').getByRole('button',{name:'0项',exact:true}).click();
-  await filter(page).getByRole('button',{name:'全选重置',exact:true}).click();
+  await filter(page).getByRole('button',{name:'全选',exact:true}).click();
   await expect(filter(page).getByLabel('East',{exact:true})).toBeChecked();
   await expect(filter(page).getByLabel('West',{exact:true})).toBeChecked();
   await page.getByRole('button',{name:'关闭字段筛选',exact:true}).click(); await ready(page);
@@ -95,7 +94,7 @@ test('filter: slicer recovers an empty selection and dark English feedback is ac
   await dialog.getByRole('textbox',{name:'Search filter values',exact:true}).fill('no-match');
   await expect(dialog.getByRole('status')).toContainText('No matching filter values');
   // Axe samples over time; wait for asynchronous profile loading and disabled ink to settle.
-  const reset=dialog.getByRole('button',{name:'Select all / Reset',exact:true});
+  const reset=dialog.getByRole('button',{name:'Select All',exact:true});
   await expect(reset).toBeEnabled();
   await expect.poll(()=>reset.evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
   const axe=await new AxeBuilder({page}).include('[role=dialog]').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze();

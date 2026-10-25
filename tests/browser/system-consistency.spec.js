@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {clickExport, clickMoreItem} from './_toolbar.js';
+import {ensureMobileShelves} from './_mobileShelves.js';
 
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 test.beforeEach(async({page})=>{
@@ -16,7 +17,7 @@ for(const width of [360,768,1280,1440])test(`system: shared configuration, dialo
     await page.addInitScript(theme=>localStorage.setItem('pivotstudio_theme',theme),theme);
     await start(page);
     await page.getByRole('button',{name:'仅图表',exact:true}).click();
-    if(width<640)await page.getByRole('button',{name:/分析配置/}).click();
+    if(width<640)await ensureMobileShelves(page,width);
     for(const zone of ['rows','columns','values','filters'])await expect(page.getByTestId('zone-'+zone)).toBeVisible();
     await expect(page.getByTestId('zone-values')).toHaveCount(1);
     await expect(page.getByTestId('calculation-basis')).toHaveCount(0);

@@ -4,6 +4,7 @@ import {encodeView} from '../../src/utils/viewConfig.js';
 import {readFile} from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 import {clickExport} from './_toolbar.js';
+import {ensureMobileShelves} from './_mobileShelves.js';
 
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 const upload=async(page,csv,recommend=false)=>{
@@ -21,13 +22,18 @@ for(const width of [360,768,1280,1440])test(`learning: first analysis, grouped c
   await expect(page.getByTestId('analysis-start')).toContainText('还没有数值指标');
   await page.getByRole('button',{name:'统计记录数',exact:true}).press('Enter');await ready(page);
   await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('3 笔');
-  if(width<768){await page.getByRole('button',{name:/字段列表/}).click();await page.getByRole('button',{name:/分析配置/}).click();}
+  await ensureMobileShelves(page,width);
   const file=page.getByLabel('上传 CSV / Excel',{exact:true});await file.focus();await expect(file).toBeFocused();
   await page.getByRole('button',{name:'添加「区域」到行分组',exact:true}).press('Enter');await ready(page);
   await expect(page.getByTestId('pivot-value-cell').first()).toHaveText('2 笔');
   await expect(page.getByTestId('zone-values')).toContainText('记录数');
   await expect(page.getByTestId('zone-values').getByLabel('切换聚合口径',{exact:true})).toBeDisabled();
   await expect(page.getByTestId('zone-values')).not.toContainText('__COUNT__');
+  await expect(page.getByTestId('analysis-reading')).toBeVisible();
+  await expect(page.getByTestId('analysis-reading')).toContainText('区域');
+  await expect(page.getByTestId('result-reading')).toBeVisible();
+  await expect(page.getByTestId('result-reading')).toContainText('区域');
+  await expect(page.getByTestId('result-reading')).toContainText('记录数');
   const help=page.getByText('如何选择行、列和值？',{exact:true});await help.press('Enter');
   await expect(page.getByText(/平均值为记录的算术平均/)).toBeVisible();
   await page.screenshot({path:info.outputPath(`guided-count-${width}.png`),fullPage:true});
@@ -50,6 +56,9 @@ test('learning: overall rate is calculated from records, not by adding group ave
   await page.mouse.move(0,0);
   await page.getByRole('button',{name:'仅图表',exact:true}).click();
   await expect(page.getByTestId('overall-summary')).toContainText('30.0%');
+  await expect(page.getByTestId('result-reading')).toBeVisible();
+  await expect(page.getByTestId('result-reading')).toContainText('区域');
+  await expect(page.getByTestId('result-reading')).toContainText('转化率');
 });
 
 test('learning: manual rate is averaged, count has no percent and undo restores the rate',async({page})=>{

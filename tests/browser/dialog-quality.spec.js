@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {encodeView} from '../../src/utils/viewConfig.js';
+import {ensureMobileShelves} from './_mobileShelves.js';
 
 test.beforeEach(async({page})=>{
   await page.route('https://fonts.googleapis.com/**',r=>r.abort());
@@ -38,7 +39,7 @@ test('dialogs: numeric grouping has named fields and preserves long titles at 36
   await page.locator('input[type=file]').first().setInputFiles({name:'synthetic-grouping.csv',mimeType:'text/csv',buffer:Buffer.from(`${field},Value\n10,12\n25,25`)});
   await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
   await expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
-  await page.getByRole('button',{name:/分析配置/}).click();
+  await ensureMobileShelves(page,360);
   await page.getByTestId('zone-rows').getByRole('button',{name:'组',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'字段分组设置',exact:true});
   await page.screenshot({path:info.outputPath('grouping-long.png')});

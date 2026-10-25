@@ -32,6 +32,7 @@ import {
 } from '../../../constants/chartVisual';
 import { UnifiedFormatter, formatAxisTickLabel, formatCellNumber } from '../../../utils/formatters';
 import { isMeasureField, isIdentifierField, getMeasureDefaults } from '../../../utils/fieldSemantics';
+import { buildResultQuestion } from '../../../utils/analysisReading.js';
 import { UnifiedChartTooltip } from './UnifiedChartTooltip';
 import { renderSmartPieLabel, renderSmartBarLabel } from './SmartChartLabels';
 import { StoryShotDialog } from './modals/StoryShotDialog';
@@ -388,8 +389,25 @@ export function ChartStudio({
   const optSelectClass =
     'w-full px-2 py-1.5 rounded-lg bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8]/80 dark:border-[#49483E] text-[11px] text-[#272822] dark:text-[#F8F8F2] focus:outline-none focus:border-[#66D9EF] [color-scheme:light] dark:[color-scheme:dark]';
 
+  // Chart-only hides the table pane — keep the same plain-language framing in the chart surface.
+  const chartResultQuestion =
+    viewMode === 'chart' && (pivotConfig?.values?.length || 0) > 0
+      ? buildResultQuestion(pivotConfig)
+      : '';
+
   return (
     <div data-highlighted-row={highlightedRowKey || ''} className="flex-1 flex flex-col h-full min-h-0">
+      {chartResultQuestion ? (
+        <div
+          data-testid="result-reading"
+          className="shrink-0 mb-2.5 px-1 py-1 text-[11px] leading-5"
+        >
+          <p className="text-[#57584B] dark:text-[#C4C4B8] [overflow-wrap:anywhere]">
+            <span className="font-semibold text-[#272822] dark:text-[#F8F8F2]">{t('这张图：')}</span>
+            {chartResultQuestion}
+          </p>
+        </div>
+      ) : null}
       {/* Encoding + type + tools — one quiet row (compact in split: shelves own the fields) */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3.5 pb-3 border-b border-[#D6D4C8]/45 dark:border-[#3E3D32]/50">
         {showEncodingEditors ? (

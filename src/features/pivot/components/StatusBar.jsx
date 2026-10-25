@@ -1,29 +1,7 @@
-import { t, getLocale } from '../../../i18n.js';
+import { t } from '../../../i18n.js';
 import React from 'react';
 import { Crosshair } from 'lucide-react';
-import { getDimDisplayLabel } from '../../../utils/formatters';
-
-function joinLabels(labels) {
-  return labels.join(getLocale() === 'en' ? ', ' : '、');
-}
-
-function buildAnalysisReading(pivotConfig) {
-  if (!pivotConfig) return '';
-  const rows = (pivotConfig.rows || []).map(getDimDisplayLabel).filter(Boolean);
-  const cols = (pivotConfig.columns || []).map(getDimDisplayLabel).filter(Boolean);
-  const vals = (pivotConfig.values || [])
-    .map((v) => (v.field === '__COUNT__' ? t('记录数') : v.field))
-    .filter(Boolean);
-  const filters = (pivotConfig.filters || []).map((f) => f.field).filter(Boolean);
-  if (!rows.length && !cols.length && !vals.length) return '';
-
-  const parts = [];
-  if (rows.length) parts.push(t('按「{0}」分行').replace('{0}', rows.join(' / ')));
-  if (cols.length) parts.push(t('按「{0}」分列').replace('{0}', cols.join(' / ')));
-  if (vals.length) parts.push(t('汇总「{0}」').replace('{0}', joinLabels(vals)));
-  if (filters.length) parts.push(t('已筛选「{0}」').replace('{0}', joinLabels(filters)));
-  return parts.join(' · ');
-}
+import { buildAnalysisReading } from '../../../utils/analysisReading.js';
 
 export function StatusBar({
   hoveredCellTelemetry,
@@ -38,18 +16,18 @@ export function StatusBar({
   const analysisReading = buildAnalysisReading(pivotConfig);
 
   return (
-    <footer className="h-7 bg-[#EFECE1] dark:bg-[#191A17] border-t border-[#D6D4C8] dark:border-[#3E3D32] px-4 flex items-center justify-between gap-4 text-[10px] shrink-0 print:hidden">
-      <div className="flex items-center gap-3 min-w-0 truncate">
+    <footer className="min-h-7 h-auto bg-[#EFECE1] dark:bg-[#191A17] border-t border-[#D6D4C8] dark:border-[#3E3D32] px-3 sm:px-4 py-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[10px] shrink-0 print:hidden">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 basis-[min(100%,18rem)]">
         <span className="inline-flex items-center gap-1 text-ink-pink font-bold shrink-0">
           <Crosshair className="w-3 h-3" />
-          <span>{t("当前焦点")}</span>
+          <span className="hidden xs:inline sm:inline">{t("当前焦点")}</span>
         </span>
         {hoveredCellTelemetry ? (
-          <div className="flex items-center gap-2.5 truncate">
+          <div className="flex items-center gap-2.5 truncate min-w-0">
             <span className="text-[#272822] dark:text-ink-yellow font-semibold truncate">
               [{hoveredCellTelemetry.rowLabel} × {hoveredCellTelemetry.colLabel}]
             </span>
-            <span className="text-ink-cyan font-bold">
+            <span className="text-ink-cyan font-bold shrink-0">
               {hoveredCellTelemetry.valLabel}: {hoveredCellTelemetry.formatted}
             </span>
             {hoveredCellTelemetry.hasAdditiveShares && (
@@ -64,7 +42,7 @@ export function StatusBar({
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-3 text-ink-muted truncate min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3 text-ink-muted min-w-0 flex-1">
             <span className="truncate" data-testid="overall-summary">
               {unifiedChartSpec.kpiCards?.[0] ? (
                 <>
@@ -78,7 +56,7 @@ export function StatusBar({
             </span>
             {analysisReading ? (
               <span
-                className="hidden md:inline truncate max-w-[42vw]"
+                className="truncate text-[9.5px] sm:text-[10px] text-[#57584B] dark:text-[#A8A89A] max-w-full sm:max-w-[42vw]"
                 data-testid="analysis-reading"
                 title={analysisReading}
               >
