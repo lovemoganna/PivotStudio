@@ -60,6 +60,43 @@ for(const width of [360,768,1280,1440]) {
   });
 }
 
+for (const width of [360,768,1280,1440]) {
+  test("loop UX first pass: pivot actions readable and reversible at " + width, async ({page}) => {
+    await page.setViewportSize({width, height:900});
+    await page.goto("/");
+    await page.getByRole("button", {name:"加载示例数据",exact:true}).click();
+    await ready(page);
+    if (width < 768) {
+      const mobile = page.getByRole("button", {name:/分析配置/});
+      await expect(mobile).toBeVisible();
+      const minHeight = await mobile.evaluate(el=>getComputedStyle(el).minHeight);
+      expect(parseFloat(minHeight)).toBeGreaterThanOrEqual(36);
+      await mobile.click();
+    }
+    await expect(page.getByText("分析配置", {exact:true})).toBeVisible();
+    for (const label of ["行列互换","恢复推荐","清空"]) {
+      const button = page.getByRole("button", {name:label,exact:true});
+      await expect(button).toBeVisible();
+      const rect = await button.evaluate(el=>{
+        const computed = getComputedStyle(el);
+        const bounds = el.getBoundingClientRect();
+        return {height:bounds.height, fontSize:parseFloat(computed.fontSize)};
+      });
+      expect(rect.height).toBeGreaterThanOrEqual(32);
+      expect(rect.fontSize).toBeGreaterThanOrEqual(11);
+    }
+    await page.getByRole("button", {name:"清空",exact:true}).click();
+    const recommended = page.getByRole("button", {name:/推荐配置/});
+    await expect(recommended).toBeVisible();
+    const guideHeight = await recommended.evaluate(el=>el.getBoundingClientRect().height);
+    expect(guideHeight).toBeGreaterThanOrEqual(32);
+    await recommended.click();
+    await ready(page);
+    await expect(page.getByTestId("zone-values").getByTestId("configured-field").first()).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+  });
+}
+
 test('focus: start page prioritizes import, paste and examples without diagnostic prose',async({page})=>{
   await page.setViewportSize({width:360,height:800});await page.goto('/');
   const start=page.getByTestId('start-page');

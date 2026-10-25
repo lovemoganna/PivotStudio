@@ -24,7 +24,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
             aria-expanded={showMobileConfig}
             aria-controls="pivot-analysis-config"
             onClick={() => setShowMobileConfig((expanded) => !expanded)}
-            className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 text-left text-[11px] font-semibold flex items-center justify-between"
+            className="w-full rounded-lg border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2.5 py-1 min-h-[36px] text-left text-xs font-semibold flex items-center justify-between"
           >
             <span>{t("分析配置 · 行 / 列 / 值 / 筛选")}</span>
             <span className="text-ink-cyan">{showMobileConfig ? t("收起") : t("展开")}</span>
@@ -38,8 +38,8 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
           {/* Header row: Title + Actions + Novice guide */}
           <div className="relative flex items-center justify-between gap-1.5 flex-wrap shrink-0">
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2]">
-                {t("透视结构放置区")}
+              <span className="text-xs font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2]">
+                {t("分析配置")}
               </span>
               <details
                 open={showHelpGuide}
@@ -76,7 +76,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
               <button
                 disabled={isReadOnly}
                 onClick={transposeRowsAndColumns}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 min-h-[24px] rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] hover:text-[#FD971F] text-[9.5px] font-semibold transition disabled:opacity-40"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 min-h-[32px] rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#FD971F] hover:text-[#FD971F] text-[11px] font-semibold transition disabled:opacity-40"
                 title={t("一键互换行维度与列维度 (快捷键: R)")}
               >
                 <RotateCcw className="w-2.5 h-2.5 text-ink-orange" />
@@ -89,7 +89,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                   setPivotConfig?.(buildDefaultPivotConfig(currentDataset));
                   showToast?.('已恢复默认推荐透视配置');
                 }}
-                className="px-1.5 py-0.5 min-h-[24px] inline-flex items-center rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-ink-muted hover:text-ink-cyan text-[9.5px] font-semibold transition disabled:opacity-40"
+                className="px-1.5 py-0.5 min-h-[32px] inline-flex items-center rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-ink-muted hover:text-ink-cyan text-[11px] font-semibold transition disabled:opacity-40"
                 title={t("根据当前数据集自动生成推荐行列与指标")}
               >
                 <span>{t("恢复推荐")}</span>
@@ -110,7 +110,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                   });
                   showToast?.('已清空全部放置区配置，可按 ⌘Z / Ctrl+Z 随时撤销');
                 }}
-                className="px-1.5 py-0.5 min-h-[24px] inline-flex items-center rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] text-ink-muted hover:text-ink-pink text-[9.5px] font-semibold transition disabled:opacity-40"
+                className="px-1.5 py-0.5 min-h-[32px] inline-flex items-center rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#F92672] text-ink-muted hover:text-ink-pink text-[11px] font-semibold transition disabled:opacity-40"
                 title={t("清空全部行、列、值和筛选配置，重新开始")}
               >
                 <span>{t("清空")}</span>
@@ -121,7 +121,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
           {/* Beginner Guided Quick Start when config is completely empty */}
           {(pivotConfig?.rows?.length || 0) === 0 && (pivotConfig?.values?.length || 0) === 0 && (
             <div className="p-2 rounded-lg border border-dashed border-[#66D9EF]/50 bg-[#66D9EF]/10 space-y-1 text-xs shrink-0 select-none">
-              <div className="flex items-center justify-between text-[10.5px] font-bold text-ink-cyan">
+              <div className="flex items-center justify-between text-xs font-bold text-ink-cyan">
                 <span className="flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-ink-yellow" />
                   {t("新手快速起步向导")}
@@ -134,12 +134,12 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                     setPivotConfig?.(buildDefaultPivotConfig(currentDataset));
                     showToast?.('已自动为您配置推荐透视模型');
                   }}
-                  className="px-1.5 py-0.2 rounded bg-[#66D9EF] text-[#1E1F1C] text-[9.5px] font-bold hover:opacity-90 transition"
+                  className="px-2 py-1 min-h-[32px] rounded bg-[#66D9EF] text-[#1E1F1C] text-[11px] font-bold hover:opacity-90 transition"
                 >
                   {t("⚡ 推荐配置")}
                 </button>
               </div>
-              <p className="text-[9.5px] text-ink-muted leading-relaxed">
+              <p className="text-[11px] text-ink-muted leading-relaxed">
                 {t("从上方点击【+行】选择分类主体（如地区），再点击【+值】选择汇总数值（如销售额），即可自动生成透视表与图表！")}
               </p>
             </div>
