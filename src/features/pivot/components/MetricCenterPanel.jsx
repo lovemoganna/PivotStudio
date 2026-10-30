@@ -984,7 +984,7 @@ export function MetricCenterPanel({
                                 values: prev.values.map((v) => (v.id === vc.id ? { ...v, agg: nextAgg } : v)),
                               }));
                             }}
-                            className="px-1 py-0.5 min-h-[24px] max-w-[45%] rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-ink-orange font-bold text-[9.5px] truncate"
+                            className="w-0 min-w-0 flex-1 px-1 py-0.5 min-h-[24px] max-w-[45%] rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-ink-orange font-bold text-[9.5px] truncate"
                           >
                             {AGG_METHODS.map((m) => (
                               <option key={m.value} value={m.value}>{t(m.short)}</option>

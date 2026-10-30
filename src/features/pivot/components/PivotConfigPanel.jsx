@@ -161,7 +161,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                   setPivotConfig?.(buildDefaultPivotConfig(currentDataset));
                   showToast?.(setupEmpty ? '已应用推荐配置' : '已恢复默认推荐透视配置');
                 }}
-                className={`px-1.5 py-0.5 min-h-[24px] inline-flex items-center gap-1 rounded-md border text-[9.5px] font-semibold transition disabled:opacity-40 ${
+                className={`px-1.5 py-0.5 min-h-[24px] inline-flex items-center gap-1 rounded-md border text-[9.5px] font-semibold transition-opacity disabled:opacity-40 ${
                   setupEmpty
                     ? 'bg-[#66D9EF] border-[#66D9EF] text-[#1E1F1C] hover:opacity-90'
                     : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#66D9EF] text-ink-muted hover:text-ink-cyan'

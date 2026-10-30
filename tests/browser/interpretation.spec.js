@@ -77,8 +77,8 @@ test('interpretation: bar lengths preserve a two to one relationship with a zero
  await start(page,{csv:'Group,Amount\nA,10\nB,20',type:'bar'});
  const chart=page.locator('#pivot-chart-container');
  await expect(chart.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').first()).toHaveText('0');
- const heights=await chart.locator('.recharts-bar-rectangle path').evaluateAll(paths=>paths.map(p=>p.getBBox().height));
- expect(heights).toHaveLength(2);expect(heights[0]/heights[1]).toBeCloseTo(.5,2);
+ await expect(chart.locator('.recharts-bar-rectangle path')).toHaveCount(2);
+ await expect.poll(async()=>{const heights=await chart.locator('.recharts-bar-rectangle path').evaluateAll(paths=>paths.map(p=>p.getBBox().height));return heights[0]/heights[1];}).toBeCloseTo(.5,2);
  await chart.scrollIntoViewIfNeeded();await page.mouse.move(0,0);await chart.screenshot({path:info.outputPath('bar-zero-baseline.png')});
  await page.getByLabel('选择图表类型',{exact:true}).selectOption('area');
  await expect(chart.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').first()).toHaveText('0');
