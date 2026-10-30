@@ -24,10 +24,15 @@ export function projectView(source) {
   if (fullConfig.valueSort) fullConfig.valueSort = pick(fullConfig.valueSort,['colKey','valueId','direction']);
   return {
     version: 1, fullConfig,
+    schema: Array.isArray(source?.schema) ? source.schema.map(field => {
+      if (typeof field?.name !== 'string' || !['text','number','date','boolean'].includes(field.type)) throw new Error('数据结构描述无效');
+      if (field.unit !== undefined && (typeof field.unit !== 'string' || field.unit.length > 40)) throw new Error('字段单位必须为不超过 40 字的文本');
+      return {name:field.name,type:field.type,percent:field.percent === true,...(field.unit?.trim() ? {unit:field.unit.trim()} : {})};
+    }) : undefined,
     vm: ['split','chart','table'].includes(source?.vm) ? source.vm : 'split',
     ct: source?.ct || 'bar',
     cf: pick(source?.cf,['colorScale','showDataBar','customRuleEnabled','customRuleOp','customRuleValue','customRuleColor']),
-    csc: pick(source?.csc,['primaryValueId','secondaryValueId','sortMode','topN','missingValueMode','lineDerivedMetric','showDataLabels','showAvgReferenceLine','clickLinkMode','histogramBins','stickyRowHeaders']),
+    csc: pick(source?.csc,['primaryValueId','secondaryValueId','sortMode','topN','missingValueMode','lineDerivedMetric','showDataLabels','dataLabelPosition','showAvgReferenceLine','clickLinkMode','histogramBins','stickyRowHeaders']),
     ts: pick(source?.ts,['density','colWidthMode','dataAlignment','showZebra','wrapText','showExtremes','customColWidths']),
   };
 }

@@ -281,3 +281,30 @@ svg text {
 @media (pointer: coarse) {
   :root { --ps-control-min: 32px; }
 }
+
+/* Sidebars can leave a narrow editor even on a wide screen. Adapt to the
+   panel's available width rather than the browser's viewport breakpoint. */
+.metric-center { container: metric-center / inline-size; }
+.metric-center :is(.metric-metadata-grid, .metric-formula-grid) > * {
+  min-width: 0;
+}
+.metric-center :is(input, select, textarea) { max-width: 100%; }
+@container metric-center (min-width: 480px) {
+  .metric-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container metric-center (min-width: 600px) {
+  .metric-metadata-grid, .metric-formula-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .metric-metadata-grid > :nth-child(1) { grid-column: span 4; }
+  .metric-metadata-grid > :nth-child(2) { grid-column: span 3; }
+  .metric-metadata-grid > :nth-child(3) { grid-column: span 5; }
+  .metric-formula-grid > :nth-child(1),
+  .metric-formula-grid > :nth-child(3) { grid-column: span 5; }
+  .metric-formula-grid > :nth-child(2) { grid-column: span 2; }
+  .metric-catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container metric-center (min-width: 880px) {
+  .metric-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .metric-catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

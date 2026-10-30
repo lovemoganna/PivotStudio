@@ -21,7 +21,8 @@ test('Keynote dynamic generation adapts to datasets with rows and highlights rea
   assert.equal(shots.length, 5);
   // Shot 1 should highlight 'Shanghai' as top frequency in rows
   assert.equal(shots[0].title, '按「City」对比Sales');
-  assert.ok(shots[0].subtitle.includes('Shanghai'), 'Subtitle should dynamically include top category highlight');
+  assert.equal(shots[0].generated,true,'Preset prompts must be identified separately from user conclusions');
+  assert.ok(!shots[0].subtitle.includes('出现较多'),'Preset generation must not assert a frequency finding from an unfiltered sample');
   assert.equal(shots[0].pivotOverride.rows[0].field, 'City');
   assert.equal(shots[0].pivotOverride.values[0].field, 'Sales');
 

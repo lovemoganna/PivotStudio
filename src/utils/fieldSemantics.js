@@ -21,14 +21,16 @@ export function getMeasureDefaults(field) {
   const isId = isIdentifierField(field?.name || '');
   const isExplicitMeasure = field?.role === 'measure';
   const numeric = field?.type === 'number' && (!isId || isExplicitMeasure);
-  const average = numeric && (isRateField(field.name) || /^(score|age|temp|temperature|latency|cpu)$|率|比|分|度|龄|均/i.test(field.name));
+  const explicitPercent = numeric && ['fraction','whole'].includes(field.percentScale);
+  const average = numeric && (explicitPercent || isRateField(field.name) || /^(score|age|temp|temperature|latency|cpu)$|率|比|分|度|龄|均/i.test(field.name));
   return {
     agg: numeric ? (average ? 'avg' : 'sum') : (isId ? 'count_distinct' : 'count'),
     format: {
       thousands: true,
       decimals: average ? 1 : 0,
       currency: numeric ? field.currency || '' : '',
-      isPercent: numeric && isRateField(field.name),
+      isPercent: explicitPercent,
+      ...(numeric && !explicitPercent && field.unit ? {unit:field.unit.trim()} : {}),
     },
   };
 }

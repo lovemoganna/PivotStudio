@@ -117,7 +117,8 @@ test('system: cancelled public import cannot change data; retry uses consistent 
   await expect(page.getByLabel('选择当前数据集',{exact:true})).toHaveValue(initial);
   await page.getByRole('button',{name:'读取公开工作表',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await ready(page);
   await expect(page.getByLabel('切换聚合口径',{exact:true}).first()).toHaveValue('avg');
-  await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('20.0%');
+  // Public CSV has no declared percentage scale: names must not invent units.
+  await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('0.2');
   await expect(page.getByRole('button',{name:'撤销',exact:true})).toBeDisabled();
 });
 

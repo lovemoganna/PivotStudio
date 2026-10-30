@@ -90,8 +90,7 @@ test('metric: fifth KPI uses actual totals and external new-metric entry navigat
   await expect(center.getByTestId('metric-center-active-card')).toHaveCount(5);await expect(center.getByTestId('metric-center-active-card').last().locator('.text-sm.font-bold')).toHaveText('30');
   for(const width of [360,768,1280,1440]){
     await page.setViewportSize({width,height:900});
-    const overflows=await center.getByTestId('metric-center-active-card').evaluateAll(cards=>cards.flatMap(card=>{const box=card.getBoundingClientRect();return [...card.querySelectorAll('select')].map(select=>select.getBoundingClientRect().right-box.right);}));
-    expect(Math.max(...overflows)).toBeLessThanOrEqual(0);
+    await expect.poll(async()=>{const overflows=await center.getByTestId('metric-center-active-card').evaluateAll(cards=>cards.flatMap(card=>{const box=card.getBoundingClientRect();return [...card.querySelectorAll('select')].map(select=>select.getBoundingClientRect().right-box.right);}));return Math.max(...overflows);}).toBeLessThanOrEqual(0);
   }
   await center.getByRole('tab',{name:/指标库与模板/}).click();await page.getByTitle('打开指标中心新建自定义计算指标',{exact:true}).click();
   center=page.getByTestId('metric-center');await expect(center.getByRole('tab',{name:/新建自定义指标/})).toHaveAttribute('aria-selected','true');await expect(center.getByLabel('自定义指标名称',{exact:true})).toBeVisible();

@@ -1,4 +1,5 @@
 import { formatDimensionValue } from '../../../utils/formatters.js';
+import { analyticNumber } from '../../../utils/normalizeScalar.js';
 
 export function profileField(dataset, fieldName, dimension, matchLabel) {
   const rows = dataset?.rows || [];
@@ -14,8 +15,8 @@ export function profileField(dataset, fieldName, dimension, matchLabel) {
     nonNullCount++;
     values.set(text,(values.get(text)||0)+1);
     if(field?.type==='number') {
-      const value=Number(text.replace(/,/g,''));
-      if(Number.isFinite(value)){sum+=value;valid++;min=Math.min(min,value);max=Math.max(max,value);}
+      const value=analyticNumber(raw);
+      if(value !== null){sum+=value;valid++;min=Math.min(min,value);max=Math.max(max,value);}
     }
   }
   const entries=[...values];

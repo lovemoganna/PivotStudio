@@ -36,7 +36,7 @@ test('R2 GBK Chinese preview, delimiter, header and field overrides',async({page
   await upload(page,gbk,'gbk.csv');
   await expect(preview(page)).toContainText('张三');
   await expect(preview(page)).toContainText('GBK');
-  const field=preview(page).locator('select').last();
+  const field=preview(page).getByLabel('金额 · 字段类型',{exact:true});
   await field.selectOption('text');
   await expect(field).toHaveValue('text');
   await preview(page).getByLabel('表头',{exact:true}).selectOption('no');
@@ -47,7 +47,7 @@ test('R2 GBK Chinese preview, delimiter, header and field overrides',async({page
   await upload(page,'区域\t日期\t金额\n'+Array.from({length:25},(_,i)=>`华东\t2026-10-20\t${i}`).join('\n'),'tab.tsv');
   await expect(preview(page)).toContainText('25 行数据');
   await expect(preview(page).locator('tbody tr')).toHaveCount(20);
-  await expect(preview(page).locator('select').last()).toHaveValue('number');
+  await expect(preview(page).getByLabel('金额 · 字段类型',{exact:true})).toHaveValue('number');
 });
 
 test('R3 four-zone drag/drop, aggregations, history and 100k refresh budget',async({page})=>{
@@ -140,21 +140,21 @@ test('R5 local named views, last deletion and data-free share restore',async({pa
   await page.getByLabel('切换聚合口径',{exact:true}).first().selectOption('avg'); await ready(page);
   await clickMoreItem(page,/工作区/);
   await page.getByPlaceholder('输入新工作区快照名称...').fill('本机视图');
-  await page.getByRole('button',{name:'保存快照',exact:true}).click();
+  await page.getByRole('button',{name:'保存配置',exact:true}).click();
   const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('pivotstudio_workspaces_v1')));
   expect(stored[0].name).toBe('本机视图'); expect(stored[0]).not.toHaveProperty('rows');
   const link=await page.getByLabel('分享配置链接',{exact:true}).inputValue();
   expect(new URL(link).search).toBe('');
   const fresh=await context.newPage();
   await fresh.goto(link); await expect(fresh.locator('#pivot-main-html-table')).toHaveCount(0);
-  await upload(fresh,'销售大区,商品类别,销售额,销量\n华东,数码,100,1\n华南,家居,300,2');
+  await upload(fresh,'销售大区,城市,订单日期,商品类别,销售额,销量\n华东,上海,2026-01-01,数码,100,1\n华南,深圳,2026-02-01,家居,300,2');
   await expect(preview(fresh)).toBeVisible();
   await fresh.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
   await ready(fresh);
   await expect(fresh.getByLabel('切换聚合口径',{exact:true}).first()).toHaveValue('avg');
   await fresh.close();
   await page.getByRole('button',{name:'删除',exact:true}).click();
-  await expect(page.getByText('保存或切换本机工作区快照 (0)',{exact:true})).toBeVisible();
+  await expect(page.getByText('保存或切换本机分析配置 (0)',{exact:true})).toBeVisible();
   await page.reload();
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pivotstudio_workspaces_v1')).length)).toBe(0);
 });
@@ -344,7 +344,7 @@ test('review: saving recovers malformed local workspace storage across reload',a
   await expect(page.locator('[role=status]').filter({hasText:'本机视图无法读取'})).toBeVisible();
   await clickMoreItem(page,/工作区/);
   await page.getByPlaceholder('输入新工作区快照名称...').fill('Recovered');
-  await page.getByRole('button',{name:'保存快照',exact:true}).click();
+  await page.getByRole('button',{name:'保存配置',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('pivotstudio_workspaces_v1'))[0]?.name)).toBe('Recovered');
   await page.reload(); await ready(page);
   await clickMoreItem(page,/工作区/);

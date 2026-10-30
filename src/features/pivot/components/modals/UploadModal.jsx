@@ -2,6 +2,8 @@ import { t } from '../../../../i18n.js';
 import React from 'react';
 import { FileSpreadsheet, X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
+import { normalizeImportedValue } from '../../../../utils/percentScale.js';
+import { isRateField } from '../../../../utils/fieldSemantics.js';
 
 export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirmUploadDataset, onClose, onReparse, isImporting }) {
   const dialogRef = useDialogFocus(Boolean(uploadPreviewModal), onClose);
@@ -12,16 +14,18 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
   const sheetName = activeSheet.name || `Sheet ${activeSheetIdx + 1}`;
   const changeType = (fieldIndex, type) => setUploadPreviewModal(prev => ({
     ...prev, sheets: prev.sheets.map((sheet, index) => index === activeSheetIdx ? {
-      ...sheet, fields: sheet.fields.map((field, index) => index === fieldIndex ? { ...field, type } : field),
+      ...sheet, fields: sheet.fields.map((field, index) => index === fieldIndex ? { ...field, type, percentScale: 'none' } : field),
     } : sheet),
   }));
+  const changeScale = (fieldIndex,percentScale) => setUploadPreviewModal(prev => ({...prev,sheets:prev.sheets.map((sheet,index) => index === activeSheetIdx ? {...sheet,fields:sheet.fields.map((field,index) => index === fieldIndex ? {...field,percentScale} : field)} : sheet)}));
+  const changeUnit = (fieldIndex,unit) => setUploadPreviewModal(prev => ({...prev,sheets:prev.sheets.map((sheet,index) => index === activeSheetIdx ? {...sheet,fields:sheet.fields.map((field,index) => index === fieldIndex ? {...field,unit} : field)} : sheet)}));
 
   return (
     <div onClick={onClose} className="fixed inset-0 z-50 bg-black/65 backdrop-blur-md flex items-center justify-center p-4 animate-apple-fade-in">
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('文件数据预览与类型校准')} tabIndex={-1} onClick={e => e.stopPropagation()}
         className="w-full max-w-6xl min-w-0 max-h-[calc(100dvh-2rem)] rounded-2xl bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] shadow-2xl flex flex-col overflow-hidden animate-apple-modal">
         {/* Header */}
-        <header className="shrink-0 px-4 sm:px-6 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-start gap-3">
+        <div className="shrink-0 px-4 sm:px-6 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-start gap-3">
           <FileSpreadsheet aria-hidden="true" className="w-5 h-5 mt-0.5 shrink-0 text-ink-green" />
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
@@ -37,7 +41,7 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
           <button onClick={onClose} aria-label={t('关闭文件预览')} className="shrink-0 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-ink-muted hover:text-[#F92672] transition">
             <X className="w-5 h-5" />
           </button>
-        </header>
+        </div>
 
         {/* Scrollable Body */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 text-xs">
@@ -101,7 +105,18 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
               <p className="text-[11px] text-ink-muted">{t('在列名下方校准字段类型')}</p>
             </div>
             <p className="text-[10.5px] text-ink-muted">{t('空值保持为空；无法转换的内容会保留原值，不会当作 0 或“否”。')}</p>
-            {activeSheet.fields.length > 2 && <p className="text-[10px] text-ink-cyan apple-font-mono">{t('左右滚动查看其余列')}</p>}
+            <p className="text-[10.5px] text-ink-muted">{t('百分比需确认源值尺度；字段名称不能确定尺度。百分数导入后统一存为小数，表格、图表和导出使用同一数值。')}</p>
+            {activeSheet.fields.some(f=>f.type==='number' && !['whole','fraction'].includes(f.percentScale)) && <details className="text-[11px]">
+              <summary className="cursor-pointer text-ink-cyan py-1">{t('字段单位（可选）')}</summary>
+              <p className="mt-1 text-ink-muted">{t('按源数据填写；仅标注单位，不换算数值。保存分析配置后，换源时会核对已声明的单位。')}</p>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {activeSheet.fields.map((field,index)=>field.type==='number' && !['whole','fraction'].includes(field.percentScale) && <label key={field.name} className="min-w-0 text-ink-muted">
+                  <span className="block break-words">{field.name}</span>
+                  <input aria-label={`${field.name} · ${t('源单位')}`} value={field.unit || field.currency || ''} disabled={isImporting} maxLength={40} onChange={e=>changeUnit(index,e.target.value)} placeholder={t('例如 kg、ms、元、万元')} className="mt-1 w-full min-w-0 rounded-md border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2 py-1" />
+                </label>)}
+              </div>
+            </details>}
+            {activeSheet.fields.length > 1 && <p className="text-[10px] text-ink-cyan apple-font-mono">{t('左右滚动查看其余列')}</p>}
             <div data-testid="import-table-scroll" tabIndex={0} role="region" aria-label={t('数据预览，可横向滚动')}
               className="max-h-[45dvh] overflow-auto rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32]">
               <table className="w-max min-w-full border-collapse text-xs apple-font-mono">
@@ -113,10 +128,23 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
                         <select aria-label={`${field.name} · ${t('字段类型')}`} disabled={isImporting} value={field.type} onChange={e => changeType(index, e.target.value)}
                           className="block mt-2 w-full rounded-md bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] px-2 py-1 text-xs font-normal text-ink-pink focus:outline-none focus:border-[#66D9EF]">
                           <option value="text">{t('文本 (text)')}</option>
-                          <option value="number">{t('数字 (number)')}</option>
+                          <option value="number" disabled={field.precisionProtected}>{t('数字 (number)')}</option>
                           <option value="date">{t('日期 (date)')}</option>
                           <option value="boolean">{t('布尔值 (boolean)')}</option>
                         </select>
+                        {field.precisionProtected && <p className="mt-1 text-[10px] font-normal text-ink-orange">{t('超出安全整数精度，保留为文本；请勿作为普通数值计算。')}</p>}
+                        {field.type === 'number' && <>
+                          <label className="block mt-2 text-[10px] text-ink-muted">
+                            {t('数值尺度')}
+                            <select aria-label={`${field.name} · ${t('数值尺度')}`} disabled={isImporting} value={field.percentScale || 'none'} onChange={e => changeScale(index,e.target.value)} className="block mt-1 w-full rounded-md bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] px-2 py-1 text-xs font-normal text-ink-pink">
+                              <option value="none">{t('普通数值（保留源值）')}</option>
+                              <option value="fraction">{t('百分比小数：0.35 → 35%')}</option>
+                              <option value="whole">{t('百分数：35 → 35%')}</option>
+                            </select>
+                          </label>
+                          {(!field.percentScale || field.percentScale === 'none') && isRateField(field.name) && <p className="mt-1 font-normal text-[10px] text-ink-orange">{t('名称可能表示比率，请确认尺度；当前保留原数值。')}</p>}
+                          {['whole','fraction'].includes(field.percentScale) && <p data-testid="percent-preview" className="mt-1 font-normal text-[10px] text-ink-muted">{t('示例：')}{(() => { const source = activeSheet.rows.find(row => typeof normalizeImportedValue(row[field.name],field) === 'number')?.[field.name]; const value = normalizeImportedValue(source,field); return source === undefined ? t('无有效数值') : `${source} → ${(value*100).toFixed(2)}%`; })()}</p>}
+                        </>}
                       </th>
                     ))}
                   </tr>
@@ -138,7 +166,7 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
         </div>
 
         {/* Footer Actions */}
-        <footer className="shrink-0 px-4 sm:px-6 py-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 bg-[#FFFDF7] dark:bg-[#272822]">
+        <div className="shrink-0 px-4 sm:px-6 py-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 bg-[#FFFDF7] dark:bg-[#272822]">
           <button disabled={isImporting} onClick={() => confirmUploadDataset(false)}
             className="px-3.5 py-2 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 apple-font-mono transition">
             {t('仅导入数据（清空当前透视）')}
@@ -148,7 +176,7 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
             <Sparkles className="w-3.5 h-3.5" />
             <span>{t('确认导入并自动构建推荐透视')}</span>
           </button>
-        </footer>
+        </div>
       </div>
     </div>
   );

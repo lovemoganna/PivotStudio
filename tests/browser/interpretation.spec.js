@@ -77,8 +77,8 @@ test('interpretation: bar lengths preserve a two to one relationship with a zero
  await start(page,{csv:'Group,Amount\nA,10\nB,20',type:'bar'});
  const chart=page.locator('#pivot-chart-container');
  await expect(chart.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').first()).toHaveText('0');
- const heights=await chart.locator('.recharts-bar-rectangle path').evaluateAll(paths=>paths.map(p=>p.getBBox().height));
- expect(heights).toHaveLength(2);expect(heights[0]/heights[1]).toBeCloseTo(.5,2);
+ await expect(chart.locator('.recharts-bar-rectangle path')).toHaveCount(2);
+ await expect.poll(async()=>{const heights=await chart.locator('.recharts-bar-rectangle path').evaluateAll(paths=>paths.map(p=>p.getBBox().height));return heights[0]/heights[1];}).toBeCloseTo(.5,2);
  await chart.scrollIntoViewIfNeeded();await page.mouse.move(0,0);await chart.screenshot({path:info.outputPath('bar-zero-baseline.png')});
  await page.getByLabel('选择图表类型',{exact:true}).selectOption('area');
  await expect(chart.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').first()).toHaveText('0');
@@ -114,7 +114,7 @@ test('interpretation: chart studio guide & notes, donut highlight value, and len
  const guide=page.getByTestId('chart-guide-note');
  await expect(guide).toBeVisible();
  await expect(guide).toContainText('怎么读这张图');
- await expect(guide).toContainText('我的结论');
+ await expect(guide).toContainText('配置摘要');
  // Switching chart type in chart-only mode preserves chart-only mode
  await page.getByLabel('选择图表类型',{exact:true}).selectOption('line');await ready(page);
  await expect(page.getByRole('button',{name:'仅图表',exact:true})).toHaveAttribute('aria-pressed','true');
@@ -125,6 +125,7 @@ test('interpretation: chart studio guide & notes, donut highlight value, and len
  await dialog.getByLabel('分析结论:',{exact:true}).fill('零基础用户记录的季度增长结论');
  await dialog.getByRole('button',{name:'保存修改',exact:true}).click();await expect(dialog).toHaveCount(0);
  await expect(guide).toContainText('零基础用户记录的季度增长结论');
+ await expect(guide).toContainText('我的结论');
  // Back to bars for drill-down; click must not leak __GRAND_TOTAL_COL__
  await page.getByLabel('选择图表类型',{exact:true}).selectOption('bar');await ready(page);
  await chart.locator('.recharts-bar-rectangle').first().click();
