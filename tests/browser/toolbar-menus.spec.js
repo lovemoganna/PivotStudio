@@ -60,6 +60,7 @@ test('toolbar: controls and floating menus work in English and dark mode',async(
   const menu=page.getByRole('menu',{name:'Export formats',exact:true});
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem',{name:'.XLSX',exact:true})).toHaveCSS('color','rgb(248, 248, 242)');
+  await expect(page.locator('#pivot-main-html-table')).toHaveCSS('color','rgb(248, 248, 242)');
   expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
 });
 

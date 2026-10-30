@@ -1014,7 +1014,7 @@ export function PivotTable({
           />
         )}
 
-        <table id="pivot-main-html-table" role="table" style={narrowTable ? {tableLayout:'fixed',width:tableWidth} : undefined} className="border-separate border-spacing-0 text-[11px] select-text tabular-nums min-w-full">
+        <table id="pivot-main-html-table" role="table" style={narrowTable ? {tableLayout:'fixed',width:tableWidth} : undefined} className="border-separate border-spacing-0 text-[11px] text-[#272822] dark:text-[#F8F8F2] select-text tabular-nums min-w-full">
           {narrowTable && <colgroup>
             {Array.from({length:Math.max(1,pivotResult.rowConfigs.length)},(_,index)=><col key={`row-${index}`} style={{width:getRowColWidth(index)}} />)}
             {pivotResult.allColGroups.flatMap(group=>pivotResult.valConfigs.map(metric=><col key={`${group.key}-${metric.id}`} style={{width:getValColWidth(group.key,metric.id)}} />))}

@@ -7,8 +7,9 @@ import {clickExport} from './_toolbar.js';
 import {ensureMobileShelves} from './_mobileShelves.js';
 
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
-const upload=async(page,csv,recommend=false)=>{
+const upload=async(page,csv,recommend=false,percentField)=>{
   await page.locator('input[type=file]').first().setInputFiles({name:'explicit-synthetic-learning.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  if(percentField)await page.getByLabel(`${percentField} · 数值尺度`,{exact:true}).selectOption('fraction');
   await page.getByRole('button',{name:recommend?'确认导入并自动构建推荐透视':'仅导入数据（清空当前透视）',exact:true}).click();await ready(page);
 };
 test.beforeEach(async({page})=>{
@@ -45,7 +46,7 @@ for(const width of [360,768,1280,1440])test(`learning: first analysis, grouped c
 });
 
 test('learning: overall rate is calculated from records, not by adding group averages',async({page})=>{
-  await page.goto('/');await upload(page,'区域,转化率\n华东,0.1\n华东,0.3\n华南,0.5',true);
+  await page.goto('/');await upload(page,'区域,转化率\n华东,0.1\n华东,0.3\n华南,0.5',true,'转化率');
   await expect(page.getByTestId('pivot-value-cell').first()).toHaveText('20.0%');
   await expect(page.getByTestId('pivot-value-cell').nth(1)).toHaveText('50.0%');
   await page.mouse.move(0,0);
@@ -62,7 +63,7 @@ test('learning: overall rate is calculated from records, not by adding group ave
 });
 
 test('learning: manual rate is averaged, count has no percent and undo restores the rate',async({page})=>{
-  await page.goto('/');await upload(page,'区域,转化率\n华东,0.1\n华东,0.3\n华南,0.5');
+  await page.goto('/');await upload(page,'区域,转化率\n华东,0.1\n华东,0.3\n华南,0.5',false,'转化率');
   await page.getByRole('button',{name:'+值 · 添加「转化率」到计算指标',exact:true}).click();await ready(page);
   await expect(page.getByLabel('切换聚合口径',{exact:true})).toHaveValue('avg');
   await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('30.0%');

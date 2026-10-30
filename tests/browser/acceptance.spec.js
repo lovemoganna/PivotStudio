@@ -36,7 +36,7 @@ test('R2 GBK Chinese preview, delimiter, header and field overrides',async({page
   await upload(page,gbk,'gbk.csv');
   await expect(preview(page)).toContainText('张三');
   await expect(preview(page)).toContainText('GBK');
-  const field=preview(page).locator('select').last();
+  const field=preview(page).getByLabel('金额 · 字段类型',{exact:true});
   await field.selectOption('text');
   await expect(field).toHaveValue('text');
   await preview(page).getByLabel('表头',{exact:true}).selectOption('no');
@@ -47,7 +47,7 @@ test('R2 GBK Chinese preview, delimiter, header and field overrides',async({page
   await upload(page,'区域\t日期\t金额\n'+Array.from({length:25},(_,i)=>`华东\t2026-10-20\t${i}`).join('\n'),'tab.tsv');
   await expect(preview(page)).toContainText('25 行数据');
   await expect(preview(page).locator('tbody tr')).toHaveCount(20);
-  await expect(preview(page).locator('select').last()).toHaveValue('number');
+  await expect(preview(page).getByLabel('金额 · 字段类型',{exact:true})).toHaveValue('number');
 });
 
 test('R3 four-zone drag/drop, aggregations, history and 100k refresh budget',async({page})=>{

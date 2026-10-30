@@ -54,11 +54,13 @@ test('workspace: saved desktop width adapts on reload and viewport changes witho
   await start(page, 1440);
   await handle(page).press('End');
   await expect(handle(page)).toHaveAttribute('aria-valuenow', '680');
-  await page.setViewportSize({width:768, height:900});
-  await expect(handle(page)).toHaveAttribute('aria-valuenow', '422');
+  // Test reload persistence away from the exact desktop/mobile CSS breakpoint.
+  // The 768px clamp and adjustment remain covered below and in the bounds cases.
+  await page.setViewportSize({width:800, height:900});
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '440');
   await usable(page);
   await page.reload(); await ready(page);
-  await expect(handle(page)).toHaveAttribute('aria-valuenow', '422');
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '440');
   await usable(page);
   await page.screenshot({path:info.outputPath('restored-tablet.png'), fullPage:true});
   await page.setViewportSize({width:360, height:900});
