@@ -132,12 +132,12 @@ try{
   assert.equal(await evaluate('!!document.getElementById("pivot-main-html-table")'),true);
   assert.equal(await clickText('表图并列') || await clickText('表图上下'),true,'split button');
   await sleep(200);
-  const before=await evaluate('(() => { const e=document.querySelector("[role=separator]"); if(!e)return null; const v=e.getAttribute("aria-valuenow"); e.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true}));return v; })()');
+  const before=await evaluate('(() => { const e=document.getElementById("split-resizer"); if(!e)return null; const v=e.getAttribute("aria-valuenow"); e.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true}));return v; })()');
   if(before===null)errors.push('keyboard separator missing');
   else {
     await sleep(200);
-    const after=await evaluate('document.querySelector("[role=separator]")?.getAttribute("aria-valuenow")');
-    if(Number(after)!==Math.min(75,Number(before)+5))errors.push('keyboard splitter did not update');
+    const after=await evaluate('document.getElementById("split-resizer")?.getAttribute("aria-valuenow")');
+    if(Number(after)!==Math.min(80,Number(before)+5))errors.push('keyboard splitter did not update');
   }
   // Chart type lives in a compact select; analysis notes stay collapsed by default in split mode.
   if(!await evaluate('!!document.querySelector(\'select[aria-label="选择图表类型"]\')'))errors.push('chart type select missing');
