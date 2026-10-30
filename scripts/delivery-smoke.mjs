@@ -2,6 +2,7 @@ import { chromium, expect } from '@playwright/test';
 import { createServer } from 'vite';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { parseCSVRecords } from '../src/utils/csvParser.js';
+import { clickExport } from '../tests/browser/_toolbar.js';
 
 // Use an explicit synthetic fixture for mechanics; this is not business-data evidence.
 const remote=process.env.DELIVERY_URL;
@@ -26,7 +27,7 @@ try {
     await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();
     const ready=()=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle',{timeout:45000});
     await ready();
-    if(width===360)await page.getByRole('button',{name:/分析配置/}).click();
+    if(width===360){const config=page.getByRole('button',{name:/分析配置/});if(await config.getAttribute('aria-expanded')==='false')await config.click();}
     await page.getByTestId('zone-rows').getByRole('button',{name:'筛选值',exact:true}).click();
     const filter=page.getByRole('dialog',{name:'字段筛选',exact:true});
     await filter.getByLabel('华南',{exact:true}).uncheck();
@@ -39,7 +40,7 @@ try {
     const drill=page.getByRole('dialog',{name:'原始交易明细下钻',exact:true});
     await expect(drill).toContainText('2 条记录');
     await page.getByRole('button',{name:'关闭下钻明细',exact:true}).click();
-    const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'.CSV',exact:true}).click();
+    const downloaded=page.waitForEvent('download');await clickExport(page,'.CSV');
     const rows=parseCSVRecords(await readFile(await (await downloaded).path(),'utf8'));
     expect(rows.flat()).toContain('华东');expect(rows.flat()).not.toContain('华南');
     expect(rows.flat().some(value=>value.replace(/^[¥$]/,'')==='30')).toBe(true);

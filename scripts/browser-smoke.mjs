@@ -69,7 +69,7 @@ try{
     await sleep(400);
     await evaluate('(() => { window.scrollTo(0,0); document.querySelectorAll("*").forEach(el => { if(el.scrollTop > 0) el.scrollTop=0; }); return true; })()');
     await sleep(90);
-    const result=await evaluate('(() => { const ch=document.getElementById("pivot-chart-container"); const tb=document.getElementById("pivot-main-html-table"); const sidebar=document.querySelector("aside"); return {pageWidth:document.documentElement.scrollWidth, viewportWidth:innerWidth, chartVisible:!!ch&&ch.getBoundingClientRect().height>0, tableVisible:!!tb&&tb.getBoundingClientRect().height>0, sidebarHeight:sidebar?.getBoundingClientRect().height || 0, datasetLabel:document.body.textContent.includes("数据来源："), appTitle:Array.from(document.querySelectorAll("h1")).find(h=>h.offsetParent!==null)?.textContent||""}; })()');
+    const result=await evaluate('(() => { const ch=document.getElementById("pivot-chart-container"); const tb=document.getElementById("pivot-main-html-table"); const sidebar=document.querySelector("aside"); return {pageWidth:document.documentElement.scrollWidth, viewportWidth:innerWidth, chartVisible:!!ch&&ch.getBoundingClientRect().height>0, tableVisible:!!tb&&tb.getBoundingClientRect().height>0, sidebarHeight:sidebar?.getBoundingClientRect().height || 0, datasetLabel:!!document.querySelector("[data-testid=dataset-telemetry]"), appTitle:Array.from(document.querySelectorAll("h1")).find(h=>h.offsetParent!==null)?.textContent||""}; })()');
     if(result.pageWidth>result.viewportWidth+2)errors.push(name+': horizontal overflow '+JSON.stringify(result));
     if((name==='mobile'||name==='small-mobile') && result.sidebarHeight>235)errors.push('mobile sidebar exceeds compact height: '+result.sidebarHeight);
     if(name==='mobile'||name==='small-mobile') {
@@ -153,7 +153,9 @@ try{
   console.log('CHART_TYPES_VERIFIED',JSON.stringify(kinds));
   await evaluate('(() => { const el=document.querySelector(\'select[aria-label="选择图表类型"]\');el.value="bar";el.dispatchEvent(new Event("change",{bubbles:true}));return true; })()');
   await sleep(130);
-  for(const [label,description] of [['格式与数值','数值与条件格式设置'],['内置校验','内置校验结果'],['工作区','本机工作区与配置分享']]){
+  assert.equal(await evaluate('!Array.from(document.querySelectorAll("button")).some(b=>b.textContent.trim()==="内置校验")'),true,'retired internal diagnostic stays out of the user toolbar');
+  for(const [label,description] of [['格式与数值','数值与条件格式设置'],['工作区','本机工作区与配置分享']]){
+    if(label==='工作区'){assert.equal(await clickText('更多'),true,'open workspace menu');await sleep(130);}
     assert.equal(await clickText(label),true,'open '+description);
     await sleep(130);
     const focused=await evaluate('(() => {const d=document.querySelector("[role=dialog]"); return d?{label:d.getAttribute("aria-label"),focused:d.contains(document.activeElement)}:null;})()');
@@ -162,7 +164,11 @@ try{
     await sleep(130);
     if(await evaluate('!!document.querySelector("[role=dialog]")'))errors.push('Escape did not close '+description);
   }
-  assert.equal(await clickText('SQL代理'),true);
+  assert.equal(await clickText('+来源'),true,'open data source manager');
+  await sleep(160);
+  const gsheet=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
+  if(!gsheet.includes('公开'))errors.push('GSheet access limits missing');
+  assert.equal(await clickText('SQL 连接说明'),true);
   await sleep(160);
   const sql=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
   if(!sql.includes('尚未实现'))errors.push('SQL integration misrepresented');
@@ -171,11 +177,6 @@ try{
   await evaluate('document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
   await sleep(160);
   if(await evaluate('!!document.querySelector("[role=dialog]")'))errors.push('Escape did not close SQL dialog');
-  assert.equal(await clickText('GSheet'),true);
-  await sleep(160);
-  const gsheet=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
-  if(!gsheet.includes('公开'))errors.push('GSheet access limits missing');
-  await evaluate('document.querySelector("button[aria-label=\\"关闭数据源\\"]")?.click()');
   const themeBefore=await evaluate('!!document.querySelector(".dark")');
   await evaluate('document.querySelector("button[aria-label=\\"切换主题\\"]")?.click()');
   await sleep(250);
@@ -194,7 +195,7 @@ try{
     const preview=await evaluate('document.querySelector("[role=dialog]")?.textContent || ""');
     if(!preview.includes('33 行')||!preview.includes('12 个字段'))errors.push('import preview did not show 33 records and 12 fields');
     assert.equal(await clickText('确认导入'),true,'confirm real CSV import');
-    await waitFor(async()=>await evaluate('document.body.textContent.includes("test_retail_sales.csv (33行)") && document.body.textContent.includes("数据来源：本地导入文件")'),'imported dataset state',12000);
+    await waitFor(async()=>await evaluate('document.body.textContent.includes("test_retail_sales.csv (33行)") && document.querySelector("[data-testid=dataset-telemetry]")?.textContent.includes("本地导入文件")'),'imported dataset state',12000);
     const imported=await evaluate('({name:document.querySelector("select")?.selectedOptions?.[0]?.textContent,table:document.querySelectorAll("#pivot-main-html-table tbody tr").length})');
     console.log('REAL_CSV_IMPORT',JSON.stringify(imported));
     if(imported.table<1)errors.push('imported pivot produced no table rows');
@@ -202,6 +203,7 @@ try{
     const downloads=join(process.cwd(),'artifacts/browser/downloads');
     await mkdir(downloads,{recursive:true});
     await send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:downloads,eventsEnabled:true});
+    assert.equal(await clickText('导出'),true,'open export menu');await sleep(130);
     assert.equal(await clickText('.XLSX'),true,'Excel export after real CSV import');
     const excelFile=await waitFor(async()=>{
       const names=await readdir(downloads);
@@ -213,6 +215,7 @@ try{
     const exported=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
     console.log('REAL_XLSX_EXPORT',JSON.stringify({sheets:book.SheetNames,rows:exported.length,columns:exported[0]?.length}));
     if(exported.length<4)errors.push('Excel workbook missing pivot rows');
+    assert.equal(await clickText('导出'),true,'open export menu');await sleep(130);
     assert.equal(await clickText('.CSV'),true,'CSV export after import');
     const csvFile=await waitFor(async()=>{
       const names=await readdir(downloads);
@@ -229,10 +232,11 @@ try{
   // Browser performance evidence: actual 100k synthetic records and responsiveness.
   await evaluate('(() => { window.__psLongTasks = []; if(typeof PerformanceObserver === "function"){try{const obs=new PerformanceObserver(list=>window.__psLongTasks.push(...list.getEntries().map(e=>e.duration)));obs.observe({entryTypes:["longtask"]});window.__psLongTaskObserver=obs;}catch{}}return true;})()');
   const largeStart=Date.now();
-  assert.equal(await clickText('100K压测'),true,'open synthetic data benchmark');
+  assert.equal(await clickText('+来源'),true,'open data source manager');await sleep(130);
+  assert.equal(await clickText('SQL 模板与压测'),true,'open synthetic data benchmark');
   await sleep(120);
   assert.equal(await clickText('生成 100,000 行合成数据'),true,'generate 100k local rows');
-  await waitFor(async()=>await evaluate('document.body.textContent.includes("100,000 / 100,000 行") && document.body.textContent.includes("本地合成压测数据")'),'100k-row real browser analysis',45000);
+  await waitFor(async()=>await evaluate('document.querySelector("[data-testid=dataset-telemetry]")?.textContent.replace(/\\s+/g,"").includes("100000/100000行") && document.body.textContent.includes("本地合成压测数据")'),'100k-row real browser analysis',45000);
   const largeWallMs=Date.now()-largeStart;
   const perf=await evaluate('({rows:document.body.textContent.includes("100,000 / 100,000 行"), chartVisible:!!document.getElementById("pivot-chart-container") && document.getElementById("pivot-chart-container").getBoundingClientRect().height>0, longTasks:window.__psLongTasks?.length||0,maxLongTaskMs:Math.round(Math.max(0,...(window.__psLongTasks||[]))),totalLongTaskMs:Math.round((window.__psLongTasks||[]).reduce((a,b)=>a+b,0))})');
   if(!perf.rows || !perf.chartVisible)errors.push('100k browser workbench not ready');
