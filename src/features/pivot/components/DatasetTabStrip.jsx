@@ -1,6 +1,7 @@
 import { t } from '../../../i18n.js';
 import React from 'react';
 import { Database, Plus, X, Zap } from 'lucide-react';
+import { ALL_BENCHMARK_PRESETS } from '../../../constants/benchmarkDatasets.js';
 
 export function DatasetTabStrip({
   datasets,
@@ -21,7 +22,7 @@ export function DatasetTabStrip({
 
   const sourceLabel = !currentDataset
     ? t("未载入数据集")
-    : currentDataset.id === 'retail_demo' || currentDataset.name?.includes('零售')
+    : ALL_BENCHMARK_PRESETS.some(preset => preset.id === currentDataset.id)
     ? t("内置演示数据")
     : currentDataset.id?.startsWith('ds_100k_')
     ? t("本地合成压测数据")

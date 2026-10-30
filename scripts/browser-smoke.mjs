@@ -236,7 +236,7 @@ try{
   assert.equal(await clickText('SQL 模板与压测'),true,'open synthetic data benchmark');
   await sleep(120);
   assert.equal(await clickText('生成 100,000 行合成数据'),true,'generate 100k local rows');
-  await waitFor(async()=>await evaluate('document.querySelector("[data-testid=dataset-telemetry]")?.textContent.replace(/\\s+/g,"").includes("100000/100000行") && document.body.textContent.includes("本地合成压测数据")'),'100k-row real browser analysis',45000);
+  await waitFor(async()=>await evaluate('document.querySelector("[data-testid=dataset-telemetry]")?.textContent.replace(/[\\s,]+/g,"").includes("100000/100000行") && document.body.textContent.includes("本地合成压测数据")'),'100k-row real browser analysis',45000);
   const largeWallMs=Date.now()-largeStart;
   const perf=await evaluate('({rows:document.body.textContent.includes("100,000 / 100,000 行"), chartVisible:!!document.getElementById("pivot-chart-container") && document.getElementById("pivot-chart-container").getBoundingClientRect().height>0, longTasks:window.__psLongTasks?.length||0,maxLongTaskMs:Math.round(Math.max(0,...(window.__psLongTasks||[]))),totalLongTaskMs:Math.round((window.__psLongTasks||[]).reduce((a,b)=>a+b,0))})');
   if(!perf.rows || !perf.chartVisible)errors.push('100k browser workbench not ready');
