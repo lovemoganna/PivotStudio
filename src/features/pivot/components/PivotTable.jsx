@@ -9,7 +9,8 @@ import { AGG_METHODS, SHOW_AS_MODES, buildDefaultPivotConfig } from '../../../co
 import { decodeGroupPath } from '../../../utils/groupKeys.js';
 import { getColorScaleStyle, formatCellNumber, getDimDisplayLabel } from '../../../utils/formatters';
 import { calculateAutoFitColumnWidths, calculateSingleColumnAutoFit } from '../../../utils/tableAutoFit';
-import { buildResultQuestion } from '../../../utils/analysisReading.js';
+import { buildResultQuestion, buildTotalReading } from '../../../utils/analysisReading.js';
+import { cellEvidence, sampleEvidence } from '../../../utils/resultEvidence.js';
 
 export function PivotTable({
   requestProfile,
@@ -140,10 +141,12 @@ export function PivotTable({
 
   // Slicer Value Pills with record counts
   const [slicerValuePills,setSlicerValuePills] = useState([]);
+  const [slicerDistinctCount,setSlicerDistinctCount] = useState(0);
   useEffect(() => {
     let active=true;
     setSlicerValuePills([]);
-    if(activeSlicerField) requestProfile?.(activeSlicerField).then((profile)=>{if(active && profile)setSlicerValuePills(profile.slicerValues);}).catch((error)=>{if(active && error.name!=='AbortError')showToast?.('切片器统计失败，请重新计算后重试','error');});
+    setSlicerDistinctCount(0);
+    if(activeSlicerField) requestProfile?.(activeSlicerField).then((profile)=>{if(active && profile){setSlicerValuePills(profile.slicerValues);setSlicerDistinctCount(profile.distinctValues.length);}}).catch((error)=>{if(active && error.name!=='AbortError')showToast?.('切片器统计失败，请重新计算后重试','error');});
     return ()=>{active=false;};
   },[activeSlicerField,requestProfile,showToast]);
 
@@ -151,6 +154,13 @@ export function PivotTable({
   const currentSlicerFilter = useMemo(() => (pivotConfig?.filters || []).find((f) => f.field === activeSlicerField), [pivotConfig?.filters, activeSlicerField]);
   const currentSlicerSelected = currentSlicerFilter?.selectedValues || [];
   const slicerSelectsAll = !currentSlicerFilter?.excludeAll && currentSlicerSelected.length === 0;
+
+  const openAllSlicerValues = () => {
+    if (isReadOnly) return;
+    const dim = currentSlicerFilter || {field:activeSlicerField,selectedValues:[],id:`filter_${Date.now()}`};
+    setHeaderFilterSearch('');
+    setActiveHeaderFilterModal({zone:'filters',dim});
+  };
 
   const handleSlicerToggle = useCallback((val) => {
     soundEngine?.playClick?.(540);
@@ -521,6 +531,17 @@ export function PivotTable({
             <span className="font-semibold text-[#272822] dark:text-[#F8F8F2]">{t('这张表：')}</span>
             {resultQuestion}
           </p>
+          <details data-testid="total-reading" className="mt-0.5 text-[#57584B] dark:text-[#C4C4B8] [overflow-wrap:anywhere]">
+            <summary className="w-fit cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] text-ink-cyan font-medium">{t('总计怎么算？')}</summary>
+            <ul className="mt-1 space-y-1 list-disc pl-4">
+              {buildTotalReading(pivotResult.valConfigs).map(note => <li key={note}>{note}</li>)}
+            </ul>
+          </details>
+          <details data-testid="sample-evidence" className="mt-0.5 text-ink-muted [overflow-wrap:anywhere]">
+            <summary className="w-fit cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] text-ink-cyan font-medium">{t('有效样本与排除项')}{Object.values(pivotResult.sampleStatsByValId || {}).some(s=>s.missing || s.invalid) ? ` · ${t('有排除项')}` : ''}</summary>
+            <p>{t('以下数量基于当前筛选范围；有效记录数不等于去重后的数量。')}</p>
+            <ul className="mt-1 space-y-1 list-disc pl-4">{pivotResult.valConfigs.map(metric => <li key={metric.id}>{metric.field === '__COUNT__' ? t('记录数') : metric.field} · {metric.isCalculated ? t('公式按各操作数分别聚合，不能用单一有效样本数代表；查看单元格明细了解不可计算的原因。') : sampleEvidence(pivotResult.sampleStatsByValId?.[metric.id])}</li>)}</ul>
+          </details>
         </div>
       ) : null}
       {pivotResult.filteredCount === 0 && (
@@ -539,8 +560,15 @@ export function PivotTable({
       )}
 
       {/* Universal Slicer Pills Bar (通用快捷切片器胶囊条) */}
-      {slicerFields.length > 0 && slicerValuePills.length > 0 && (
-        <div className="bg-[#FAF8F1] dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1 flex items-center gap-2 overflow-x-auto text-[10px] apple-font-mono shrink-0 select-none">
+      {slicerFields.length > 0 && slicerDistinctCount > 0 && (
+        <div data-testid="quick-slicer" className="bg-[#FAF8F1] dark:bg-[#22231E] border-b border-[#D6D4C8] dark:border-[#3E3D32] px-3 py-1 flex flex-col gap-1 text-[10px] apple-font-mono shrink-0 select-none">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <span className="text-ink-muted">{t('括号为源数据条数，不随筛选变化')}</span>
+            <button type="button" disabled={isReadOnly} onClick={openAllSlicerValues} className="shrink-0 px-2 py-1 rounded border border-[#D6D4C8] dark:border-[#49483E] text-ink-cyan disabled:opacity-40">
+              {t('查看全部')} ({slicerDistinctCount})
+            </button>
+          </div>
+          <div className="flex min-w-0 items-center gap-2">
           <div className="flex items-center gap-1.5 shrink-0 text-ink-muted font-bold">
             <Filter className="w-3 h-3 text-ink-green" />
             <span className="hidden sm:inline">{t("切片器:")}</span>
@@ -561,6 +589,7 @@ export function PivotTable({
 
           <div className="flex items-center gap-1 overflow-x-auto min-w-0 pr-1">
             <button
+              disabled={isReadOnly}
               onClick={() => handleSlicerToggle(null)}
               aria-pressed={slicerSelectsAll}
               className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-semibold transition shrink-0 ${
@@ -574,6 +603,7 @@ export function PivotTable({
               return (
                 <button
                   key={p.label}
+                  disabled={isReadOnly}
                   onClick={() => handleSlicerToggle(p.label)}
                   aria-pressed={isSelected}
                   className={`px-2 py-0.5 rounded-full text-[9.5px] font-medium transition shrink-0 flex items-center gap-1 ${
@@ -582,17 +612,19 @@ export function PivotTable({
                       : 'bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-ink-muted hover:border-[#66D9EF] hover:text-[#272822] dark:hover:text-[#F8F8F2]'
                   }`}
                 >
-                  <span className="truncate max-w-[120px]">{p.label}</span>
-                  <span className="text-ink-muted text-[9px]">({p.count})</span>
+                  <span className="truncate max-w-[120px]">{p.label || t('(空)')}</span>
+                  <span className={`text-[9px] ${isSelected ? "text-inherit" : "text-ink-muted"}`}>({p.count})</span>
                 </button>
               );
             })}
           </div>
+          </div>
+          {!slicerSelectsAll && <span className="text-ink-muted truncate" title={currentSlicerSelected.join('、')}>{t('当前选择：')}{currentSlicerFilter?.excludeAll ? t('无') : currentSlicerSelected.map(v=>v || t('(空)')).join('、')}</span>}
         </div>
       )}
 
       {/* Quiet default: keep one toggle visible; expand for column/row cosmetics. */}
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-1 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/60">
+      <div className="shrink-0 min-h-[40px] flex flex-nowrap items-center justify-between gap-2 px-3 py-1 border-b border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/60 dark:bg-[#1E1F1C]/60">
         <button
           type="button"
           aria-expanded={showDisplaySettings}
@@ -611,9 +643,9 @@ export function PivotTable({
           <span>{t('表格选项')}</span>
           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDisplaySettings ? 'rotate-180' : ''}`} aria-hidden="true" />
         </button>
-        <div className="flex items-center gap-2 text-[10px]">
+        <div className="flex items-center gap-2 text-[10px] min-w-0 flex-1 justify-end">
           {selectionRange && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-ink-cyan font-semibold">
+            <div className="flex min-w-0 items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-ink-cyan font-semibold">
               <span className="truncate">{' ' + t("选区:") + ' '}{Math.abs((selectionRange?.endRow || 0) - (selectionRange?.startRow || 0)) + 1}{t("行 ×") + ' '}{Math.abs((selectionRange?.endCol || 0) - (selectionRange?.startCol || 0)) + 1}{t("列") + ' '}</span>
               <button
                 onClick={() => setSelectionRange(null)}
@@ -638,7 +670,7 @@ export function PivotTable({
               {viewMode === 'table' ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
             </button>
           )}
-          <span className="px-1.5 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.05] text-[9px] text-ink-muted tabular-nums">
+          <span className="px-1.5 py-0.5 rounded bg-black/[0.04] dark:bg-white/[0.05] text-[9px] text-ink-muted tabular-nums whitespace-nowrap shrink-0">
             {pivotResult.tableRows.length}{t("行 ×") + ' '}{pivotResult.allColGroups.length * Math.max(1, pivotResult.valConfigs.length)}{t("列") + ' '}
           </span>
         </div>
@@ -1462,6 +1494,7 @@ export function PivotTable({
                           rowLabel: row.label,
                           colLabel: cGroup.isTotal ? '总计' : cGroup.pathLabels.join(' / '),
                           valLabel: `${vCfg.field} (${vCfg.agg})`, valueFormatted: formattedText,
+                          evidence: cellEvidence(cellObj),
                         });
                       };
 
@@ -1470,10 +1503,11 @@ export function PivotTable({
                           role="cell"
                           data-testid="pivot-value-cell"
                           data-row-key={row.rowKey}
+                          data-value-status={cellObj?.reason || 'valid'}
                           key={cellKey}
-                          title={`${row.label} · ${cGroup.isTotal ? t('行总计') : cGroup.pathLabels.join(' / ')}: ${formattedText} (${t('双击穿透明细 / Alt+单击复制')})`}
+                          title={`${row.label} · ${cGroup.isTotal ? t('行总计') : cGroup.pathLabels.join(' / ')}: ${formattedText}；${cellEvidence(cellObj)} (${t('双击穿透明细 / Alt+单击复制')})`}
                           tabIndex={isKeyboardDrill ? 0 : undefined}
-                          aria-label={`${row.label}，${cGroup.isTotal ? '行总计' : cGroup.pathLabels.join(' / ')}，${vCfg.field}(${vCfg.agg})：${formattedText}${isKeyboardDrill ? '。双击查看明细，Alt+单击复制' : ''}`}
+                          aria-label={`${row.label}，${cGroup.isTotal ? '行总计' : cGroup.pathLabels.join(' / ')}，${vCfg.field}(${vCfg.agg})：${formattedText}；${cellEvidence(cellObj)}${isKeyboardDrill ? '。双击查看明细，Alt+单击复制' : ''}`}
                           onKeyDown={isKeyboardDrill ? (event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
@@ -1626,9 +1660,9 @@ export function PivotTable({
                       : ''
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2">
                     <span>{t("总计 (Grand Total)")}</span>
-                    <span className="text-[9px] text-ink-muted font-normal font-mono">{t("全量聚合")}</span>
+                    <span className="text-[9px] text-ink-muted font-normal font-mono">{t('当前筛选范围')}</span>
                   </div>
                 </td>
                 {pivotResult.allColGroups.map((cGroup) =>
@@ -1645,6 +1679,7 @@ export function PivotTable({
                         colLabel: cGroup.isTotal ? t('总计') : (cGroup.pathLabels?.join(' / ') || t('全量')),
                         valLabel: `${vCfg.field} (${vCfg.agg})`,
                         valueFormatted: formattedText,
+                        evidence: cellEvidence(cellObj),
                       });
                     };
 
@@ -1653,7 +1688,8 @@ export function PivotTable({
                         role="cell"
                         key={`foot_${cellKey}`}
                         onDoubleClick={openGrandTotalDetail}
-                        title={t("双击查看此总计项对应的原始交易明细")}
+                        title={`${cellEvidence(cellObj)}；${t("双击查看此总计项对应的原始交易明细")}`}
+                        data-value-status={cellObj?.reason || 'valid'}
                         style={{
                           width: `${colW}px`,
                           minWidth: `${colW}px`,

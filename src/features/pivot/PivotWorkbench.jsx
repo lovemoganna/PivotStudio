@@ -1,6 +1,7 @@
 import { t, getLocale, setLocale } from '../../i18n.js';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
+  AGG_METHODS,
   RETAIL_TEST_DATASET,
   KEYNOTE_STORYBOARD_SHOTS,
   generateDynamicKeynoteShots,
@@ -11,6 +12,8 @@ import { soundEngine } from '../../services/soundEngine';
 import { decodeView, projectView } from '../../utils/viewConfig';
 import { startImportTask } from '../../utils/workerTask';
 import { getMeasureDefaults, isMeasureField } from '../../utils/fieldSemantics.js';
+import { viewCompatibility } from '../../utils/viewCompatibility.js';
+import { updateConfigHistory } from '../../utils/configHistory.js';
 import { decodeGroupPath } from '../../utils/groupKeys.js';
 import { hasOpenDialog } from '../../utils/useDialogFocus.js';
 import {
@@ -101,11 +104,9 @@ export default function PivotWorkbench() {
     [datasets, activeDatasetId]
   );
 
-  const [configHistory, setConfigHistory] = useState(() => [buildDefaultPivotConfig(datasets[0] || null)]);
+  const [configHistoryState, setConfigHistoryState] = useState(() => ({history:[buildDefaultPivotConfig(datasets[0] || null)],index:0}));
+  const {history:configHistory,index:historyIndex} = configHistoryState;
   const readOnlyRef = useRef(false);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  const historyIndexRef = useRef(0);
-  historyIndexRef.current = historyIndex;
 
   const pivotConfig = configHistory[historyIndex] || configHistory[0];
   const datasetHistoriesRef = useRef(new Map());
@@ -113,32 +114,12 @@ export default function PivotWorkbench() {
     if (currentDataset) datasetHistoriesRef.current.set(currentDataset.id, {history:configHistory,index:historyIndex});
   }, [currentDataset,configHistory,historyIndex]);
   const replacePivotConfig = useCallback(config => {
-    historyIndexRef.current = 0;
-    setHistoryIndex(0);
-    setConfigHistory([config]);
+    setConfigHistoryState({history:[config],index:0});
   }, []);
 
   const setPivotConfig = useCallback((updater) => {
     if (readOnlyRef.current) return;
-    setConfigHistory((prevHistory) => {
-      const curIdx = historyIndexRef.current;
-      const currentConfig = prevHistory[curIdx] || prevHistory[prevHistory.length - 1];
-      const nextConfig = typeof updater === 'function' ? updater(currentConfig) : updater;
-
-      if (JSON.stringify(currentConfig) === JSON.stringify(nextConfig)) {
-        return prevHistory;
-      }
-
-      const truncated = prevHistory.slice(0, curIdx + 1);
-      const nextHistory = [...truncated, nextConfig];
-      if (nextHistory.length > 30) {
-        nextHistory.shift();
-      }
-      const nextIdx = nextHistory.length - 1;
-      historyIndexRef.current = nextIdx;
-      setHistoryIndex(nextIdx);
-      return nextHistory;
-    });
+    setConfigHistoryState(state => updateConfigHistory(state,updater));
   }, []);
 
   const [viewMode, setViewMode] = useState('split');
@@ -153,6 +134,7 @@ export default function PivotWorkbench() {
     missingValueMode: 'connect',
     lineDerivedMetric: 'none',
     showDataLabels: true,
+    dataLabelPosition: 'auto',
     showAvgReferenceLine: true,
     clickLinkMode: 'drill',
     histogramBins: 0,
@@ -201,6 +183,7 @@ export default function PivotWorkbench() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [newWorkspaceNameInput, setNewWorkspaceNameInput] = useState('');
   const pendingViewRef = useRef(null);
+  const [pendingViewStatus,setPendingViewStatus] = useState(null);
   const [shareTokenInput, setShareTokenInput] = useState('');
   const workspaceLoadErrorRef = useRef(null);
   const [savedWorkspaces, setSavedWorkspaces] = useState(() => {
@@ -237,6 +220,46 @@ export default function PivotWorkbench() {
     if (type !== 'error') toastTimerRef.current = setTimeout(() => { setToastMessage(null); }, 3200);
   }, []);
 
+  const applyRestoredView = useCallback((view, resetHistory = true) => {
+    if (resetHistory) replacePivotConfig(view.fullConfig);
+    else setPivotConfig(view.fullConfig);
+    if (view.cf) setCondFormat(view.cf);
+    if (view.csc) setChartSpecConfig(p => ({...p,...view.csc}));
+    if (view.vm) setViewMode(view.vm);
+    if (view.ct) setChartType(view.ct);
+    if (view.ts) setTableSettings(p => ({...p,...view.ts}));
+    pendingViewRef.current = null;
+    setPendingViewStatus(null);
+  },[replacePivotConfig,setPivotConfig]);
+
+  const restoreView = useCallback((view,dataset) => {
+    if (!dataset) {
+      pendingViewRef.current = view;
+      setPendingViewStatus('配置等待关联数据：请导入对应文件；字段、类型和数值尺度通过检查后才会恢复。');
+      showToast('已暂存分析配置，尚未恢复结果；请导入对应数据');
+      return true;
+    }
+    const issues = viewCompatibility(view.fullConfig,view.schema,dataset);
+    if (issues.length) { showToast(`无法恢复配置：${issues.join('；')}`,'error'); return false; }
+    setActiveDatasetId(dataset.id);
+    applyRestoredView(view,dataset.id !== activeDatasetId || readOnlyRef.current);
+    showToast('已恢复分析配置；数据结构匹配，请核对文件内容和统计口径');
+    return true;
+  },[applyRestoredView,showToast,activeDatasetId]);
+
+  const consumePendingView = useCallback((dataset) => {
+    const view = pendingViewRef.current;
+    if (!view) return false;
+    const issues = viewCompatibility(view.fullConfig,view.schema,dataset);
+    if (issues.length) {
+      setPendingViewStatus(`配置仍待关联：${issues.join('；')}。已保留导入数据，请选择正确文件后重试，或取消恢复。`);
+      return false;
+    }
+    applyRestoredView(view);
+    showToast('已关联导入数据并恢复分析配置；请核对文件内容和统计口径');
+    return true;
+  },[applyRestoredView,showToast]);
+
   useEffect(() => {
     if (workspaceLoadErrorRef.current) {
       showToast(workspaceLoadErrorRef.current,'error');
@@ -262,25 +285,21 @@ export default function PivotWorkbench() {
 
   const undo = useCallback(() => {
     if (readOnlyRef.current) return;
-    if (historyIndexRef.current > 0) {
-      const nextIdx = historyIndexRef.current - 1;
-      historyIndexRef.current = nextIdx;
-      setHistoryIndex(nextIdx);
+    if (historyIndex > 0) {
+      setConfigHistoryState(state=>({...state,index:Math.max(0,state.index-1)}));
       soundEngine?.playClick?.(500);
       showToast('已撤销 (Undo)');
     }
-  }, [soundEngine, showToast]);
+  }, [historyIndex, soundEngine, showToast]);
 
   const redo = useCallback(() => {
     if (readOnlyRef.current) return;
-    if (historyIndexRef.current < configHistory.length - 1) {
-      const nextIdx = historyIndexRef.current + 1;
-      historyIndexRef.current = nextIdx;
-      setHistoryIndex(nextIdx);
+    if (historyIndex < configHistory.length - 1) {
+      setConfigHistoryState(state=>({...state,index:Math.min(state.history.length-1,state.index+1)}));
       soundEngine?.playClick?.(580);
       showToast('已重做 (Redo)');
     }
-  }, [configHistory.length, soundEngine, showToast]);
+  }, [historyIndex, configHistory.length, soundEngine, showToast]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -362,9 +381,7 @@ export default function PivotWorkbench() {
 
     const saved = datasetHistoriesRef.current.get(nextDs.id);
     if (saved) {
-      historyIndexRef.current = saved.index;
-      setHistoryIndex(saved.index);
-      setConfigHistory(saved.history);
+      setConfigHistoryState(saved);
     } else replacePivotConfig(buildDefaultPivotConfig(nextDs));
 
     setChartSpecConfig((prev) => ({
@@ -701,6 +718,7 @@ export default function PivotWorkbench() {
     shots[shotIdx] = {
       ...shots[shotIdx],
       ...updatedData,
+      generated: false,
       shortLabel: updatedData.title ? updatedData.title.slice(0, 6) : shots[shotIdx].shortLabel,
     };
     setCustomStoryShotsByDataset((prev) => ({
@@ -797,6 +815,7 @@ export default function PivotWorkbench() {
               field: fieldName,
               showAs: 'normal',
               ...getMeasureDefaults(fMeta),
+              ...(AGG_METHODS.some(method=>method.value === source?.aggregation) && (fMeta?.type === 'number' || ['count','count_distinct'].includes(source.aggregation)) ? {agg:source.aggregation} : {}),
             },
           ],
         };
@@ -870,7 +889,7 @@ export default function PivotWorkbench() {
       ...prev,
       collapsedRowKeys: {
         ...prev.collapsedRowKeys,
-        [rowKey]: !prev.collapsedRowKeys[rowKey],
+        [rowKey]: !prev.collapsedRowKeys?.[rowKey],
       },
     }));
   }, []);
@@ -880,7 +899,7 @@ export default function PivotWorkbench() {
       ...prev,
       collapsedColKeys: {
         ...prev.collapsedColKeys,
-        [colKey]: !prev.collapsedColKeys[colKey],
+        [colKey]: !prev.collapsedColKeys?.[colKey],
       },
     }));
   }, []);
@@ -1046,11 +1065,8 @@ export default function PivotWorkbench() {
     setHoveredCellTelemetry(null);
     setKeynoteShotIdx(0);
     setChartSpecConfig(prev => ({...prev, primaryValueId:'', secondaryValueId:''}));
-    if (pendingViewRef.current) {
-      replacePivotConfig(pendingViewRef.current);
-      pendingViewRef.current = null;
-    } else replacePivotConfig(buildDefaultPivotConfig(autoInitPivot ? newDs : null));
-  }, [replacePivotConfig]);
+    if (!consumePendingView(newDs)) replacePivotConfig(buildDefaultPivotConfig(autoInitPivot ? newDs : null));
+  }, [replacePivotConfig,consumePendingView]);
 
   const confirmUploadDataset = useCallback(async (autoInitPivot = true) => {
     if (!uploadPreviewModal) return;
@@ -1128,11 +1144,10 @@ export default function PivotWorkbench() {
       return [...prev, preset];
     });
     switchDataset(preset.id, preset);
-    if (pendingViewRef.current) replacePivotConfig(pendingViewRef.current);
-    pendingViewRef.current = null;
+    consumePendingView(preset);
     soundEngine?.playTransitionChord?.();
     showToast(`已加载测试集「${preset.name}」`);
-  }, [switchDataset, showToast, replacePivotConfig]);
+  }, [switchDataset, showToast, consumePendingView]);
 
   const unloadDataset = useCallback((id) => {
     const next = datasets.filter(d => d.id !== id);
@@ -1190,20 +1205,12 @@ export default function PivotWorkbench() {
     if (!rawInput || !rawInput.trim()) return false;
     try {
       const decoded = decodeView(rawInput);
-      pendingViewRef.current = currentDataset ? null : decoded.fullConfig;
-      setPivotConfig(decoded.fullConfig);
-      if (decoded.cf) setCondFormat(decoded.cf);
-      if (decoded.csc) setChartSpecConfig((p) => ({ ...p, ...decoded.csc }));
-      if (decoded.vm) setViewMode(decoded.vm);
-      if (decoded.ct) setChartType(decoded.ct);
-      if (decoded.ts) setTableSettings((p) => ({ ...p, ...decoded.ts }));
-      showToast(currentDataset ? '已恢复视图配置，请核对字段是否匹配' : '已载入视图配置，请自行加载相同字段的数据');
-      return true;
+      return restoreView(decoded,currentDataset);
     } catch {
       showToast('Share Token 格式无效，无法解析还原', 'error');
       return false;
     }
-  }, [showToast, currentDataset, setPivotConfig]);
+  }, [showToast, currentDataset, restoreView]);
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.hash.slice(1)).get('share_token') || new URLSearchParams(window.location.search).get('share_token');
@@ -1357,6 +1364,7 @@ export default function PivotWorkbench() {
 
         {/* Modular Header Bar */}
         <HeaderBar
+          hasSavedViews={savedWorkspaces.length > 0}
           theme={theme} setTheme={setTheme}
           locale={locale} onLocaleChange={(value) => { const saved = setLocale(value); setLocaleState(value); if (!saved) showToast('无法保存语言偏好，当前标签页内仍有效', 'error'); }}
           canUndo={canUndo}
@@ -1419,6 +1427,7 @@ export default function PivotWorkbench() {
           <span>{computeError}</span><button onClick={() => setComputeAttempt((value) => value + 1)} className="border rounded px-2 py-1">重新计算</button>
         </div>}
         {/* Workspace Dataset Tab Strip & Context Bar */}
+        {pendingViewStatus && <div role="status" data-testid="pending-view" className="px-4 py-2 border-b border-[#FD971F]/40 text-xs text-ink-orange flex flex-wrap items-center gap-2"><span className="flex-1 min-w-0 [overflow-wrap:anywhere]">{t(pendingViewStatus)}</span><button className="border rounded px-2 py-1 shrink-0" onClick={() => { pendingViewRef.current = null; setPendingViewStatus(null); }}>{t('取消恢复')}</button></div>}
         <DatasetTabStrip
           datasets={datasets}
           activeDatasetId={activeDatasetId}
@@ -1771,7 +1780,7 @@ export default function PivotWorkbench() {
         />
 
         <WorkspaceModal
-          restorePivotConfig={(config, datasetAvailable) => { pendingViewRef.current = datasetAvailable ? null : config; replacePivotConfig(config); }}
+          restoreView={restoreView}
           isOpen={showWorkspaceModal}
           onClose={() => setShowWorkspaceModal(false)}
           currentUser={currentUser}

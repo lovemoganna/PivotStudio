@@ -19,7 +19,8 @@ export function FilterModal({
   const [loading,setLoading] = useState(true);
   const dim = activeHeaderFilterModal?.dim;
   const zone = activeHeaderFilterModal?.zone;
-  const liveDim = (pivotConfig[zone] || []).find((item)=>item.id===dim?.id) || dim;
+  const matchesDim = item => dim?.id ? item.id === dim.id : item.field === dim?.field;
+  const liveDim = (pivotConfig[zone] || []).find(matchesDim) || dim;
   const dimensionSignature=JSON.stringify(liveDim && {field:liveDim.field,dateGranularity:liveDim.dateGranularity,numberBin:liveDim.numberBin});
   useEffect(()=>{
     let active=true;setAllDistinctVals([]);setProfileError(null);setLoading(true);
@@ -45,81 +46,43 @@ export function FilterModal({
     return !excl.includes(v);
   };
 
-  const toggleVal = (v) => {
-    setPivotConfig((prev) => ({
-      ...prev,
-      [zone]: prev[zone].map((it) => {
-        if (it.id !== liveDim.id) return it;
-        if (zone === 'filters') {
-          const curSel = it.selectedValues || [];
-          const effectiveSel = it.excludeAll ? [] : curSel.length === 0 ? allDistinctVals : curSel;
-          const nextSel = effectiveSel.includes(v)
-            ? effectiveSel.filter((x) => x !== v)
-            : [...effectiveSel, v];
-          return { ...it, excludeAll: nextSel.length === 0, selectedValues: nextSel.length === allDistinctVals.length ? [] : nextSel };
-        }
-        const curExcl = it.excludedValues || [];
-        const nextExcl = curExcl.includes(v) ? curExcl.filter((x) => x !== v) : [...curExcl, v];
-        return { ...it, excludedValues: nextExcl };
-      }),
-    }));
-  };
+  // A quick-slicer dialog may start with a draft filter. Opening it is read-only;
+  // commit a filter only when a selection changes, through the normal undo history.
+  const updateDim = transform => setPivotConfig(prev => {
+    const items = prev[zone] || [];
+    const index = items.findIndex(matchesDim);
+    const next = transform(index < 0 ? liveDim : items[index]);
+    if (index < 0 && !next.excludeAll && !(next.selectedValues || []).length && !(next.excludedValues || []).length) return prev;
+    return {...prev,[zone]:index < 0 ? [...items,next] : items.map((item,i)=>i===index ? next : item)};
+  });
 
-  const selectOnlyThis = (v) => {
-    setPivotConfig((prev) => ({
-      ...prev,
-      [zone]: prev[zone].map((it) => {
-        if (it.id !== liveDim.id) return it;
-        if (zone === 'filters') {
-          return { ...it, excludeAll: false, selectedValues: [v] };
-        }
-        return { ...it, excludedValues: allDistinctVals.filter((x) => x !== v) };
-      }),
-    }));
-  };
-
-  const resetAll = () => {
-    setPivotConfig((prev) => ({
-      ...prev,
-      [zone]: prev[zone].map((it) =>
-        it.id === liveDim.id ? { ...it, excludeAll: false, selectedValues: [], excludedValues: [] } : it
-      ),
-    }));
-  };
-
-  const deselectAll = () => {
-    setPivotConfig((prev) => ({
-      ...prev,
-      [zone]: prev[zone].map((it) => {
-        if (it.id !== liveDim.id) return it;
-        if (zone === 'filters') {
-          return { ...it, excludeAll: true, selectedValues: [] };
-        }
-        return { ...it, excludedValues: [...allDistinctVals] };
-      }),
-    }));
-  };
-
-  const invertSelection = () => {
-    setPivotConfig((prev) => ({
-      ...prev,
-      [zone]: prev[zone].map((it) => {
-        if (it.id !== liveDim.id) return it;
-        if (zone === 'filters') {
-          if (it.excludeAll) {
-            return { ...it, excludeAll: false, selectedValues: [] };
-          }
-          const curSel = it.selectedValues || [];
-          const effectiveSel = curSel.length === 0 ? allDistinctVals : curSel;
-          const inverted = allDistinctVals.filter((v) => !effectiveSel.includes(v));
-          return { ...it, excludeAll: inverted.length === 0, selectedValues: inverted };
-        }
-        const curExcl = it.excludedValues || [];
-        const invertedExcl = allDistinctVals.filter((v) => !curExcl.includes(v));
-        return { ...it, excludedValues: invertedExcl };
-      }),
-    }));
-  };
+  const toggleVal = v => updateDim(it => {
+    if (zone === 'filters') {
+      const curSel = it.selectedValues || [];
+      const effectiveSel = it.excludeAll ? [] : curSel.length === 0 ? allDistinctVals : curSel;
+      const nextSel = effectiveSel.includes(v) ? effectiveSel.filter(x=>x!==v) : [...effectiveSel,v];
+      return {...it,excludeAll:nextSel.length===0,selectedValues:nextSel.length===allDistinctVals.length ? [] : nextSel};
+    }
+    const excluded = it.excludedValues || [];
+    return {...it,excludedValues:excluded.includes(v) ? excluded.filter(x=>x!==v) : [...excluded,v]};
+  });
+  const selectOnlyThis = v => updateDim(it => zone === 'filters'
+    ? {...it,excludeAll:false,selectedValues:[v]}
+    : {...it,excludedValues:allDistinctVals.filter(x=>x!==v)});
+  const resetAll = () => updateDim(it=>({...it,excludeAll:false,selectedValues:[],excludedValues:[]}));
+  const deselectAll = () => updateDim(it => zone === 'filters'
+    ? {...it,excludeAll:true,selectedValues:[]}
+    : {...it,excludedValues:[...allDistinctVals]});
+  const invertSelection = () => updateDim(it => {
+    if (zone === 'filters') {
+      if (it.excludeAll) return {...it,excludeAll:false,selectedValues:[]};
+      const selected = (it.selectedValues || []).length ? it.selectedValues : allDistinctVals;
+      const inverted = allDistinctVals.filter(v=>!selected.includes(v));
+      return {...it,excludeAll:inverted.length===0,selectedValues:inverted};
+    }
+    const excluded = it.excludedValues || [];
+    return {...it,excludedValues:allDistinctVals.filter(v=>!excluded.includes(v))};
+  });
 
   return (
     <div

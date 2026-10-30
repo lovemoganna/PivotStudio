@@ -1,6 +1,6 @@
 import {getMetricCatalogKey} from '../../../utils/metricCatalog.js';
 import { t } from '../../../i18n.js';
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import {
   GripVertical, ArrowUp, ArrowDown,
   ArrowUpDown, Filter, RotateCcw, X, ChevronDown,
@@ -18,6 +18,10 @@ import { hasOpenDialog } from '../../../utils/useDialogFocus';
 const DEFAULT_SIDEBAR_WIDTH = 440;
 const MIN_SIDEBAR_WIDTH = 280;
 const MAX_SIDEBAR_WIDTH = 680;
+// Retain the existing drag limit for every way of changing the sidebar.
+const getSidebarMaxWidth = (containerWidth) => Math.max(MIN_SIDEBAR_WIDTH,
+  Math.min(MAX_SIDEBAR_WIDTH, Math.floor(containerWidth * 0.55)));
+const clampSidebarWidth = (width, maximum) => Math.max(MIN_SIDEBAR_WIDTH, Math.min(maximum, width));
 
 export function FieldShelf({
   requestProfile,
@@ -77,9 +81,15 @@ export function FieldShelf({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarMode, setSidebarMode] = useState('split'); // 'split' | 'fields' | 'zones'
   const [showInsightsDeck, setShowInsightsDeck] = useState(false);
+  const [locationRequest, setLocationRequest] = useState(null);
+  const locateField = (zone, field) => {
+    setSidebarMode('split');
+    setLocationRequest({zone, field, request:Date.now()});
+  };
   const [fieldSearchQuery, setFieldSearchQuery] = useState('');
   const [fieldCategoryTab, setFieldCategoryTab] = useState('all'); // 'all' | 'dimension' | 'measure' | 'unused'
   const searchInputRef = useRef(null);
+  const unusedTabRef = useRef(null);
   const [profilingField, setProfilingField] = useState(null);
 
   // Sidebar vertical split ratio between 可用字段 and 透视结构放置区 (default 50:50 equal split)
@@ -298,9 +308,9 @@ export function FieldShelf({
 
   const filteredCustomMetrics = useMemo(() => {
     if (fieldCategoryTab === 'dimension') return [];
-    let list = customMetricsCatalog;
+    let list = fieldCategoryTab === 'unused' ? customMetricsCatalog.filter(metric=>!isFieldUsed(metric.id || metric.field)) : customMetricsCatalog;
     if (fieldSearchQuery.trim()) {
-      const q = fieldSearchQuery.toLowerCase();
+      const q = fieldSearchQuery.trim().toLowerCase();
       list = list.filter(
         (m) =>
           (m.field || '').toLowerCase().includes(q) ||
@@ -309,21 +319,27 @@ export function FieldShelf({
       );
     }
     return list;
-  }, [customMetricsCatalog, fieldCategoryTab, fieldSearchQuery]);
+  }, [customMetricsCatalog, fieldCategoryTab, fieldSearchQuery, isFieldUsed]);
 
   const filteredFields = useMemo(() => {
     let list = currentDataset?.fields || [];
     if (fieldSearchQuery.trim()) {
-      const q = fieldSearchQuery.toLowerCase();
+      const q = fieldSearchQuery.trim().toLowerCase();
       list = list.filter((f) => f.name.toLowerCase().includes(q));
     }
     if (fieldCategoryTab === 'dimension') {
       list = list.filter((f) => !isFieldMeasure(f));
     } else if (fieldCategoryTab === 'measure') {
       list = list.filter((f) => isFieldMeasure(f));
+    } else if (fieldCategoryTab === 'unused') {
+      list = list.filter((f) => !isFieldUsed(f.name));
     }
     return list;
-  }, [currentDataset?.fields, fieldSearchQuery, fieldCategoryTab]);
+  }, [currentDataset?.fields, fieldSearchQuery, fieldCategoryTab, isFieldUsed]);
+  useLayoutEffect(()=>{
+    if (fieldCategoryTab === 'unused' && document.activeElement === document.body) unusedTabRef.current?.focus({preventScroll:true});
+  },[fieldCategoryTab, filteredFields.length, filteredCustomMetrics.length]);
+
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -343,7 +359,8 @@ export function FieldShelf({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [soundEngine, showToast]);
 
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
+  // Persist the user's preference separately from the width that currently fits.
+  const [preferredSidebarWidth, setSidebarWidth] = useState(() => {
     try {
       const saved = localStorage.getItem('pivotstudio_sidebar_width');
       if (saved) {
@@ -358,12 +375,25 @@ export function FieldShelf({
   });
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(() => window.innerWidth);
+  const maxSidebarWidth = getSidebarMaxWidth(containerWidth);
+  const sidebarWidth = clampSidebarWidth(preferredSidebarWidth, maxSidebarWidth);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const measure = () => setContainerWidth(container.getBoundingClientRect().width);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     try {
-      localStorage.setItem('pivotstudio_sidebar_width', String(sidebarWidth));
+      localStorage.setItem('pivotstudio_sidebar_width', String(preferredSidebarWidth));
     } catch {}
-  }, [sidebarWidth]);
+  }, [preferredSidebarWidth]);
 
   useEffect(() => {
     if (!isResizingSidebar) return;
@@ -377,9 +407,7 @@ export function FieldShelf({
       if (!containerRef.current) return;
       const containerRect = containerRef.current.getBoundingClientRect();
       const rawWidth = Math.round(e.clientX - containerRect.left);
-      const maxAllowed = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.floor(containerRect.width * 0.55)));
-      const clamped = Math.max(MIN_SIDEBAR_WIDTH, Math.min(maxAllowed, rawWidth));
-      setSidebarWidth(clamped);
+      setSidebarWidth(clampSidebarWidth(rawWidth, getSidebarMaxWidth(containerRect.width)));
     };
 
     const handleMouseUp = () => {
@@ -401,27 +429,27 @@ export function FieldShelf({
   const resetSidebarWidth = useCallback(() => {
     setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
     soundEngine?.playClick?.(480);
-    showToast?.(`已恢复侧边栏默认宽度 (${DEFAULT_SIDEBAR_WIDTH}px)`);
+    showToast?.(t('已恢复侧边栏默认宽度（自动适配可用空间）'));
   }, [soundEngine, showToast]);
 
   const handleResizerKeyDown = useCallback((e) => {
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      setSidebarWidth((w) => Math.max(MIN_SIDEBAR_WIDTH, w - 16));
+      setSidebarWidth((w) => clampSidebarWidth(clampSidebarWidth(w, maxSidebarWidth) - 16, maxSidebarWidth));
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      setSidebarWidth((w) => Math.min(MAX_SIDEBAR_WIDTH, w + 16));
+      setSidebarWidth((w) => clampSidebarWidth(clampSidebarWidth(w, maxSidebarWidth) + 16, maxSidebarWidth));
     } else if (e.key === 'Home') {
       e.preventDefault();
       setSidebarWidth(MIN_SIDEBAR_WIDTH);
     } else if (e.key === 'End') {
       e.preventDefault();
-      setSidebarWidth(MAX_SIDEBAR_WIDTH);
+      setSidebarWidth(maxSidebarWidth);
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       resetSidebarWidth();
     }
-  }, [resetSidebarWidth]);
+  }, [resetSidebarWidth, maxSidebarWidth]);
 
   return (
     <>
@@ -644,19 +672,26 @@ export function FieldShelf({
                       {/* Tabs: 全部 / 维度 / 度量 */}
                       <div className="flex rounded-md p-0.5 bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#3E3D32] text-[9.5px] apple-font-mono">
                         <button
+                          aria-pressed={fieldCategoryTab === 'all'}
                           onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('all'); }}
                           className={`flex-1 py-0.5 min-h-[24px] rounded text-center font-medium transition ${fieldCategoryTab === 'all' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-[#272822] dark:text-[#F8F8F2] shadow-2xs font-bold' : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'}`}
                         >{' ' + t("全部 (")}{(currentDataset?.fields?.length || 0) + customMetricsCatalog.length})
                         </button>
                         <button
+                          aria-pressed={fieldCategoryTab === 'dimension'}
                           onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('dimension'); }}
                           className={`flex-1 py-0.5 min-h-[24px] rounded text-center font-medium transition ${fieldCategoryTab === 'dimension' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-ink-cyan shadow-2xs font-bold' : 'text-ink-muted hover:text-[#0088A3] dark:hover:text-[#66D9EF]'}`}
                         >{' ' + t("维度 (")}{dimensionCount})
                         </button>
                         <button
+                          aria-pressed={fieldCategoryTab === 'measure'}
                           onClick={() => { soundEngine?.playClick?.(480); setFieldCategoryTab('measure'); }}
                           className={`flex-1 py-0.5 min-h-[24px] rounded text-center font-medium transition ${fieldCategoryTab === 'measure' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-ink-orange shadow-2xs font-bold' : 'text-ink-muted hover:text-[#C86400] dark:hover:text-[#FD971F]'}`}
                         >{' ' + t("度量 (")}{measureCount})
+                        </button>
+                        <button ref={unusedTabRef} type="button" aria-pressed={fieldCategoryTab === 'unused'} onClick={()=>setFieldCategoryTab('unused')}
+                          className={`flex-1 py-0.5 min-h-[24px] rounded text-center font-medium ${fieldCategoryTab === 'unused' ? 'bg-[#FFFDF7] dark:bg-[#1E1F1C] text-ink-cyan shadow-2xs' : 'text-ink-muted'}`}>
+                          {t('未使用')} ({unusedCount})
                         </button>
                       </div>
                     </div>
@@ -666,6 +701,7 @@ export function FieldShelf({
                     {filteredFields.length === 0 && filteredCustomMetrics.length === 0 ? (
                       <div className="py-4 text-center text-xs text-ink-muted apple-font-mono space-y-1">
                         <p>{t("无匹配字段")}</p>
+                        {fieldCategoryTab === 'unused' && <button type="button" onClick={()=>setFieldCategoryTab('all')} className="text-ink-cyan underline">{t('查看全部字段')}</button>}
                         {fieldSearchQuery && (
                           <button
                             onClick={() => setFieldSearchQuery('')}
@@ -717,13 +753,15 @@ export function FieldShelf({
                                   return (
                                     <div className="flex items-center gap-0.5 shrink-0 select-none">
                                       {placements.map((p) => (
-                                        <span
+                                        <button type="button"
                                           key={p.zone}
-                                          className={`px-1 py-0.2 rounded text-[8px] font-bold border ${p.bg}`}
-                                          title={`已配置在：${p.label}区域`}
+                                          onClick={event=>{event.stopPropagation();locateField(p.zone, cm.id || cm.field);}}
+                                          aria-label={`${t('定位已配置字段')} · ${cm.id || cm.field} · ${t(p.label)}`}
+                                          className={`px-1 py-0.5 min-h-[24px] rounded text-[9px] font-bold border ${p.bg}`}
+                                          title={`已配置在：${t(p.label)}区域`}
                                         >
-                                          {p.label}
-                                        </span>
+                                          {t(p.label)}
+                                        </button>
                                       ))}
                                     </div>
                                   );
@@ -826,13 +864,15 @@ export function FieldShelf({
                                 return (
                                   <div className="flex items-center gap-0.5 shrink-0 select-none">
                                     {placements.map((p) => (
-                                      <span
+                                      <button type="button"
                                         key={p.zone}
-                                        className={`px-1 py-0.2 rounded text-[8px] font-bold border ${p.bg}`}
-                                        title={`已配置在：${p.label}区域`}
+                                        onClick={event=>{event.stopPropagation();locateField(p.zone, field.name);}}
+                                        aria-label={`${t('定位已配置字段')} · ${field.name} · ${t(p.label)}`}
+                                        className={`px-1 py-0.5 min-h-[24px] rounded text-[9px] font-bold border ${p.bg}`}
+                                        title={`已配置在：${t(p.label)}区域`}
                                       >
-                                        {p.label}
-                                      </span>
+                                        {t(p.label)}
+                                      </button>
                                     ))}
                                   </div>
                                 );
@@ -852,7 +892,7 @@ export function FieldShelf({
                               <button
                                 type="button"
                                 disabled={isReadOnly}
-                                aria-label={`添加「${field.name}」到行分组`}
+                                aria-label={`${t('+行')} · 添加「${field.name}」到行分组`}
                                 onClick={(e) => { e.stopPropagation(); addFieldToZone('rows', field.name); }}
                                 className={`px-1.5 py-0.5 min-h-[24px] rounded font-semibold transition ${
                                   !isMeasure
@@ -866,7 +906,7 @@ export function FieldShelf({
                               <button
                                 type="button"
                                 disabled={isReadOnly}
-                                aria-label={`添加「${field.name}」到列比较`}
+                                aria-label={`${t('+列')} · 添加「${field.name}」到列比较`}
                                 onClick={(e) => { e.stopPropagation(); addFieldToZone('columns', field.name); }}
                                 className={`px-1.5 py-0.5 min-h-[24px] rounded font-semibold transition ${
                                   !isMeasure
@@ -880,7 +920,7 @@ export function FieldShelf({
                               <button
                                 type="button"
                                 disabled={isReadOnly}
-                                aria-label={`添加「${field.name}」到计算指标`}
+                                aria-label={`${t('+值')} · 添加「${field.name}」到计算指标`}
                                 onClick={(e) => { e.stopPropagation(); addFieldToZone('values', field.name); }}
                                 className={`px-1.5 py-0.5 min-h-[24px] rounded font-semibold transition ${
                                   isMeasure
@@ -894,7 +934,7 @@ export function FieldShelf({
                               <button
                                 type="button"
                                 disabled={isReadOnly}
-                                aria-label={`添加「${field.name}」到筛选`}
+                                aria-label={`${t('+筛')} · 添加「${field.name}」到筛选`}
                                 onClick={(e) => { e.stopPropagation(); addFieldToZone('filters', field.name); }}
                                 className="px-1.5 py-0.5 min-h-[24px] rounded bg-[#A6E22E]/15 text-ink-green hover:bg-[#A6E22E] hover:text-[#1E1F1C] font-semibold transition"
                                 title={t("添加到筛选条件")}
@@ -976,6 +1016,9 @@ export function FieldShelf({
                       pivotConfig={pivotConfig}
                       setPivotConfig={setPivotConfig}
                       currentDataset={currentDataset}
+                      locationRequest={locationRequest}
+                      customMetrics={customMetricsCatalog}
+                      onAddCustomMetric={addCustomMetricToPivot}
                       isReadOnly={isReadOnly}
                       draggingPayload={draggingPayload}
                       setDraggingPayload={setDraggingPayload}
@@ -1007,6 +1050,7 @@ export function FieldShelf({
             </aside>
 
             {/* Draggable Resizer Handle (Desktop only) */}
+            <div role="region" aria-label={t('调整工作区布局')} className="hidden md:flex w-2 -ml-1 shrink-0">
             <div
               role="separator"
               tabIndex={0}
@@ -1014,17 +1058,17 @@ export function FieldShelf({
               aria-label={t("调节侧边栏宽度")}
               aria-valuenow={sidebarWidth}
               aria-valuemin={MIN_SIDEBAR_WIDTH}
-              aria-valuemax={MAX_SIDEBAR_WIDTH}
+              aria-valuemax={maxSidebarWidth}
               onMouseDown={(e) => {
                 e.preventDefault();
                 setIsResizingSidebar(true);
               }}
               onDoubleClick={resetSidebarWidth}
               onKeyDown={handleResizerKeyDown}
-              className={`hidden md:flex relative items-center justify-center w-2 -ml-1 cursor-col-resize z-20 group select-none shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] transition-colors ${
+              className={`flex relative items-center justify-center w-full cursor-col-resize z-20 group select-none outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] transition-colors ${
                 isResizingSidebar ? 'bg-[#66D9EF]/50' : 'hover:bg-[#66D9EF]/30 active:bg-[#66D9EF]'
               }`}
-              title={t("拖动调节侧边栏宽度 (双击恢复默认 380px)")}
+              title={t('拖动或用方向键调整宽度；Home / End 到边界，双击或 Enter 恢复默认')}
             >
               <div
                 className={`w-0.5 h-8 rounded-full transition-colors ${
@@ -1038,6 +1082,7 @@ export function FieldShelf({
                   {sidebarWidth}px
                 </div>
               )}
+            </div>
             </div>
           </>
         )
@@ -1083,19 +1128,18 @@ export function FieldShelf({
 
             </div>
 
-            <div className="flex items-center gap-1.5">
-              {highlightedRowKey && (
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Reserve focus status space so pointer-down cannot move the table. */}
                 <button
                   onClick={() => setHighlightedRowKey(null)}
-                  className="px-2 py-0.5 rounded-md text-[11px] text-ink-orange hover:bg-[#FD971F]/12 transition"
-                  title={t('清除聚焦')}
+                  disabled={!highlightedRowKey}
+                  aria-hidden={!highlightedRowKey}
+                  aria-label={`${highlightedRowKey?.replace(/\|\|/g, ' / ') || ''} × ${t('清除聚焦')}`}
+                  className={`w-20 min-w-0 truncate px-2 py-0.5 rounded-md text-[11px] text-ink-orange hover:bg-[#FD971F]/12 transition ${highlightedRowKey ? '' : 'invisible'}`}
+                  title={`${t('清除聚焦')}${highlightedRowKey ? `: ${highlightedRowKey.replace(/\|\|/g, ' / ')}` : ''}`}
                 >
-                  {(() => {
-                    const label = highlightedRowKey.replace(/\|\|/g, ' / ');
-                    return label.length > 18 ? `${label.slice(0, 18)}…` : label;
-                  })()} ×
+                  {highlightedRowKey?.replace(/\|\|/g, ' / ')} ×
                 </button>
-              )}
 
               <button
                 type="button"
@@ -1104,7 +1148,7 @@ export function FieldShelf({
                   setShowInsightsDeck((prev) => !prev);
                 }}
                 aria-expanded={showInsightsDeck}
-                aria-label={t("指标中心")}
+                aria-label={`${t('指标中心')}${pivotConfig?.values?.length ? ` ${pivotConfig.values.length}` : ''}`}
                 className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-lg text-[11px] transition ${
                   showInsightsDeck
                     ? 'bg-[#AE81FF]/12 text-ink-purple font-medium'
@@ -1115,7 +1159,7 @@ export function FieldShelf({
                 <Calculator className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">{t("指标中心")}</span>
                 {(pivotConfig?.values?.length || 0) > 0 && (
-                  <span className="text-[10px] tabular-nums opacity-70">{pivotConfig.values.length}</span>
+                  <span className="text-[10px] tabular-nums opacity-70">{' '}{pivotConfig.values.length}</span>
                 )}
               </button>
             </div>

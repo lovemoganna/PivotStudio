@@ -167,7 +167,7 @@ export function SmartTemplatesBar({
         type="button"
         disabled={isReadOnly}
         onClick={applyTimeSeriesMoM}
-        className="tactile-btn flex items-center gap-1 px-2 py-0.8 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] hover:text-[#A6E22E] transition shrink-0 disabled:opacity-40"
+        className="tactile-btn flex items-center gap-1 px-2 py-0.8 rounded-md bg-[#FFFDF7] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] hover:border-[#A6E22E] text-[#272822] dark:text-[#F8F8F2] hover:text-ink-green transition shrink-0 disabled:opacity-40"
         title={dateField ? t("时序交叉分期，自动计算较上期环比变动率 (%)") : t("多维分组对比与占比分析")}
       >
         <Calendar className="w-3 h-3 text-ink-green" />

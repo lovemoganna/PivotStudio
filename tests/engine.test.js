@@ -429,7 +429,7 @@ test('recommendations exclude numeric identifiers and never invent currency',()=
 
 
 test('duration is not a ratio and source fractions format as percentages once',()=>{
-  const cfg=buildDefaultPivotConfig({fields:[{name:'Administrative_Duration',type:'number'},{name:'BounceRates',type:'number'}],rows:[]});
+  const cfg=buildDefaultPivotConfig({fields:[{name:'Administrative_Duration',type:'number'},{name:'BounceRates',type:'number',percentScale:'fraction'}],rows:[]});
   assert.equal(cfg.values[0].agg,'sum');assert.equal(cfg.values[0].format.isPercent,false);
   assert.equal(cfg.values[1].agg,'avg');assert.equal(cfg.values[1].format.isPercent,true);
   assert.equal(UnifiedFormatter.formatValue(.0268666074,{field:'BounceRates',format:{isPercent:true,decimals:2}}),'2.69%');

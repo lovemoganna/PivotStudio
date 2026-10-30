@@ -1,12 +1,13 @@
 import { t } from '../../../../i18n.js';
 import React, { useState } from 'react';
 import { createShareLink } from '../../../../utils/viewConfig';
+import { datasetSchema, viewCompatibility } from '../../../../utils/viewCompatibility.js';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { FolderOpen, X, Share2, Download, UserCheck, Shield, Layers, HelpCircle, FileCheck } from 'lucide-react';
 
 export function WorkspaceModal({
   isOpen,
-  restorePivotConfig,
+  restoreView,
   onClose,
   currentUser,
   setCurrentUser,
@@ -38,6 +39,8 @@ export function WorkspaceModal({
   copyTextToClipboard,
   showToast,
 }) {
+  const [linkingWorkspace,setLinkingWorkspace] = useState(null);
+  const [linkDatasetId,setLinkDatasetId] = useState('');
   const dialogRef = useDialogFocus(Boolean(isOpen), onClose);
   if (!isOpen) return null;
 
@@ -59,10 +62,10 @@ export function WorkspaceModal({
       >
         {/* Header */}
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between shrink-0">
-          <h3 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
+          <h2 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-ink-pink" />
             <span>{t("WORKSPACE_HUB // 本机快照与配置分享")}</span>
-          </h3>
+          </h2>
           <button
             onClick={onClose}
             aria-label={t("关闭本机工作区与配置分享")}
@@ -111,9 +114,34 @@ export function WorkspaceModal({
 
           {/* Section 2: Local Workspace Snapshots */}
           <div className="space-y-2.5">
+            <p className="text-xs leading-5 text-ink-muted">{t('仅保存分析配置，不含原始数据。关闭或刷新页面后，导入数据需要重新选择文件；请保留源文件。')}</p>
+            {linkingWorkspace && <section data-testid="workspace-link" className="p-3 border border-[#FD971F]/50 rounded-lg space-y-2 [overflow-wrap:anywhere]">
+              <p className="font-semibold">{linkingWorkspace.name} · {t('原数据集不可用或不匹配，尚未恢复配置。')}</p>
+              <p className="text-ink-muted">{t('结构匹配只检查字段、类型和数值尺度，不代表文件内容相同；请确认数据来源。')}</p>
+              {!linkingWorkspace.datasetSchema && <p className="text-ink-orange">{t('旧配置没有源字段类型记录，请核对字段含义后再关联。')}</p>}
+              <label className="block">{t('关联已导入的数据集')}
+                <select aria-label={t('关联已导入的数据集')} value={linkDatasetId} onChange={e => setLinkDatasetId(e.target.value)} className="block w-full mt-1 p-2 rounded border bg-[#FFFDF7] dark:bg-[#272822]">
+                  <option value="">{t('请选择数据集')}</option>
+                  {datasets.map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.name}</option>)}
+                </select>
+              </label>
+              {linkDatasetId && viewCompatibility(linkingWorkspace.pivotConfig,linkingWorkspace.datasetSchema,datasets.find(d => d.id === linkDatasetId)).map(problem => <p role="alert" key={problem} className="text-ink-pink">{problem}</p>)}
+              <div className="flex flex-wrap gap-2">
+                <button className="px-2 py-1 border rounded disabled:opacity-40" disabled={!linkDatasetId || viewCompatibility(linkingWorkspace.pivotConfig,linkingWorkspace.datasetSchema,datasets.find(d => d.id === linkDatasetId)).length > 0} onClick={() => {
+                  const ws = linkingWorkspace;
+                  if (restoreView({fullConfig:ws.pivotConfig,schema:ws.datasetSchema,vm:ws.viewMode,ct:ws.chartType,cf:ws.condFormat,csc:ws.chartSpecConfig,ts:ws.tableSettings},datasets.find(d => d.id === linkDatasetId))) { setActiveWorkspaceId(ws.id); setLinkingWorkspace(null); onClose(); }
+                }}>{t('确认关联并恢复')}</button>
+                <button className="px-2 py-1 border rounded" onClick={() => {
+                  const ws = linkingWorkspace;
+                  restoreView({fullConfig:ws.pivotConfig,schema:ws.datasetSchema,vm:ws.viewMode,ct:ws.chartType,cf:ws.condFormat,csc:ws.chartSpecConfig,ts:ws.tableSettings},null);
+                  setLinkingWorkspace(null); onClose();
+                }}>{t('重新导入对应文件')}</button>
+                <button className="px-2 py-1 border rounded" onClick={() => setLinkingWorkspace(null)}>{t('取消关联')}</button>
+              </div>
+            </section>}
             <div className="flex items-center justify-between">
               <div className="font-bold text-ink-green text-xs">
-                {t("保存或切换本机工作区快照 (")}{savedWorkspaces.length})
+                {t("保存或切换本机分析配置 (")}{savedWorkspaces.length})
               </div>
               <span className="text-[10px] text-ink-muted">{t("保存在当前浏览器本地存储")}</span>
             </div>
@@ -139,7 +167,8 @@ export function WorkspaceModal({
                     updatedAt: new Date().toLocaleString('zh-CN'),
                     author: currentUser.name,
                     datasetId: activeDatasetId,
-                    datasetName: currentDatasetObj?.name || '零售数据集',
+                    datasetSchema: datasetSchema(currentDatasetObj,pivotConfig),
+                    datasetName: currentDatasetObj?.name || '未关联数据',
                     viewMode,
                     chartType,
                     condFormat,
@@ -154,7 +183,7 @@ export function WorkspaceModal({
                 }}
                 className="px-3.5 py-1.5 rounded-lg bg-[#A6E22E] text-[#1E1F1C] font-bold text-xs shadow-xs hover:bg-[#B8F03E] transition disabled:opacity-40"
               >
-                {' ' + t("保存快照") + ' '}
+                {' ' + t("保存配置") + ' '}
               </button>
             </div>
 
@@ -163,7 +192,7 @@ export function WorkspaceModal({
               {savedWorkspaces.length === 0 ? (
                 <div className="p-4 rounded-xl border border-dashed border-[#D6D4C8] dark:border-[#3E3D32] text-center text-ink-muted dark:text-[#B8B5A8] text-[11px] space-y-1">
                   <div>{t("暂无保存的工作区快照")}</div>
-                  <div className="text-[10.5px] text-[#555245] dark:text-[#A8A598]">{t("完成一组透视分析后，在上方输入名称并点击「保存快照」，即可保留多套分析视角供汇报切换。")}</div>
+                  <div className="text-[10.5px] text-[#555245] dark:text-[#A8A598]">{t("完成一组透视分析后，在上方输入名称并点击「保存配置」，即可保留多套分析视角供汇报切换。")}</div>
                 </div>
               ) : (
                 savedWorkspaces.map((ws) => (
@@ -196,20 +225,12 @@ export function WorkspaceModal({
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => {
-                          if (ws.datasetId && datasets.some((d) => d.id === ws.datasetId)) {
-                            setActiveDatasetId(ws.datasetId);
+                          const dataset = datasets.find(d => d.id === ws.datasetId);
+                          const view = {fullConfig:ws.pivotConfig,schema:ws.datasetSchema,vm:ws.viewMode,ct:ws.chartType,cf:ws.condFormat,csc:ws.chartSpecConfig,ts:ws.tableSettings};
+                          if (!dataset || viewCompatibility(ws.pivotConfig,ws.datasetSchema,dataset).length) {
+                            setLinkingWorkspace(ws); setLinkDatasetId(''); return;
                           }
-                          setViewMode(ws.viewMode || 'split');
-                          setChartType(ws.chartType || 'bar');
-                          if (ws.condFormat) setCondFormat(ws.condFormat);
-                          if (ws.chartSpecConfig) setChartSpecConfig((p) => ({ ...p, ...ws.chartSpecConfig }));
-                          if (ws.pivotConfig) {
-                            restorePivotConfig(ws.pivotConfig, Boolean(ws.datasetId && datasets.some((d) => d.id === ws.datasetId)));
-                          }
-                          if (ws.tableSettings && setTableSettings) setTableSettings(ws.tableSettings);
-                          setActiveWorkspaceId(ws.id);
-                          onClose();
-                          showToast?.(`已加载工作区「${ws.name}」`);
+                          if (restoreView(view,dataset)) { setActiveWorkspaceId(ws.id); onClose(); }
                         }}
                         className="px-2.5 py-1 rounded-md bg-[#66D9EF]/20 text-ink-cyan text-[10px] font-bold hover:bg-[#66D9EF]/30 transition"
                       >
@@ -248,7 +269,7 @@ export function WorkspaceModal({
               let shareLink;
               try {
                 shareLink = createShareLink(
-                  { vm: viewMode, ct: chartType, cf: condFormat, csc: chartSpecConfig, fullConfig: pivotConfig, ts: tableSettings },
+                  { vm: viewMode, ct: chartType, cf: condFormat, csc: chartSpecConfig, fullConfig: pivotConfig, ts: tableSettings, schema: datasetSchema(currentDatasetObj,pivotConfig) },
                   window.location
                 );
               } catch (error) {

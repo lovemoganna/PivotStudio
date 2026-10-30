@@ -4,8 +4,9 @@ import { UnifiedFormatter, getDimDisplayLabel } from '../../../utils/formatters.
 import { isMissingValue } from '../../../utils/normalizeScalar.js';
 import { getMeasureDefaults, isMeasureField } from '../../../utils/fieldSemantics.js';
 import { decodeGroupPath, encodeGroupSegment } from '../../../utils/groupKeys.js';
-import { computeAggregation } from './calculatePivot.js';
+import { computeAggregation, calculatePivot } from './calculatePivot.js';
 import { buildHistogramBins } from './histogram.js';
+import { periodIndex, temporalAxisIssue } from '../../../utils/temporalAnalysis.js';
 
 function summarizeValues(values) {
   const total = values.reduce((sum, value) => sum + value, 0);
@@ -18,6 +19,16 @@ function summarizeValues(values) {
   };
 }
 export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpecConfig) {
+  // A chart's analysis grain is independent of the table's expansion state.
+  // Reuse the pivot engine for parent aggregates, including formulas/show-as modes.
+  const sourceConfig = pivotResult?.analysisConfig;
+  const grouped = chartSpecConfig?.groupingMode !== 'detailed';
+  const rollup = grouped && (sourceConfig?.rows?.length || 0) > 1 && (sourceConfig?.columns?.length || 0) > 0 && !['histogram','heatmap','combo'].includes(chartType);
+  const folded = sourceConfig && [sourceConfig.collapsedRowKeys,sourceConfig.collapsedColKeys].some(keys => Object.values(keys || {}).some(Boolean));
+  if (sourceConfig && (rollup || folded)) {
+    const records = pivotResult.cellRecordsMap?.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__');
+    if (records) pivotResult = calculatePivot({...dataset,rows:records},{...sourceConfig,rows:rollup ? sourceConfig.rows.slice(0,1) : sourceConfig.rows,filters:[],collapsedRowKeys:{},collapsedColKeys:{},showSubtotals:false});
+  }
   const valConfigs = pivotResult?.valConfigs || [];
   const hasValues = valConfigs.length > 0;
 
@@ -49,7 +60,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   const colConfigs = pivotResult?.colConfigs || [];
   const groupingMode = chartSpecConfig?.groupingMode || 'grouped';
   const dataRows = (pivotResult?.tableRows || []).filter((r) => !r.isTotal && !r.isSubtotal);
-  const shouldGroupRows = chartType !== 'histogram'
+  const shouldGroupRows = !['histogram', 'heatmap'].includes(chartType)
     && groupingMode !== 'detailed'
     && rowConfigs.length >= 2
     && dataRows.length > 0;
@@ -409,6 +420,16 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     processedItems = [item];
   }
 
+  processedItems.forEach(item => {
+    item._seriesEvidence = {};
+    seriesMetaList.forEach(sm => {
+      const rowKey = rowConfigs.length ? item._seriesRowKeys?.[sm.key] || item.rowKey : '__GRAND_TOTAL_ROW__';
+      const colKey = !rowConfigs.length && hasColGroups ? item.rowKey : sm.colKey;
+      const cell = pivotResult.displayMatrix[`${rowKey}@@${colKey}@@${sm.valCfg.id}`];
+      if (cell) item._seriesEvidence[sm.key] = {samples:cell.samples,reason:cell.reason};
+    });
+  });
+
   // Composition charts require additive, nonnegative values. Never turn losses into gains.
   const isAdditive = metric => !metric.isCalculated && ['sum', 'count'].includes(metric.agg) && (!metric.showAs || metric.showAs === 'normal') && (metric.agg === 'count' || !metric.format?.isPercent);
   const compositionMetricValid = seriesMetaList.every(sm => isAdditive(sm.valCfg));
@@ -449,39 +470,51 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     processedItems.sort((a, b) => (b._rawSeriesValues[primarySeriesKey] ?? 0) - (a._rawSeriesValues[primarySeriesKey] ?? 0));
   }
   const availableGroupCount = processedItems.length;
-  if (chartSpecConfig?.topN && chartSpecConfig.topN > 0) {
-    processedItems = processedItems.slice(0, chartSpecConfig.topN);
-  }
-
   let derivedSeriesKey = null;
   const derivedMode = chartSpecConfig?.lineDerivedMetric || 'none';
-  if (derivedMode !== 'none' && processedItems.length > 0) {
+  const isTemporal = chartType === 'line' && ['ma3','mom_pct'].includes(derivedMode);
+  const derivedIssue = isTemporal ? temporalAxisIssue(dataset,rowConfigs,colConfigs,chartSpecConfig?.sortMode,processedItems) : null;
+  const temporalDimension = (rowConfigs.length ? rowConfigs : colConfigs)[0];
+  if (isTemporal && !derivedIssue) processedItems.sort((a,b) => periodIndex(a.name,temporalDimension.dateGranularity)-periodIndex(b.name,temporalDimension.dateGranularity));
+  const observedPrimary = item => {
+    if (!isTemporal) return item._rawSeriesValues[primarySeriesKey];
+    const sm = seriesMetaList[0];
+    const key = rowConfigs.length ? `${item.rowKey}@@${sm.colKey}@@${sm.valCfg.id}` : `__GRAND_TOTAL_ROW__@@${item.rowKey}@@${sm.valCfg.id}`;
+    return pivotResult.displayMatrix[key]?.display ?? null;
+  };
+  let hasPeriodGaps = false;
+  if (derivedMode !== 'none' && !derivedIssue && processedItems.length > 0) {
     let runningCum = 0;
     if (derivedMode === 'cumulative') derivedSeriesKey = `${primarySeriesKey}·累计值`;
     if (derivedMode === 'ma3') derivedSeriesKey = `${primarySeriesKey}·3期均线`;
     if (derivedMode === 'mom_pct') derivedSeriesKey = `${primarySeriesKey}·环比(%)`;
 
     processedItems.forEach((it, idx) => {
-      const cur = it._rawSeriesValues[primarySeriesKey];
+      const cur = observedPrimary(it);
       if (!Number.isFinite(cur)) { it[derivedSeriesKey] = null; return; }
       if (derivedMode === 'cumulative') {
         runningCum += cur;
         it[derivedSeriesKey] = runningCum;
       } else if (derivedMode === 'ma3') {
-        const slice = processedItems.slice(Math.max(0, idx - 2), idx + 1);
-        if (slice.some(x => !Number.isFinite(x._rawSeriesValues[primarySeriesKey]))) {it[derivedSeriesKey] = null;return;}
-        const avg = slice.reduce((s, x) => s + Number(x._rawSeriesValues[primarySeriesKey] ?? 0), 0) / slice.length;
-        it[derivedSeriesKey] = Number(avg.toFixed(1));
+        if (idx < 2) { it[derivedSeriesKey] = null; return; }
+        const slice = processedItems.slice(idx - 2, idx + 1);
+        if (isTemporal && slice.some((item,n) => n && periodIndex(item.name,temporalDimension.dateGranularity)-periodIndex(slice[n-1].name,temporalDimension.dateGranularity) !== 1)) { hasPeriodGaps = true; it[derivedSeriesKey] = null; return; }
+        if (slice.some(x => !Number.isFinite(observedPrimary(x)))) {it[derivedSeriesKey] = null;return;}
+        const avg = slice.reduce((s, x) => s + observedPrimary(x), 0) / slice.length;
+        it[derivedSeriesKey] = avg;
       } else if (derivedMode === 'mom_pct') {
         if (idx === 0) {
           it[derivedSeriesKey] = null;
         } else {
-          const prev = processedItems[idx - 1]._rawSeriesValues[primarySeriesKey];
-          it[derivedSeriesKey] = Number.isFinite(prev) && prev !== 0 ? Number((((cur - prev) / Math.abs(prev)) * 100).toFixed(1)) : null;
+          if (isTemporal && periodIndex(it.name,temporalDimension.dateGranularity)-periodIndex(processedItems[idx-1].name,temporalDimension.dateGranularity) !== 1) { hasPeriodGaps = true; it[derivedSeriesKey] = null; return; }
+          const prev = observedPrimary(processedItems[idx - 1]);
+          it[derivedSeriesKey] = Number.isFinite(prev) && prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : null;
         }
       }
     });
   }
+  // Compute against the full time sequence before limiting visible points.
+  if (chartSpecConfig?.topN > 0) processedItems = processedItems.slice(0,chartSpecConfig.topN);
 
   // Executive Insight Synthesis
   let executiveInsight = null;
@@ -510,7 +543,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
 
     // Benchmark count (above mean)
     const meanVal = totalSum / sortedByPrimary.length;
-    const aboveMeanCount = sortedByPrimary.filter(it => (it._rawSeriesValues[primarySeriesKey] ?? 0) >= meanVal).length;
+    const aboveMeanCount = sortedByPrimary.filter(it => it._rawSeriesValues[primarySeriesKey] > meanVal).length;
     const meanFormatted = UnifiedFormatter.formatValue(meanVal, primaryValCfg, { compact: false });
 
     // Statistical Z-Score outlier detection across primary series (|z| > 1.8σ)
@@ -545,7 +578,8 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       extremeRatio,
       aboveMeanCount,
       meanFormatted,
-      groupCount: processedItems.length,
+      groupCount: validItems.length,
+      totalGroupCount: processedItems.length,
     };
   }
 
@@ -735,6 +769,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   return {
     chartType,
     hasValues: true,
+    aggregationBasis: rollup ? getDimDisplayLabel(sourceConfig.rows[0]) : null,
     isPercentMode,
     isGroupedView: shouldGroupRows,
     groupingDimension: shouldGroupRows ? rowConfigs[0]?.field : null,
@@ -755,6 +790,9 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       ? '记录数'
       : (secondaryValCfg?.field || secondarySeriesKey),
     derivedSeriesKey,
+    derivedIssue,
+    temporalBasis: isTemporal && !derivedIssue,
+    hasPeriodGaps,
     derivedMode,
     seriesMetaList,
     kpiCards,

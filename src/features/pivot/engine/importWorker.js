@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { parseCSVTextToSheet, decodeCSVBuffer } from '../../../utils/csvParser.js';
-import { normalizeScalar } from '../../../utils/normalizeScalar.js';
+import { normalizeImportedValue, hasPercentageFormat } from '../../../utils/percentScale.js';
+import { isUnsafeInteger } from '../../../utils/normalizeScalar.js';
 
 self.onmessage = async ({ data: { file, text, sheets, normalize, options = {} } }) => {
   const progress = (pct) => self.postMessage({ progress: pct });
@@ -12,7 +13,7 @@ self.onmessage = async ({ data: { file, text, sheets, normalize, options = {} } 
         if (index % 10000 === 0) progress(Math.round(index / Math.max(1, sheet.rows.length) * 95));
         const next = { ...row };
         for (const field of sheet.fields) {
-          if (field.type === 'number' || field.type === 'boolean') next[field.name] = normalizeScalar(row[field.name], field.type);
+          if (field.type === 'number' || field.type === 'boolean') next[field.name] = normalizeImportedValue(row[field.name], field);
         }
         return next;
       });
@@ -40,7 +41,13 @@ self.onmessage = async ({ data: { file, text, sheets, normalize, options = {} } 
           }
           return `"${raw.replace(/"/g, '""')}"`;
         }).join(',')).join('\n');
-        return parseCSVTextToSheet(csv, name, { delimiter: ',', header: 'yes' });
+        const parsed = parseCSVTextToSheet(csv, name, { delimiter: ',', header: 'yes' });
+        if (parsed) parsed.fields = parsed.fields.map((field,columnIndex) => {
+          const numericCells = records.slice(1).map((_,rowIndex) => sheet[XLSX.utils.encode_cell({r:range.s.r+rowIndex+1,c:range.s.c+columnIndex})]).filter(cell => cell?.t === 'n');
+          return field.type === 'number' && numericCells.length && numericCells.every(cell => hasPercentageFormat(cell.z)) ? {...field,percentScale:'fraction'} : field;
+        });
+        if (parsed && records.slice(1).some(row => row.some(value => typeof value === 'number' && isUnsafeInteger(value)))) parsed.importMeta.warnings += ' Excel 数字单元格可能已在源文件中丢失精度，无法还原；请从源系统导出文本形式的标识。';
+        return parsed;
       }).filter(Boolean);
     } else {
       let content = text;

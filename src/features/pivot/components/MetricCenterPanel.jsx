@@ -15,23 +15,24 @@ import {
   buildFormulaFromVisualSpec,
   formatFormulaField,
 } from '../engine/formulaEngine.js';
+import { buildMetricPresets } from '../../../utils/metricPresets.js';
 import { normalizeMetricDefinitions, validateMetricCatalogMerge } from '../../../utils/metricCatalog.js';
 import { MiniSparkline } from './MiniSparkline.jsx';
 import { SmartTemplatesBar } from './SmartTemplatesBar.jsx';
 
 const METRIC_CATEGORIES = [
   { id: 'ratio', label: '比率/效率', color: 'text-ink-purple bg-[#AE81FF]/15 border-[#AE81FF]/30' },
-  { id: 'profit', label: '利润/净额', color: 'text-ink-green bg-[#A6E22E]/15 border-[#A6E22E]/30' },
+  { id: 'profit', label: '差额/差额比', color: 'text-ink-green bg-[#A6E22E]/15 border-[#A6E22E]/30' },
   { id: 'average', label: '单均/频次', color: 'text-ink-cyan bg-[#66D9EF]/15 border-[#66D9EF]/30' },
   { id: 'scale', label: '规模/折算', color: 'text-ink-orange bg-[#FD971F]/15 border-[#FD971F]/30' },
 ];
 
 const GOAL_CATEGORIES = [
   { id: 'all', label: '全部场景' },
-  { id: 'profit', label: '💰 盈利与利润', desc: '毛利率、复合净率、利润额' },
-  { id: 'average', label: '🛒 客单与消费', desc: '客单价、笔均销售、件均价' },
-  { id: 'ratio', label: '📈 效率与转化', desc: '转化率、退款率、比率分析' },
-  { id: 'scale', label: '📦 量级与折算', desc: '大额万元折算、单位转换' },
+  { id: 'profit', label: '差额比较', desc: '差值与差额比，需确认单位一致' },
+  { id: 'average', label: '按记录或类别分摊', desc: '总量除以记录数或字段唯一值个数' },
+  { id: 'ratio', label: '比值计算', desc: '两项汇总值相除，不推断业务含义' },
+  { id: 'scale', label: '数量级折算', desc: '保留原字段单位，调整显示数量级' },
 ];
 
 /**
@@ -167,9 +168,9 @@ export function MetricCenterPanel({
     setEditingId(null);
     setBuilderMode('binary');
     setFormState({
-      name: hasTwo ? `${m1}/${m0}率` : measureFields.length === 1 ? `笔均${m0}` : '自定义衍生指标',
+      name: hasTwo ? `${m1}/${m0}比值` : measureFields.length === 1 ? `${m0}/记录数` : '自定义衍生指标',
       category: hasTwo ? 'ratio' : 'average',
-      description: hasTwo ? `${m1}占${m0}的比值` : `每笔记录平均${m0}`,
+      description: hasTwo ? `${m1}与${m0}分别汇总后相除；是否具有业务意义需核对字段定义与单位。` : `${m0}汇总后除以全部记录数（含空值记录）。`,
       operandAField: opA,
       operandAAgg: aggA,
       op: '/',
@@ -280,67 +281,7 @@ export function MetricCenterPanel({
     [effectiveFormula, fields]
   );
 
-  const businessInterpretation = useMemo(() => {
-    if (!formulaValidation.valid) return null;
-    if (builderMode === 'margin') {
-      return {
-        title: '复合净利率/毛利率场景',
-        icon: '💰',
-        desc: `衡量扣除 [${formState.operandBField}] 后的净留存占比。即：每单位基准 [${formState.operandAField}] 中，扣除成本后还剩下多少利润比重。系统会自动采用全量汇总 (SUM(A)-SUM(B))/SUM(A) 避免辛普森悖论。`
-      };
-    }
-    if (builderMode === 'constant') {
-      return {
-        title: '量级单位折算场景',
-        icon: '📦',
-        desc: `将大额基础数值按常数 ${formState.constantValue} 进行折算（如除以 10000 换算为“万元”或“万件”），大幅提升跨团队汇报的阅读效率。`
-      };
-    }
-    if (builderMode === 'binary') {
-      if (formState.op === '/') {
-        if (formState.operandBField === '__COUNT__' || formState.operandBAgg === 'count' || formState.operandBAgg === 'count_distinct') {
-          return {
-            title: '单均产出场景 (客单价 / 笔均量)',
-            icon: '🛒',
-            desc: `计算平均每一笔记录或客户贡献的 [${formState.operandAField}]。可用于衡量客户消费能力、单笔交易质量与人均效率。`
-          };
-        }
-        return {
-          title: '比率与转化场景',
-          icon: '📈',
-          desc: `计算 [${formState.operandAField}] 占 [${formState.operandBField}] 的比重。透视表底层采用全量加权汇总算法，保障在各层级分组下比率计算均严谨精准。`
-        };
-      }
-      if (formState.op === '-') {
-        return {
-          title: '净额差额场景',
-          icon: '💰',
-          desc: '计算两项度量的差值（如销售额 - 成本 = 毛利额）。'
-        };
-      }
-      if (formState.op === '*') {
-        return {
-          title: '衍生连乘场景',
-          icon: '🔢',
-          desc: '计算两项指标的乘积（如单价 × 销量，或销售额 × 抽成提成率）。'
-        };
-      }
-      if (formState.op === '+') {
-        return {
-          title: '合并汇总场景',
-          icon: '➕',
-          desc: '合并两项度量求和（如主营收入 + 附营收入）。'
-        };
-      }
-    }
-    return {
-      title: '自定义高级公式场景',
-      icon: '✨',
-      desc: '基于多字段 AST 语法树解析并动态计算。零分母除零安全防护已全局开启，空值自动优雅回退。'
-    };
-  }, [formulaValidation.valid, builderMode, formState.op, formState.operandAField, formState.operandBField, formState.operandBAgg, formState.constantValue]);
 
-  // Suggested Formula Fix for beginners
   const suggestedFormulaFix = useMemo(() => {
     if (builderMode !== 'expression' || formulaValidation.valid) return null;
     return suggestFormulaFix(formState.formula, fields);
@@ -437,7 +378,7 @@ export function MetricCenterPanel({
     if (builderMode === 'margin') {
       const a = formState.operandAField === '__COUNT__' ? '记录数' : `【${formState.operandAField}】`;
       const b = formState.operandBField === '__COUNT__' ? '记录数' : `【${formState.operandBField}】`;
-      return `口径解读：计算 (${a}汇总 - ${b}汇总) ÷ ${a}汇总。采用复合加权汇总算法，真实衡量净盈利水平或剔除率，彻底避免了逐行计算后再平均导致的极端值失真。`;
+      return `口径解读：计算 (${a}汇总 - ${b}汇总) ÷ ${a}汇总。先汇总再计算比率，不是逐行比率的平均值；是否代表利润率，取决于所选字段的业务含义。`;
     }
     if (builderMode === 'binary') {
       const a = formState.operandAField === '__COUNT__' ? '记录数' : `【${formState.operandAField}】`;
@@ -445,203 +386,13 @@ export function MetricCenterPanel({
       const aggA = formState.operandAField === '__COUNT__' ? '总记录数' : `${a}（${AGG_METHODS.find(m => m.value === formState.operandAAgg)?.short || formState.operandAAgg}）`;
       const aggB = formState.operandBField === '__COUNT__' ? '总记录数' : `${b}（${AGG_METHODS.find(m => m.value === formState.operandBAgg)?.short || formState.operandBAgg}）`;
       const opText = formState.op === '/' ? '除以' : formState.op === '*' ? '乘以' : formState.op === '-' ? '减去' : '加上';
-      const whyNote = formState.op === '/' ? '系统在底层全量加权汇总后再相除，保证了大权重数据的真实主导性（避开辛普森悖论陷阱）。' : '';
+      const whyNote = formState.op === '/' ? '先按所选口径分别汇总，再相除；不是逐行比率的平均值。' : '';
       return `口径解读：计算每组维度的 ${aggA} ${opText} ${aggB}。${whyNote}`;
     }
     return '高级公式解读：支持各类聚合函数、去重计数与数学运算，已内置零分母防报错与空值优雅回退机制。';
   }, [builderMode, formState.operandAField, formState.operandAAgg, formState.op, formState.operandBField, formState.operandBAgg, formState.constantValue]);
 
-  // Contextual Smart Custom Metric Presets based on current dataset semantics
-  const smartMetricPresets = useMemo(() => {
-    const presets = [];
-    const m0 = measureFields[0]?.name;
-    const m1 = measureFields[1]?.name;
-    const d0 = dimensionFields[0]?.name;
-
-    const findField = (regex) => fields.find(f => regex.test(f.name))?.name;
-    const salesField = findField(/销售|收入|金额|营收|revenue|sales|amount/i);
-    const costField = findField(/成本|费用|支出|cost|expense/i);
-    const custField = findField(/客户|用户|会员|买家|customer|user/i);
-    const orderField = findField(/订单|成交|笔数|order/i);
-    const visitorField = findField(/访客|访问|浏览|流量|uv|pv|visitor/i);
-
-    if (salesField && costField) {
-      presets.push({
-        id: 'preset_gross_margin',
-        label: `毛利率 ((${salesField}-${costField})÷${salesField})`,
-        badge: '盈利核心',
-        category: 'profit',
-        mode: 'margin',
-        spec: {
-          name: '毛利率',
-          description: `(${salesField} - ${costField}) / ${salesField} 真实复合毛利率`,
-          operandAField: salesField,
-          operandAAgg: 'sum',
-          op: '/',
-          operandBField: costField,
-          operandBAgg: 'sum',
-          formatPreset: 'percent',
-          decimals: 1,
-        },
-      });
-    }
-    if (salesField && custField) {
-      presets.push({
-        id: 'preset_arpu',
-        label: `客单价 (${salesField}÷去重${custField})`,
-        badge: '客单价值',
-        category: 'average',
-        mode: 'binary',
-        spec: {
-          name: `客单价(${custField})`,
-          description: `总${salesField}除以去重${custField}数：SUM([${salesField}]) / COUNTD([${custField}])`,
-          operandAField: salesField,
-          operandAAgg: 'sum',
-          op: '/',
-          operandBField: custField,
-          operandBAgg: 'count_distinct',
-          formatPreset: 'cny',
-          decimals: 1,
-        },
-      });
-    }
-    if (orderField && visitorField) {
-      presets.push({
-        id: 'preset_cvr',
-        label: `转化率 (${orderField}÷${visitorField})`,
-        badge: '流量转化',
-        category: 'ratio',
-        mode: 'binary',
-        spec: {
-          name: '订单转化率',
-          description: `统计总${orderField}占总${visitorField}的转化比率`,
-          operandAField: orderField,
-          operandAAgg: 'sum',
-          op: '/',
-          operandBField: visitorField,
-          operandBAgg: 'sum',
-          formatPreset: 'percent',
-          decimals: 1,
-        },
-      });
-    }
-
-    if (m0 && m1) {
-      presets.push({
-        id: 'preset_ratio',
-        label: `${m1}÷${m0}比率 (%)`,
-        badge: '比率',
-        category: 'ratio',
-        mode: 'binary',
-        spec: {
-          name: `${m1}/${m0}率`,
-          description: `计算 ${m1} 占 ${m0} 的汇总百分比`,
-          operandAField: m1,
-          operandAAgg: 'sum',
-          op: '/',
-          operandBField: m0,
-          operandBAgg: 'sum',
-          formatPreset: 'percent',
-          decimals: 1,
-        },
-      });
-      presets.push({
-        id: 'preset_margin',
-        label: `(${m0}-${m1})÷${m0}净率`,
-        badge: '复合净率',
-        category: 'profit',
-        mode: 'margin',
-        spec: {
-          name: `${m0}扣除${m1}净利率`,
-          description: `(${m0} - ${m1}) / ${m0} 复合利润率`,
-          operandAField: m0,
-          operandAAgg: 'sum',
-          op: '/',
-          operandBField: m1,
-          operandBAgg: 'sum',
-          formatPreset: 'percent',
-          decimals: 1,
-        },
-      });
-      presets.push({
-        id: 'preset_diff',
-        label: `${m0}-${m1}净差额`,
-        badge: '差额',
-        category: 'profit',
-        mode: 'binary',
-        spec: {
-          name: `${m0}-${m1}净额`,
-          description: `${m0} 与 ${m1} 的汇总差值`,
-          operandAField: m0,
-          operandAAgg: 'sum',
-          op: '-',
-          operandBField: m1,
-          operandBAgg: 'sum',
-          formatPreset: 'number',
-          decimals: 0,
-        },
-      });
-    }
-    if (m0) {
-      presets.push({
-        id: 'preset_aov',
-        label: `笔均${m0} (÷记录数)`,
-        badge: '单均',
-        category: 'average',
-        mode: 'binary',
-        spec: {
-          name: `笔均${m0}`,
-          description: `平均每条明细记录的 ${m0}`,
-          operandAField: m0,
-          operandAAgg: 'sum',
-          op: '/',
-          operandBField: '__COUNT__',
-          operandBAgg: 'count',
-          formatPreset: 'number',
-          decimals: 1,
-        },
-      });
-      if (d0) {
-        presets.push({
-          id: 'preset_per_dim',
-          label: `每个${d0}平均${m0}`,
-          badge: '去重均产出',
-          category: 'average',
-          mode: 'binary',
-          spec: {
-            name: `${d0}均${m0}`,
-            description: `按去重 ${d0} 数量计算的均值：SUM([${m0}]) / COUNTD([${d0}])`,
-            operandAField: m0,
-            operandAAgg: 'sum',
-            op: '/',
-            operandBField: d0,
-            operandBAgg: 'count_distinct',
-            formatPreset: 'number',
-            decimals: 1,
-          },
-        });
-      }
-      presets.push({
-        id: 'preset_wan',
-        label: `${m0} (万元折算)`,
-        badge: '折算',
-        category: 'scale',
-        mode: 'constant',
-        spec: {
-          name: `${m0}(万元)`,
-          description: `将 ${m0} 按 10,000 折算为万元单位`,
-          operandAField: m0,
-          operandAAgg: 'sum',
-          op: '/',
-          constantValue: 10000,
-          formatPreset: 'number',
-          decimals: 2,
-          unit: '万',
-        },
-      });
-    }
-    return presets;
-  }, [fields, measureFields, dimensionFields]);
+  const smartMetricPresets = useMemo(() => buildMetricPresets(fields), [fields]);
 
   // Filter presets based on selected goal
   const filteredSmartPresets = useMemo(() => {
@@ -992,7 +743,7 @@ export function MetricCenterPanel({
   return (
     <div
       data-testid="metric-center"
-      className="mx-2.5 sm:mx-4 mt-2 p-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822]/95 shadow-md space-y-2.5 shrink-0 animate-apple-stage max-h-[460px] overflow-y-auto apple-font-mono"
+      className="metric-center min-w-0 mx-2.5 sm:mx-4 mt-2 p-3 rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#272822]/95 shadow-md space-y-2.5 shrink-0 animate-apple-stage max-h-[460px] overflow-y-auto apple-font-mono"
     >
       {/* Top Navigation Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#D6D4C8]/70 dark:border-[#3E3D32]/70">
@@ -1006,7 +757,7 @@ export function MetricCenterPanel({
           <div
             role="tablist"
             aria-label={t("指标中心功能视图")}
-            className="inline-flex items-center rounded-lg p-0.5 bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px]"
+            className="flex min-w-0 max-w-full flex-wrap items-center rounded-lg p-0.5 bg-[#EFECE1] dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] text-[10px]"
           >
             {[
               { id: 'active', label: `${t("已配指标与看板")} (${activeValues.length})` },
@@ -1022,7 +773,7 @@ export function MetricCenterPanel({
                   soundEngine?.playClick?.(500);
                   setActiveTab(tab.id);
                 }}
-                className={`px-2.5 py-1 min-h-[24px] rounded-md font-semibold transition ${
+                className={`min-w-0 flex-auto break-words px-2.5 py-1 min-h-[24px] rounded-md font-semibold transition ${
                   activeTab === tab.id
                     ? 'bg-[#FFFDF7] dark:bg-[#272822] text-ink-purple shadow-2xs font-bold'
                     : 'text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2]'
@@ -1105,7 +856,7 @@ export function MetricCenterPanel({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+            <div className="metric-kpi-grid grid grid-cols-1 gap-2">
               {activeValues.map((vc, idx) => {
                 const kpi = (unifiedChartSpec?.kpiCards || []).find((k) => k.id === vc.id);
                 const grandRaw = pivotResult?.displayMatrix?.[`__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${vc.id}`]?.display ?? null;
@@ -1368,17 +1119,18 @@ export function MetricCenterPanel({
           {/* Smart 1-Click Industry Metric Presets */}
           {filteredSmartPresets.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-[#D6D4C8]/50 dark:border-[#3E3D32]/50">
-              <span className="text-[9.5px] font-bold text-ink-muted shrink-0">{t("智能指标模板 (点击载入或直接上表):")}</span>
+              <span className="text-[9.5px] font-bold text-ink-muted shrink-0">{t("计算模板（先查看口径）:")}</span>
               {filteredSmartPresets.map((preset) => (
                 <div
                   key={preset.id}
-                  className="inline-flex items-center rounded-md border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/60 dark:bg-[#1E1F1C] overflow-hidden"
+                  className="inline-flex max-w-full min-w-0 items-center rounded-md border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#EFECE1]/60 dark:bg-[#1E1F1C] overflow-hidden"
                 >
                   <button
                     type="button"
                     disabled={isReadOnly}
+                    data-testid={`metric-preset-${preset.id}`}
                     onClick={() => applyPresetToStudio(preset, false)}
-                    className="px-2 py-0.5 min-h-[24px] hover:bg-black/5 dark:hover:bg-white/5 text-[#272822] dark:text-[#F8F8F2] text-[9.5px] font-semibold transition"
+                    className="min-w-0 break-words px-2 py-0.5 min-h-[24px] hover:bg-black/5 dark:hover:bg-white/5 text-[#272822] dark:text-[#F8F8F2] text-[9.5px] font-semibold transition"
                     title={`${preset.spec.description} (点击载入到下方编辑器)`}
                   >
                     {preset.label}
@@ -1386,8 +1138,10 @@ export function MetricCenterPanel({
                   <button
                     type="button"
                     disabled={isReadOnly}
+                    data-testid={`metric-preset-add-${preset.id}`}
+                    aria-label={`+上表：${preset.label}`}
                     onClick={() => applyPresetToStudio(preset, true)}
-                    className="px-1.5 py-0.5 min-h-[24px] bg-[#AE81FF]/15 hover:bg-[#AE81FF] text-ink-purple hover:text-[#1E1F1C] text-[9px] font-bold border-l border-[#D6D4C8] dark:border-[#3E3D32] transition"
+                    className="shrink-0 px-1.5 py-0.5 min-h-[24px] bg-[#AE81FF]/15 hover:bg-[#AE81FF] text-ink-purple hover:text-[#1E1F1C] text-[9px] font-bold border-l border-[#D6D4C8] dark:border-[#3E3D32] transition"
                     title={t("一键直接生成并添加到透视表")}
                   >
                     {t("+上表")}
@@ -1397,13 +1151,17 @@ export function MetricCenterPanel({
             </div>
           )}
 
+          <p data-testid="metric-preset-guidance" className="text-ink-muted leading-relaxed">
+            {t('模板只描述计算方式。请先核对字段、单位和统计粒度，再决定是否上表。')}
+          </p>
+
           {/* Builder Mode Switcher: 双字段四则 / 复合净率 / 常数折算 / FX高级公式 */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-[9.5px] text-ink-muted font-semibold">{t("构建模式:")}</span>
               {[
                 { id: 'binary', label: '双字段四则 (A ÷ B)' },
-                { id: 'margin', label: '复合净率 ((A - B) ÷ A)' },
+                { id: 'margin', label: '差额比 ((A - B) ÷ A)' },
                 { id: 'constant', label: '常数折算 (A ÷ 10000)' },
                 { id: 'expression', label: 'FX 高级公式表达式' },
               ].map((m) => (
@@ -1444,8 +1202,8 @@ export function MetricCenterPanel({
           </div>
 
           {/* Row 1: Metric Metadata (Name, Category, Description) */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-            <div className="sm:col-span-4">
+          <div className="metric-metadata-grid grid grid-cols-1 gap-2">
+            <div>
               <label className="block text-[9.5px] text-ink-muted mb-0.5">{t("自定义指标名称:")}</label>
               <input
                 type="text"
@@ -1458,7 +1216,7 @@ export function MetricCenterPanel({
               />
             </div>
 
-            <div className="sm:col-span-3">
+            <div>
               <label className="block text-[9.5px] text-ink-muted mb-0.5">{t("指标业务分类:")}</label>
               <select
                 aria-label={t("自定义指标业务分类")}
@@ -1473,7 +1231,7 @@ export function MetricCenterPanel({
               </select>
             </div>
 
-            <div className="sm:col-span-5">
+            <div>
               <label className="block text-[9.5px] text-ink-muted mb-0.5">{t("业务口径说明 (选填):")}</label>
               <input
                 type="text"
@@ -1490,9 +1248,9 @@ export function MetricCenterPanel({
           {/* Row 2: Formula Definition (Visual Guided OR FX Expression Editor) */}
           {builderMode !== 'expression' ? (
             <div className="space-y-1.5">
-              <div className="p-2.5 rounded-lg bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+              <div className="metric-formula-grid p-2.5 rounded-lg bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] grid grid-cols-1 gap-2 items-end">
                 {/* Operand A */}
-                <div className="sm:col-span-5">
+                <div>
                   <label className="block text-[9.5px] text-ink-muted mb-0.5">
                     {builderMode === 'margin' ? t("基准指标 A (如销售额):") : t("首项/分子 (指标 A):")}
                   </label>
@@ -1545,7 +1303,7 @@ export function MetricCenterPanel({
                 </div>
 
                 {/* Operator */}
-                <div className="sm:col-span-2">
+                <div>
                   <label className="block text-[9.5px] text-ink-muted mb-0.5">{t("运算规则:")}</label>
                   {builderMode === 'margin' ? (
                     <div className="px-2 py-1 min-h-[26px] rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-center font-bold text-ink-purple text-[10px]">
@@ -1575,7 +1333,7 @@ export function MetricCenterPanel({
                 </div>
 
                 {/* Operand B or Constant */}
-                <div className="sm:col-span-5">
+                <div>
                   {builderMode === 'constant' ? (
                     <>
                       <label className="block text-[9.5px] text-ink-muted mb-0.5">{t("常数/折算系数:")}</label>
@@ -1646,13 +1404,9 @@ export function MetricCenterPanel({
               </div>
 
               {/* Natural Language Interpretation Banner */}
-              <div className="flex items-center justify-between gap-2 px-2.5 py-1 rounded bg-[#66D9EF]/10 border border-[#66D9EF]/30 text-[9.5px]">
-                <span className="text-ink-cyan truncate">
+              <div data-testid="metric-formula-explanation" className="flex flex-wrap items-start gap-2 px-2.5 py-1 rounded bg-[#66D9EF]/10 border border-[#66D9EF]/30 text-[11px] leading-relaxed">
+                <span className="text-ink-cyan min-w-0 flex-1 basis-48 [overflow-wrap:anywhere]">
                   {naturalLanguageFormulaNote}
-                </span>
-                <span className="hidden md:inline-flex items-center gap-1 text-[8.5px] font-semibold text-ink-green shrink-0">
-                  <ShieldCheck className="w-3 h-3 text-ink-green" />
-                  <span>{t("零分母安全保护已开启")}</span>
                 </span>
               </div>
             </div>
@@ -1720,17 +1474,10 @@ export function MetricCenterPanel({
             </div>
           )}
 
-          {/* Real-time Business Interpretation & Analyst Guide */}
-          {businessInterpretation && (
-            <div className="p-2 rounded-lg bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] space-y-0.5 text-[9.5px] apple-font-mono shrink-0 animate-apple-modal">
-              <div className="flex items-center gap-1 font-bold text-[#272822] dark:text-[#F8F8F2]">
-                <span>{businessInterpretation.icon}</span>
-                <span className="text-ink-purple">{t(businessInterpretation.title)}:</span>
-              </div>
-              <p className="leading-relaxed text-[#57584B] dark:text-[#C4C4B8]">
-                {t(businessInterpretation.desc)}
-              </p>
-            </div>
+          {builderMode === 'binary' && formState.op === '*' && (
+            <p data-testid="aggregate-product-warning" className="text-[11px] leading-relaxed text-ink-muted">
+              {t('先分别汇总两项，再相乘；这不是逐行相乘后求和。如需计算销售额，请使用每条记录的金额字段。')}
+            </p>
           )}
 
           {/* Row 3: Format, ShowAs & Live Trial Preview + Save Actions */}
@@ -1793,10 +1540,10 @@ export function MetricCenterPanel({
             </div>
 
             {/* Live Validation & Preview + Commit Buttons */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
               <div
                 data-testid="metric-live-preview"
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] ${
+                className={`inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] ${
                   formulaValidation.valid
                     ? 'bg-[#A6E22E]/10 border-[#A6E22E]/40 text-ink-green'
                     : 'bg-[#F92672]/10 border-[#F92672]/40 text-ink-pink'
@@ -1806,7 +1553,7 @@ export function MetricCenterPanel({
                   <>
                     <Check className="w-3 h-3 shrink-0" />
                     <span className="text-ink-muted">{t("实时全表试算:")}</span>
-                    <strong className="text-[#272822] dark:text-[#F8F8F2]">{livePreviewResult.formatted}</strong>
+                    <strong className="min-w-0 [overflow-wrap:anywhere] text-[#272822] dark:text-[#F8F8F2]">{livePreviewResult.formatted}</strong>
                     <span className="hidden md:inline text-[9px] text-ink-muted truncate max-w-[180px]" title={effectiveFormula}>
                       ({effectiveFormula})
                     </span>
@@ -1818,6 +1565,12 @@ export function MetricCenterPanel({
                   </>
                 )}
               </div>
+
+              {formulaValidation.valid && (
+                <span data-testid="metric-preview-scope" className="text-[10px] leading-relaxed text-ink-muted">
+                  {t('基于全部导入记录，不应用当前筛选；上表后按透视表范围计算。')}
+                </span>
+              )}
 
               {/* One-Click Auto-Fix Suggestion for Beginners */}
               {suggestedFormulaFix && (
@@ -2083,7 +1836,7 @@ export function MetricCenterPanel({
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2 max-h-[220px] overflow-y-auto pr-0.5">
+          <div className="metric-catalog-grid grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto pr-0.5">
             {/* Custom Metrics in Catalog */}
             {catalogFilter !== 'native' &&
               customMetricsCatalog

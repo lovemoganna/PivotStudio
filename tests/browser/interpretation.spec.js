@@ -114,7 +114,7 @@ test('interpretation: chart studio guide & notes, donut highlight value, and len
  const guide=page.getByTestId('chart-guide-note');
  await expect(guide).toBeVisible();
  await expect(guide).toContainText('怎么读这张图');
- await expect(guide).toContainText('我的结论');
+ await expect(guide).toContainText('配置摘要');
  // Switching chart type in chart-only mode preserves chart-only mode
  await page.getByLabel('选择图表类型',{exact:true}).selectOption('line');await ready(page);
  await expect(page.getByRole('button',{name:'仅图表',exact:true})).toHaveAttribute('aria-pressed','true');
@@ -125,6 +125,7 @@ test('interpretation: chart studio guide & notes, donut highlight value, and len
  await dialog.getByLabel('分析结论:',{exact:true}).fill('零基础用户记录的季度增长结论');
  await dialog.getByRole('button',{name:'保存修改',exact:true}).click();await expect(dialog).toHaveCount(0);
  await expect(guide).toContainText('零基础用户记录的季度增长结论');
+ await expect(guide).toContainText('我的结论');
  // Back to bars for drill-down; click must not leak __GRAND_TOTAL_COL__
  await page.getByLabel('选择图表类型',{exact:true}).selectOption('bar');await ready(page);
  await chart.locator('.recharts-bar-rectangle').first().click();

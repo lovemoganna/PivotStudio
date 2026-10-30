@@ -90,13 +90,13 @@ export const CHART_METHOD_GUIDES = {
   bar: {
     intent: '对比排行',
     purpose: '比较各组高低，找出最高与最低。',
-    howToRead: '横轴是分组，纵轴是数值；虚线是各组均值，高于虚线即高于平均。',
+    howToRead: '横轴是分组，纵轴是当前指标的展示值。',
     actionTip: '点「排序」切到降序，或点某一柱查看明细。',
   },
   horizontal_bar: {
     intent: '对比排行',
     purpose: '名称较长或分组较多时，条形图更易扫读。',
-    howToRead: '条越长数值越大；纵向虚线是均值。',
+    howToRead: '条越长，当前指标的展示值越大。',
     actionTip: '在「选项」里设 Top 5 / Top 10，先看头部。',
   },
   heatmap: {
@@ -108,7 +108,7 @@ export const CHART_METHOD_GUIDES = {
   line: {
     intent: '趋势演变',
     purpose: '看指标随时间或顺序如何升降。',
-    howToRead: '斜率表示快慢；虚线是全程均值。',
+    howToRead: '沿横轴顺序观察指标的升降；只有时间轴才能解释为随时间变化。',
     actionTip: '在「选项 → 衍生线」可开移动平均或环比%。',
   },
   area: {
@@ -498,29 +498,13 @@ export function generateDynamicKeynoteShots(dataset) {
     ? [{ id: 'c_k1', field: colDimName, sort: hasDateCol ? 'asc' : 'none', dateGranularity: hasDateCol ? 'year' : 'raw', excludedValues: [] }]
     : [];
 
-  // Extract quick data highlight if dataset rows are available
-  let dim1TopVal = null;
-  if (dataset.rows && dataset.rows.length > 0 && dim1) {
-    const counts = new Map();
-    const limit = Math.min(dataset.rows.length, 1000);
-    for (let i = 0; i < limit; i++) {
-      const v = dataset.rows[i][dim1];
-      if (v !== undefined && v !== null && v !== '') counts.set(v, (counts.get(v) || 0) + 1);
-    }
-    let maxC = 0;
-    for (const [k, c] of counts.entries()) {
-      if (c > maxC) { maxC = c; dim1TopVal = k; }
-    }
-  }
-  const topValHint = dim1TopVal ? `样本中「${dim1TopVal}」出现较多。` : '';
-
   return [
     {
       id: 'shot_1',
       number: '01',
       title: `按「${dim1}」对比${num1}${num2 !== num1 ? `与${num2}` : ''}`,
       shortLabel: `${dim1}对比`,
-      subtitle: `比较各「${dim1}」在「${num1}」${num2 !== num1 ? `与「${num2}」` : ''}上的高低。${topValHint}`,
+      subtitle: `比较各「${dim1}」在「${num1}」${num2 !== num1 ? `与「${num2}」` : ''}上的高低。`,
       viewMode: 'split',
       chartType: 'bar',
       pivotOverride: {
@@ -593,5 +577,5 @@ export function generateDynamicKeynoteShots(dataset) {
         values: measures.length > 1 ? [makeVal(num1, 'v_1'), makeVal(num2, 'v_2')] : [makeVal(num1, 'v_1')],
       },
     },
-  ];
+  ].map(shot => ({...shot,generated:true}));
 }

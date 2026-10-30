@@ -1,8 +1,4 @@
-function numericValue(raw) {
-  if (raw === null || raw === undefined || String(raw).trim() === '') return null;
-  const value = typeof raw === 'number' ? raw : Number(String(raw).replace(/,/g, ''));
-  return Number.isFinite(value) ? value : null;
-}
+import { analyticNumber as numericValue } from '../../../utils/normalizeScalar.js';
 
 export function matchesHistogramBin(record, bin) {
   const value = numericValue(record[bin.field]);

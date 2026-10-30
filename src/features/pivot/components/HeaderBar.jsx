@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { KEYNOTE_STORYBOARD_SHOTS } from '../../../constants/pivotConstants';
 import { StoryShotDialog } from './modals/StoryShotDialog';
+import { ToolbarMenu } from './ToolbarMenu';
 
 export function HeaderBar({
   theme, setTheme, locale, onLocaleChange,
@@ -55,6 +56,7 @@ export function HeaderBar({
   unifiedChartSpec,
   onEnsureDatasetLoaded,
   currentDataset,
+  hasSavedViews = false,
 }) {
   const effectiveStoryShots = (storyShots && storyShots.length > 0) ? storyShots : KEYNOTE_STORYBOARD_SHOTS;
   const activeKeynoteShot = effectiveStoryShots[keynoteShotIdx] || effectiveStoryShots[0] || KEYNOTE_STORYBOARD_SHOTS[0];
@@ -83,30 +85,6 @@ export function HeaderBar({
       window.removeEventListener('resize', measure);
     };
   }, [hasDataset, keynotePlaying, cinemaTheaterMode]);
-
-  React.useEffect(() => {
-    if (!exportMenuOpen && !moreMenuOpen) return;
-    const onPointerDown = (event) => {
-      if (exportMenuOpen && exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
-        setExportMenuOpen(false);
-      }
-      if (moreMenuOpen && moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
-        setMoreMenuOpen(false);
-      }
-    };
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setExportMenuOpen(false);
-        setMoreMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [exportMenuOpen, moreMenuOpen]);
 
   React.useEffect(() => {
     if (!hasDataset) {
@@ -268,11 +246,7 @@ export function HeaderBar({
                     <ChevronDown className={`w-3 h-3 opacity-70 transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {exportMenuOpen && (
-                    <div
-                      role="menu"
-                      aria-label={t("导出格式")}
-                      className="absolute top-[calc(100%+6px)] right-0 z-50 min-w-[148px] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#1E1F1C] shadow-xl p-1"
-                    >
+                    <ToolbarMenu anchorRef={exportMenuRef} label={t('导出格式')} darkMode={darkMode} onClose={()=>setExportMenuOpen(false)}>
                       {[
                         { label: '.XLSX', onClick: exportToExcelMerged, title: t('导出真正的 Excel 工作簿 (.xlsx)'), disabled: false },
                         { label: '.CSV', onClick: exportToCSV, title: t('导出 CSV 数据表 (.csv)'), disabled: false },
@@ -296,11 +270,13 @@ export function HeaderBar({
                           {item.label}
                         </button>
                       ))}
-                    </div>
+                    </ToolbarMenu>
                   )}
                 </div>
               )}
             </div>
+
+            {!hasDataset && hasSavedViews && <button onClick={() => setShowWorkspaceModal(true)} className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg border border-[#D6D4C8] dark:border-[#3E3D32] text-xs text-ink-cyan shrink-0"><FolderOpen className="w-3.5 h-3.5" />{t('恢复分析配置')}</button>}
 
             {/* ---------------------------------------------------------------------
                 CLUSTER 2: 分析操作与全局指令 (Analysis Operations & Commands)
@@ -337,7 +313,7 @@ export function HeaderBar({
                 onClick={() => { soundEngine?.playClick(640); setShowCommandPalette(true); setCommandQuery(''); }}
                 className={`h-full flex items-center gap-1.5 px-2 hover:bg-[#3E3D32]/10 dark:hover:bg-[#3E3D32]/50 text-[11px] text-ink-muted hover:text-[#272822] dark:hover:text-[#F8F8F2] apple-transition ${!hasDataset ? 'rounded-r-lg' : ''}`}
                 title={t("打开全局指令面板 (⌘K / Ctrl+K)")}
-                aria-label={t("打开指令面板")}
+                aria-label={`${t('指令')} ⌘K · ${t('打开指令面板')}`}
               >
                 <Search className="w-3.5 h-3.5 text-ink-cyan" />
                 <span className="hidden md:inline font-medium text-[11px]">{t("指令")}</span>
@@ -379,11 +355,7 @@ export function HeaderBar({
                   <ChevronDown className={`w-3 h-3 opacity-70 transition-transform ${moreMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {moreMenuOpen && (
-                  <div
-                    role="menu"
-                    aria-label={t("更多操作")}
-                    className="absolute top-[calc(100%+6px)] right-0 z-50 min-w-[180px] rounded-xl border border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7] dark:bg-[#1E1F1C] shadow-xl p-1"
-                  >
+                  <ToolbarMenu anchorRef={moreMenuRef} label={t('更多操作')} darkMode={darkMode} minWidth={180} onClose={()=>setMoreMenuOpen(false)}>
                     <button
                       type="button"
                       role="menuitem"
@@ -433,7 +405,7 @@ export function HeaderBar({
                     >
                       <span>{t("演示舞台")}</span>
                     </button>
-                  </div>
+                  </ToolbarMenu>
                 )}
               </div>
             )}

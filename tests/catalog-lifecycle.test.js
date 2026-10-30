@@ -16,5 +16,7 @@ test('file catalogs survive new session ids and updated row counts',()=>{
  assert.equal(getMetricCatalogKey(dataset),getMetricCatalogKey({...dataset,id:'session2',rows:[{Amount:2},{Amount:3}]}));
  for(const other of [{fileName:'other.csv',sheetName:'Sheet1'},{fileName:'sales.csv',sheetName:'Sheet2'}])assert.notEqual(getMetricCatalogKey(dataset),getMetricCatalogKey({...dataset,metricCatalogSource:other}));
  assert.notEqual(getMetricCatalogKey(dataset),getMetricCatalogKey({...dataset,fields:[{name:'Amount',type:'string'}]}));
+ assert.notEqual(getMetricCatalogKey(dataset),getMetricCatalogKey({...dataset,fields:[{name:'Amount',type:'number',percentScale:'whole'}]}));
+ assert.equal(getMetricCatalogKey({...dataset,fields:[{name:'Amount',type:'number',percentScale:'fraction'}]}),getMetricCatalogKey({...dataset,fields:[{name:'Amount',type:'number',percentScale:'whole'}]}));
  assert.equal(getMetricCatalogKey({id:'retail'}),'retail');
 });

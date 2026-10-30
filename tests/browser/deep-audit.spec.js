@@ -31,7 +31,7 @@ for(const width of [360,768,1280,1440])test(`deep: import, inspect unfamiliar fi
   const axeProfile=await new AxeBuilder({page}).include('[role=dialog]').withTags(['wcag2a','wcag2aa','wcag21aa','wcag22aa']).analyze();expect(axeProfile.violations).toEqual([]);
   await page.screenshot({path:info.outputPath('02-understand-field.png')});
   await profile.getByRole('button',{name:'+ 值指标',exact:true}).press('Enter');await ready(page);
-  await page.getByRole('button',{name:'添加「Region」到行分组',exact:true}).click();await ready(page);
+  await page.getByRole('button',{name:'+行 · 添加「Region」到行分组',exact:true}).click();await ready(page);
   await expect(page.getByTestId('pivot-value-cell')).toHaveText(['0','-','-']);
   const visibleValue=await page.getByTestId('pivot-value-cell').first().locator('span').last().boundingBox();
   const viewport=await page.getByRole('region',{name:'透视表结果，可横向滚动',exact:true}).boundingBox();

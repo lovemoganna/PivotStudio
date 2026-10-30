@@ -1,6 +1,7 @@
 import { t } from '../../../i18n.js';
 import React from 'react';
 import { UnifiedFormatter } from '../../../utils/formatters';
+import { cellEvidence } from '../../../utils/resultEvidence.js';
 
 export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMode, clickLinkMode = 'drill' }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -140,12 +141,15 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
             }
 
             return (
-              <div key={`tip_${idx}`} className="flex items-center justify-between gap-4">
+              <div key={`tip_${idx}`}>
+              <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 truncate">
                   <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color || item.fill || '#F92672' }} />
                   <span className="text-ink-muted truncate">{seriesKey}:</span>
                 </div>
                 <span className="apple-font-mono font-semibold">{formatted}</span>
+              </div>
+              {rawPoint?._seriesEvidence?.[seriesKey] && <p className="text-[10px] leading-4 mt-0.5 text-ink-muted [overflow-wrap:anywhere]">{cellEvidence(rawPoint._seriesEvidence[seriesKey])}</p>}
               </div>
             );
           })}

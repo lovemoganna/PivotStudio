@@ -45,7 +45,7 @@ self.onmessage = (e) => {
     // cellRecordsMap holds a reference to every raw record bucket and is large for big datasets.
     // Transferring it via postMessage (Structured Clone) dominates message cost for 100k+ rows.
     // Strip it here; the worker retains buckets and returns requested details on demand.
-    const { cellRecordsMap: _dropped, ...pivotResultTransferable } = pivotResult;
+    const { cellRecordsMap: _dropped, analysisConfig: _config, ...pivotResultTransferable } = pivotResult;
     // Raw samples in chart points duplicate the dataset during structured cloning.
     // Chart clicks request complete matching records from this worker instead.
     const chartTransferable = { ...unifiedChartSpec };

@@ -1,6 +1,7 @@
 import { formatDimensionValue } from '../../../utils/formatters.js';
 import { encodeGroupSegment } from '../../../utils/groupKeys.js';
 import { parseFormulaAST, evaluateFormulaAST } from './formulaEngine.js';
+import { analyticNumber } from '../../../utils/normalizeScalar.js';
 
 export function computeAggregation(records, fieldName, aggMethod) {
   return aggregateWithSamples(records, fieldName, aggMethod).value;
@@ -29,8 +30,8 @@ export function aggregateWithSamples(records = [], fieldName, aggMethod) {
   for (const row of records) {
     const raw = row[fieldName];
     if (!meaningful(raw)) { missing++; continue; }
-    const value = typeof raw === 'number' ? raw : Number(String(raw).replace(/,/g, ''));
-    if (!Number.isFinite(value)) { invalid++; continue; }
+    const value = analyticNumber(raw);
+    if (value === null) { invalid++; continue; }
     sum += value;
     count++;
     min = Math.min(min, value);
@@ -510,6 +511,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
         if (!vc.isCalculated) {
           const summary = aggregateWithSamples(recs, vc.field, vc.agg);
           rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = summary.value;
+          displayMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = {samples:summary,reason:summary.value !== null ? null : !summary.total ? 'no_records' : !summary.valid ? 'no_valid_numbers' : vc.agg === 'stddev' && summary.valid < 2 ? 'insufficient_samples' : 'numeric_overflow'};
           if (r.isTotal && cg.isTotal) sampleStatsByValId[vc.id] = summary;
         }
       }
@@ -562,6 +564,13 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
           else if (vc.op === '/') calcVal = valB !== 0 ? (valA / valB) : null;
         }
         rawValueMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = Number.isFinite(calcVal) ? calcVal : null;
+        let reason = null;
+        if (!Number.isFinite(calcVal)) {
+          reason = !recs.length ? 'no_records' : vc.formula && !formulaAST ? 'invalid_formula' : 'formula_unavailable';
+          if (formulaAST?.type === 'BinaryOp' && formulaAST.op === '/' && Number.isFinite(evaluateFormulaAST(formulaAST.left,recs)) && evaluateFormulaAST(formulaAST.right,recs) === 0) reason = 'zero_denominator';
+          if (!formulaAST && vc.op === '/' && computeAggregation(recs,targetFieldB,targetAggB) === 0) reason = 'zero_denominator';
+        }
+        displayMatrix[`${r.rowKey}@@${cg.key}@@${vc.id}`] = {reason};
       }
     }
   });
@@ -582,6 +591,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
         const colTotVal = rawValueMatrix[`__GRAND_TOTAL_ROW__@@${cg.key}@@${vc.id}`] || 0;
 
         let displayVal = rawVal;
+        let reason = displayMatrix[mKey]?.reason || null;
         let isBaseline = false;
 
         if (vc.showAs === 'pct_grand') {
@@ -633,7 +643,15 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
         }
 
         if (rawVal === null) displayVal = null;
+        if (isBaseline) reason = 'baseline';
+        else if (rawVal !== null && displayVal === null) {
+          const previous = nonTotalRows[(rowPositions.get(r.rowKey) ?? 0)-1];
+          const previousValue = previous ? rawValueMatrix[`${previous.rowKey}@@${cg.key}@@${vc.id}`] : null;
+          reason = ['prev_diff','pct_prev_diff'].includes(vc.showAs) && (previousValue === null || previousValue === undefined) ? 'previous_unavailable' : 'zero_denominator';
+        }
         displayMatrix[mKey] = {
+          ...displayMatrix[mKey],
+          reason,
           raw: rawVal,
           display: displayVal,
           isBaseline,
@@ -659,6 +677,7 @@ export function calculatePivot(dataset, pivotConfig, onProgress) {
 
   const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return {
+    analysisConfig: pivotConfig,
     rowConfigs,
     colConfigs,
     valConfigs,

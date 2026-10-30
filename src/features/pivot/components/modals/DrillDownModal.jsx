@@ -68,6 +68,7 @@ export function DrillDownModal({
             </h3>
             <p className="text-xs text-ink-muted mt-0.5 [overflow-wrap:anywhere] break-all">{' ' + t("分组路径:") + ' '}{modalData.rowLabel} × {modalData.colLabel}{' ' + t("· 指标:") + ' '}{modalData.valLabel}
             </p>
+            {modalData.evidence && <p data-testid="cell-evidence" className="text-xs leading-5 mt-1 text-ink-orange [overflow-wrap:anywhere]">{modalData.evidence}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full min-w-0">
             <input

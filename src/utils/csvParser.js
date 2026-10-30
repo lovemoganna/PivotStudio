@@ -1,4 +1,5 @@
 import { isIdentifierField } from './fieldSemantics.js';
+import { isUnsafeInteger } from './normalizeScalar.js';
 
 // Quoted commas, embedded newlines and escaped quotes are handled as one CSV record.
 export function parseCSVRecords(text, delimiter = ',', limit = Infinity) {
@@ -98,8 +99,11 @@ export function parseCSVTextToSheet(csvText, sheetName = 'Sheet1', options = {})
       const type = scalarType(row[name]);
       if (type !== 'empty') { nonempty++; counts[type]++; }
     }
-    const type = isIdentifierField(name) ? 'text' : ['boolean','date','number'].find((key) => nonempty && counts[key] / nonempty >= 0.7) || 'text';
-    return { name, type };
+    // Inspect every row for irreversible precision loss, including beyond inference's sample.
+    const precisionProtected = rows.some(row => isUnsafeInteger(row[name]));
+    const type = precisionProtected || isIdentifierField(name) ? 'text' : ['boolean','date','number'].find((key) => nonempty && counts[key] / nonempty >= 0.7) || 'text';
+    return { name, type, ...(precisionProtected ? {precisionProtected:true} : {}) };
   });
-  return { name: sheetName, fields, rows, importMeta: { delimiter, hasHeader, encoding: options.encoding || 'utf-8', warnings: shortRowCount ? `${shortRowCount} 行缺少字段，已按原有规则补为空值；请核对分隔符设置，并确认原文件是否遗漏列` : '' } };
+  const warnings = [shortRowCount ? `${shortRowCount} 行缺少字段，已按原有规则补为空值；请核对分隔符设置，并确认原文件是否遗漏列` : '', fields.some(f=>f.precisionProtected) ? '检测到超出安全整数精度的值，相关列已保留为文本，避免不同值被合并。' : ''].filter(Boolean).join('；');
+  return { name: sheetName, fields, rows, importMeta: { delimiter, hasHeader, encoding: options.encoding || 'utf-8', warnings } };
 }

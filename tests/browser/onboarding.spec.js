@@ -24,7 +24,7 @@ for(const width of [360,768,1280,1440])test(`learning: first analysis, grouped c
   await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('3 笔');
   await ensureMobileShelves(page,width);
   const file=page.getByLabel('上传 CSV / Excel',{exact:true});await file.focus();await expect(file).toBeFocused();
-  await page.getByRole('button',{name:'添加「区域」到行分组',exact:true}).press('Enter');await ready(page);
+  await page.getByRole('button',{name:'+行 · 添加「区域」到行分组',exact:true}).press('Enter');await ready(page);
   await expect(page.getByTestId('pivot-value-cell').first()).toHaveText('2 笔');
   await expect(page.getByTestId('zone-values')).toContainText('记录数');
   await expect(page.getByTestId('zone-values').getByLabel('切换聚合口径',{exact:true})).toBeDisabled();
@@ -63,7 +63,7 @@ test('learning: overall rate is calculated from records, not by adding group ave
 
 test('learning: manual rate is averaged, count has no percent and undo restores the rate',async({page})=>{
   await page.goto('/');await upload(page,'区域,转化率\n华东,0.1\n华东,0.3\n华南,0.5');
-  await page.getByRole('button',{name:'添加「转化率」到计算指标',exact:true}).click();await ready(page);
+  await page.getByRole('button',{name:'+值 · 添加「转化率」到计算指标',exact:true}).click();await ready(page);
   await expect(page.getByLabel('切换聚合口径',{exact:true})).toHaveValue('avg');
   await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText('30.0%');
   await page.getByLabel('切换聚合口径',{exact:true}).selectOption('count');await ready(page);

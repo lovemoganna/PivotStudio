@@ -32,9 +32,10 @@ import {
 } from '../../../constants/chartVisual';
 import { UnifiedFormatter, formatAxisTickLabel, formatCellNumber } from '../../../utils/formatters';
 import { isMeasureField, isIdentifierField, getMeasureDefaults } from '../../../utils/fieldSemantics';
-import { buildResultQuestion } from '../../../utils/analysisReading.js';
+import { buildResultQuestion, buildTotalReading, resolveChartNote } from '../../../utils/analysisReading.js';
 import { UnifiedChartTooltip } from './UnifiedChartTooltip';
 import { renderSmartPieLabel, renderSmartBarLabel } from './SmartChartLabels';
+import { getLabelPositions, resolveLabelPosition } from '../../../utils/chartLabels.js';
 import { StoryShotDialog } from './modals/StoryShotDialog';
 
 export function ChartStudio({
@@ -79,6 +80,9 @@ export function ChartStudio({
   onExportPNG,
   onExportSVG,
 }) {
+  const labelPositions = getLabelPositions(chartType);
+  const labelPosition = resolveLabelPosition(chartType, chartSpecConfig.dataLabelPosition);
+  const rectLabelPosition = labelPosition === 'auto' ? 'top' : labelPosition;
   const chartTypeSelectRef = React.useRef(null);
   const restoreScopeFocusRef = React.useRef(false);
   React.useEffect(() => {
@@ -184,6 +188,7 @@ export function ChartStudio({
   const zeroBaselineDomain = [(min) => Math.min(0, min), (max) => Math.max(0, max)];
   const analysisShots = (storyShots && storyShots.length > 0) ? storyShots : KEYNOTE_STORYBOARD_SHOTS;
   const activeShot = analysisShots[keynoteShotIdx] || analysisShots[0] || KEYNOTE_STORYBOARD_SHOTS[0];
+  const currentNote = resolveChartNote(activeShot,hasCustomStoryShots,pivotConfig);
   const methodGuide = CHART_METHOD_GUIDES[chartType] || CHART_METHOD_GUIDES.bar;
   const isGuideOpen = viewMode === 'chart' && !isChartFullscreen ? !guideCollapsedInChartMode : showGuideInSplitMode;
 
@@ -348,18 +353,18 @@ export function ChartStudio({
     const configCols = pivotConfig?.columns || pivotConfig?.cols || [];
     const colSummary = configCols.map((c) => c.field || c).join(' / ');
     const reportLines = [
-      "# " + (activeShot?.title || t("数据透视分析报告")),
+      "# " + currentNote.title,
       "> " + t("生成时间：") + new Date().toLocaleString() + " · " + t("数据集：") + (currentDataset?.name || t("当前工作表")),
       "",
-      "## " + t("一、结论"),
-      activeShot?.subtitle || t("基于当前行列与指标配置的透视结果。"),
+      "## " + t(currentNote.authored ? '一、结论' : '一、配置摘要'),
+      currentNote.body || t("基于当前行列与指标配置的透视结果。"),
       "",
       "## " + t("二、关键发现"),
       insight ? [
         "- **" + t("首位") + "**：「" + insight.topName + "」" + insight.topFormatted + (insight.topSharePct ? "（" + insight.topSharePct + "%）" : ""),
         insight.groupCount > 1 ? "- **" + t("末位") + "**：「" + insight.bottomName + "」" + insight.bottomFormatted : "",
         insight.top3SharePct && insight.groupCount >= 3 ? "- **CR3**：前 3 组合计 " + insight.top3SharePct + "%" : "",
-        insight.groupCount > 1 ? "- **" + t("均值") + "**：" + insight.meanFormatted + "（" + t("高于均值") + " " + insight.aboveMeanCount + "/" + insight.groupCount + "）" : "",
+        insight.groupCount > 1 ? "- **" + t("各组展示值均值") + "**：" + insight.meanFormatted + "（" + t("高于均值") + " " + insight.aboveMeanCount + "/" + insight.groupCount + "）" : "",
       ].filter(Boolean).join("\n") : "- " + t("暂无统计发现"),
       "",
       "## " + t("三、透视配置"),
@@ -367,8 +372,19 @@ export function ChartStudio({
       "- **" + t("列") + "**: " + (colSummary || t("无")),
       "- **" + t("值") + "**: " + (pivotConfig?.values?.length > 0 ? pivotConfig.values.map((v) => v.field + " (" + t(v.agg || "sum") + ")").join(", ") : unifiedChartSpec.primarySeriesKey),
       "- **" + t("图表") + "**: " + t(VISUAL_CHART_TYPES.find((item) => item.value === chartType)?.label || chartType),
+      '', '## ' + t('统计口径'),
+      ...buildTotalReading(pivotResult.valConfigs).map(note=>`- ${note}`),
     ];
-    copyTextToClipboard?.(reportLines.join("\n"), t("已复制分析报告 Markdown"));
+    const blob = new Blob([`\uFEFF${reportLines.join('\n')}`],{type:'text/markdown;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${String(currentNote.title).replace(/[/\\:*?"<>|]/g,'_').slice(0,80) || 'analysis'}.md`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showToast?.(t('已导出分析报告 Markdown'));
   };
 
   const handleCopyConclusion = () => {
@@ -376,10 +392,10 @@ export function ChartStudio({
     const configCols = pivotConfig?.columns || pivotConfig?.cols || [];
     const colSummary = configCols.map((c) => c.field || c).join(' / ');
     const lines = [
-      `【${activeShot?.title || t('透视图分析笔记')}】`,
-      activeShot?.subtitle ? `${t('核心结论：')}${activeShot.subtitle}` : '',
+      `【${currentNote.title}】`,
+      currentNote.body ? `${t(currentNote.authored ? '核心结论：' : '配置摘要：')}${currentNote.body}` : '',
       insight
-        ? `${t('数据摘要：')}${t('首位')}「${insight.topName}」(${insight.topFormatted}${insight.topSharePct ? `，${t('占')} ${insight.topSharePct}%` : ''})${insight.groupCount > 1 ? `；${t('末位')}「${insight.bottomName}」(${insight.bottomFormatted})；${t('均值')} ${insight.meanFormatted}（${t('高于均值')} ${insight.aboveMeanCount}/${insight.groupCount} ${t('组')}）` : ''}`
+        ? `${t('数据摘要：')}${t('首位')}「${insight.topName}」(${insight.topFormatted}${insight.topSharePct ? `，${t('占')} ${insight.topSharePct}%` : ''})${insight.groupCount > 1 ? `；${t('末位')}「${insight.bottomName}」(${insight.bottomFormatted})；${t('各组展示值均值')} ${insight.meanFormatted}（${t('高于均值')} ${insight.aboveMeanCount}/${insight.groupCount} ${t('组')}）` : ''}`
         : '',
       `透视配方：行/轴 [${unifiedChartSpec.xDimensionLabel || (pivotConfig?.rows?.map(r=>r.field||r).join(' / ')) || t('无')}] · 列/组 [${colSummary || t('无')}] · 度量 [${pivotConfig?.values?.length > 0 ? pivotConfig.values.map((v) => `${v.field}(${t(v.agg || 'sum')})`).join(', ') : unifiedChartSpec.primarySeriesKey}] · 图表 [${t(VISUAL_CHART_TYPES.find((item) => item.value === chartType)?.label || chartType)}]`,
     ].filter(Boolean);
@@ -610,14 +626,29 @@ export function ChartStudio({
                   </button>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={Boolean(chartSpecConfig.showDataLabels)} onChange={(event) => setChartSpecConfig((p) => ({ ...p, showDataLabels: event.target.checked }))} className="accent-[#A6CE39]" />
+                    {t('显示数值标签')}
+                  </label>
+                  <label className="flex items-center justify-between gap-2">
+                    <span>{t('标签位置')}</span>
+                    <select aria-label={t('标签位置')} disabled={!chartSpecConfig.showDataLabels} value={labelPosition}
+                      onChange={(event) => setChartSpecConfig((p) => ({ ...p, dataLabelPosition: event.target.value }))}
+                      className="min-w-0 flex-1 max-w-[10rem] rounded-md border border-[#D6D4C8] dark:border-[#49483E] bg-[#FFFDF7] dark:bg-[#272822] px-2 py-1.5 disabled:opacity-50">
+                      {labelPositions.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
+                    </select>
+                  </label>
+                </div>
+
                 <div className="flex flex-wrap gap-1">
                   {[
-                    { key: 'showDataLabels', label: t('标签'), on: chartSpecConfig.showDataLabels },
                     { key: 'showAvgReferenceLine', label: t('均值'), on: chartSpecConfig.showAvgReferenceLine },
                   ].map((chip) => (
                     <button
                       key={chip.key}
                       type="button"
+                      aria-pressed={Boolean(chip.on)}
                       onClick={() => setChartSpecConfig((p) => ({ ...p, [chip.key]: !p[chip.key] }))}
                       className={`px-2 py-1 rounded-md text-[11px] transition ${chip.on ? 'bg-[#66D9EF]/15 text-ink-cyan' : 'text-ink-muted hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'}`}
                     >
@@ -759,6 +790,9 @@ export function ChartStudio({
       </div>
 
       {/* Disclaimers & Context Warnings */}
+      {unifiedChartSpec.aggregationBasis && <p data-testid="aggregation-basis" className="text-xs leading-5 mb-2 text-ink-muted [overflow-wrap:anywhere]">{t('图表按以下维度从原始记录重新聚合：')}{unifiedChartSpec.aggregationBasis}{t('；表格展开或折叠不会改变图表统计口径。')}</p>}
+      {chartType === 'line' && unifiedChartSpec.derivedIssue && <p role="status" data-testid="derived-guidance" className="text-xs leading-5 mb-2 text-ink-orange">{t(unifiedChartSpec.derivedIssue)}</p>}
+      {chartType === 'line' && unifiedChartSpec.temporalBasis && <p data-testid="temporal-basis" className="text-xs leading-5 mb-2 text-ink-muted">{t('按时间升序计算。环比 =（本期 − 前期）÷ |前期|；首期、缺期、无有效数值或前期为 0 时不显示。3 期均线为连续 3 个周期聚合值的等权平均。')}{unifiedChartSpec.hasPeriodGaps && t('当前存在缺期，未跨缺期计算。')}</p>}
       {chartType === 'histogram' && unifiedChartSpec.histogramSummary && (
         <p data-testid="histogram-basis" className="text-xs leading-5 mb-2 text-ink-muted [overflow-wrap:anywhere]">
           {unifiedChartSpec.histogramSummary.field} · {t('原始记录的数值分布')} · {t('有效样本：')}{unifiedChartSpec.histogramSummary.valid}/{unifiedChartSpec.histogramSummary.total} · {t('空值：')}{unifiedChartSpec.histogramSummary.missing} · {t('非数值：')}{unifiedChartSpec.histogramSummary.total - unifiedChartSpec.histogramSummary.valid - unifiedChartSpec.histogramSummary.missing}
@@ -888,7 +922,7 @@ export function ChartStudio({
                         onClick={() => handleChartPointClick({ rowKey: row.rowKey, colKey: group.key, name: (!rows.length && group.pathLabels?.join(' / ')) || group.label || row.label, formattedValue: formatted })}
                         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleChartPointClick({ rowKey: row.rowKey, colKey: group.key, name: row.label, formattedValue: formatted }); } }}>
                         <rect x={160 + c * 110} y={34 + r * 38} width="106" height="34" rx={CV.heatmap.cellRx} fill={cell?.display < 0 ? CV.heatmap.neg : CV.heatmap.pos} fillOpacity={CV.heatmap.opacityMin + CV.heatmap.opacitySpan * Math.abs(cell?.display || 0) / magnitude} stroke={highlightedRowKey === row.rowKey ? CV.semantic.highlight : 'transparent'} strokeWidth={CV.stroke.highlight} />
-                        <text x={168 + c * 110} y={56 + r * 38} fontSize={CV.typography.tickHeat} fill={inkFill}>{formatted}</text>
+                        {chartSpecConfig.showDataLabels && <text data-value-label="true" x={213 + c * 110} y={(labelPosition === 'insideTop' ? 43 : labelPosition === 'insideBottom' ? 60 : 51) + r * 38} textAnchor="middle" dominantBaseline="central" fontSize={CV.typography.tickHeat} fill={inkFill}>{formatted}</text>}
                       </g>;
                     })}
                   </g>)}
@@ -925,7 +959,7 @@ export function ChartStudio({
                   >
                     <text x="8" y={y + 24} fontSize={CV.typography.tickFunnel} fill={inkFill}>{formatAxisTickLabel(item.name, 16)}</text>
                     {width > 0 && <polygon points={`${x},${y + 22} ${x + width},${y + 22} ${x + width - Math.min(8, width / 2)},${y + 42} ${x + Math.min(8, width / 2)},${y + 42}`} fill={item.fill} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'} strokeWidth={CV.stroke.highlight} />}
-                    <text x="180" y={y + 14} fontSize={CV.typography.tickFunnel} fill={inkFill}>{item.formattedValue} · {item.conversionFormatted}</text>
+                    {chartSpecConfig.showDataLabels && <text data-value-label="true" x={455} y={y + (labelPosition === 'inside' ? 32 : labelPosition === 'bottom' ? 49 : 14)} textAnchor="middle" dominantBaseline="central" fontSize={CV.typography.tickFunnel} fill={labelPosition === 'inside' ? '#1E1F1C' : inkFill}>{item.formattedValue} · {item.conversionFormatted}</text>}
                   </g>
                 );
               })}
@@ -943,22 +977,8 @@ export function ChartStudio({
                   tick={renderCategoryAxisTick}
                 />
                 <YAxis yAxisId="left" tick={valueTick} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
-                {(unifiedChartSpec.hasDualAxis || unifiedChartSpec.derivedSeriesKey) && (
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tick={valueTick}
-                    tickFormatter={(v) => {
-                      if (unifiedChartSpec.hasDualAxis) {
-                        return UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true });
-                      }
-                      if (chartSpecConfig.lineDerivedMetric === 'mom_pct') {
-                        return `${Number(v).toFixed(0)}%`;
-                      }
-                      return UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true });
-                    }}
-                  />
-                )}
+                {unifiedChartSpec.hasDualAxis && <YAxis yAxisId="right" orientation="right" tick={valueTick} tickFormatter={v => UnifiedFormatter.formatValue(v,unifiedChartSpec.secondaryValCfg,{compact:true})} />}
+                {unifiedChartSpec.derivedSeriesKey && <YAxis yAxisId="derived" orientation="right" tick={valueTick} tickFormatter={v => chartSpecConfig.lineDerivedMetric === 'mom_pct' ? `${Number(v).toFixed(0)}%` : UnifiedFormatter.formatValue(v,unifiedChartSpec.primaryValCfg,{compact:true})} />}
                 {chartSpecConfig.showAvgReferenceLine && hasValidMean && (
                   <ReferenceLine
                     yAxisId="left"
@@ -983,13 +1003,13 @@ export function ChartStudio({
                     activeDot={{ r: CV.dot.active, onClick: (_, payload) => handleChartPointClick({ ...payload?.payload, colKey: sm.colKey }) }}
                   >
                     {chartSpecConfig.showDataLabels && idx === 0 && unifiedChartSpec.items.length <= 24 && (
-                      <LabelList dataKey="_compactPrimaryLabel" position="top" style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill }} />
+                      <LabelList dataKey="_compactPrimaryLabel" position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill }} />
                     )}
                   </Line>
                 ))}
                 {unifiedChartSpec.derivedSeriesKey && (
                   <Line isAnimationActive={false}
-                    yAxisId="right"
+                    yAxisId="derived"
                     type="monotone"
                     dataKey={unifiedChartSpec.derivedSeriesKey}
                     stroke={CV.semantic.derived}
@@ -1041,7 +1061,11 @@ export function ChartStudio({
                     strokeWidth={CV.stroke.series}
                     fill={`url(#appleAreaGrad_${idx % CHART_COLORS.length})`}
                     activeDot={{ r: CV.dot.areaActive, onClick: (_, payload) => handleChartPointClick(payload?.payload || payload) }}
-                  />
+                  >
+                    {chartSpecConfig.showDataLabels && idx === 0 && unifiedChartSpec.items.length <= 24 && (
+                      <LabelList dataKey={sm.key} position={rectLabelPosition} formatter={(value) => chartType === 'pct_area' ? `${Number(value).toFixed(1)}%` : UnifiedFormatter.formatValue(value, sm.valCfg, {compact:true})} style={{fontSize: CV.typography.dataLabel, fill: inkFill}} />
+                    )}
+                  </Area>
                 ))}
               </AreaChart>
             ) : chartType === 'combo' ? (
@@ -1088,7 +1112,7 @@ export function ChartStudio({
                     />
                   ))}
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="_compactPrimaryLabel" content={(p) => renderSmartBarLabel(p, darkMode, false)} />
+                    <LabelList dataKey="_compactPrimaryLabel" content={(p) => renderSmartBarLabel(p, darkMode, false, labelPosition)} />
                   )}
                 </Bar>
                 {unifiedChartSpec.hasDualAxis && unifiedChartSpec.secondarySeriesKey && (
@@ -1117,7 +1141,7 @@ export function ChartStudio({
                   innerRadius={chartType === 'donut' ? (isChartFullscreen ? 80 : (compactAxis ? 48 : 56)) : 0}
                   outerRadius={isChartFullscreen ? 140 : (compactAxis ? 86 : 98)}
                   paddingAngle={chartType === 'donut' ? 3 : 1}
-                  label={(p) => renderSmartPieLabel(p, unifiedChartSpec.primaryValCfg, darkMode)}
+                  label={chartSpecConfig.showDataLabels ? (p) => renderSmartPieLabel(p, unifiedChartSpec.primaryValCfg, darkMode, labelPosition) : false}
                   labelLine={false}
                   onClick={(d) => handleChartPointClick(d)}
                 >
@@ -1188,7 +1212,7 @@ export function ChartStudio({
                     />
                   ))}
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="formattedDelta" position="top" style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill }} />
+                    <LabelList dataKey="formattedDelta" position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill }} />
                   )}
                 </Bar>
               </BarChart>
@@ -1243,7 +1267,7 @@ export function ChartStudio({
                     />
                   ))}
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="name" position="top" style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill }} />
+                    <LabelList dataKey="y" formatter={(value) => UnifiedFormatter.formatValue(value, unifiedChartSpec.secondaryValCfg, {compact:true})} position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill }} />
                   )}
                 </Scatter>
               </ScatterChart>
@@ -1273,7 +1297,7 @@ export function ChartStudio({
                   }}
                 >
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="count" position="top" formatter={(v) => `${v}笔`} style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill }} />
+                    <LabelList dataKey="count" position={rectLabelPosition} formatter={(v) => `${v}笔`} style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill }} />
                   )}
                 </Bar>
               </BarChart>
@@ -1358,10 +1382,10 @@ export function ChartStudio({
                       }}
                     >
                       {unifiedChartSpec.items.map((item) => <Cell key={item.rowKey} data-highlighted={highlightedRowKey === item.rowKey || (highlightedRowKey && typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(item.rowKey + '||'))} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'} strokeWidth={CV.stroke.highlight} fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== item.rowKey))} />)}
-                      {chartSpecConfig.showDataLabels && (idx === 0 || !isStacked) && unifiedChartSpec.seriesMetaList.length <= 3 && (
+                      {chartSpecConfig.showDataLabels && (
                         <LabelList
-                          dataKey={idx === 0 && !isStacked ? '_compactPrimaryLabel' : sm.key}
-                          content={(p) => renderSmartBarLabel(p, darkMode, chartType === 'horizontal_bar')}
+                          dataKey={sm.key}
+                          content={(p) => renderSmartBarLabel({...p, value: chartType === 'pct_stacked_bar' ? `${Number(p.value).toFixed(1)}%` : UnifiedFormatter.formatValue(p.value, sm.valCfg, {compact:true})}, darkMode, chartType === 'horizontal_bar', labelPosition)}
                         />
                       )}
                     </Bar>
@@ -1399,7 +1423,7 @@ export function ChartStudio({
               <div className="space-y-2 pr-0 md:pr-3 md:border-r border-[#D6D4C8]/50 dark:border-[#3E3D32]/60">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-[#272822] dark:text-[#F8F8F2]">
-                    {t("我的结论")}
+                    {t(currentNote.authored ? '我的结论' : '配置摘要')}
                   </span>
                   <div className="flex items-center gap-0.5">
                     {onUpdateStoryShot && (
@@ -1408,7 +1432,7 @@ export function ChartStudio({
                         disabled={isReadOnly}
                         onClick={() => {
                           soundEngine?.playClick?.(540);
-                          setEditNoteForm({ title: activeShot?.title || '', subtitle: activeShot?.subtitle || '' });
+                          setEditNoteForm({ title: currentNote.title, subtitle: currentNote.body });
                           setIsEditingNote(true);
                         }}
                         className="px-2 py-0.5 rounded-md text-[10px] text-ink-muted hover:text-ink-cyan hover:bg-[#66D9EF]/10 inline-flex items-center gap-1 transition"
@@ -1442,9 +1466,10 @@ export function ChartStudio({
                     )}
                   </div>
                 </div>
-                <p className="text-[#272822] dark:text-[#F8F8F2] leading-relaxed">
-                  {activeShot?.subtitle || t("写下你从图中读到的结论，例如：谁最高、差多少、下一步查什么。")}
+                <p data-testid="chart-note-body" className="text-[#272822] dark:text-[#F8F8F2] leading-relaxed break-words [overflow-wrap:anywhere]">
+                  {currentNote.body || t("写下你从图中读到的结论，例如：谁最高、差多少、下一步查什么。")}
                 </p>
+                {currentNote.authored && <p className="text-ink-muted">{t('用户笔记不会随配置自动改写，请核对是否仍适用。')}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -1454,6 +1479,11 @@ export function ChartStudio({
                 </span>
                 <p className="text-ink-muted leading-relaxed">{t(methodGuide?.purpose || '')}</p>
                 <p className="text-ink-muted leading-relaxed">{t(methodGuide?.howToRead || '')}</p>
+                {chartSpecConfig.showAvgReferenceLine && hasValidMean && ['bar','horizontal_bar','line','area','combo'].includes(chartType) && <p data-testid="reference-mean-reading" className="text-ink-muted leading-relaxed">{t('AVG 参考线是当前图中主指标各组展示值的简单平均，不一定等于按原始记录重新计算的总体结果。')}</p>}
+                <details data-testid="chart-metric-reading" className="text-ink-muted">
+                  <summary className="cursor-pointer rounded py-1 text-ink-cyan focus-visible:ring-2 focus-visible:ring-[#66D9EF]">{t('指标怎么算？')}</summary>
+                  <ul className="mt-1 list-disc pl-4 space-y-1">{buildTotalReading(pivotResult.valConfigs).map(note=><li key={note}>{note}</li>)}</ul>
+                </details>
               </div>
             </div>
           </div>

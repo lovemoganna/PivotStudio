@@ -1,8 +1,11 @@
 import {t} from '../../../i18n.js';
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {Info, RotateCcw, GripVertical, ArrowUp, ArrowDown, ArrowUpDown, Filter, X, Sparkles, Trash2} from 'lucide-react';
 import {AGG_METHODS, SHOW_AS_MODES, buildDefaultPivotConfig} from '../../../constants/pivotConstants';
+import {getAnalysisNextStep} from '../../../utils/analysisNextStep.js';
+import {FieldPickerDialog} from './FieldPickerDialog';
 import {getDimDisplayLabel} from '../../../utils/formatters';
+import {aggregationChoiceLabel, aggregationChoiceDescription} from '../../../utils/aggregationChoice.js';
 
 function isPivotSetupEmpty(config) {
   return (config?.rows?.length || 0) === 0 && (config?.values?.length || 0) === 0;
@@ -26,9 +29,9 @@ function buildMobileShelfSummary(config) {
 function getValueMeasureHint(item) {
   if (!item || item.isCalculated) return null;
   const parts = [];
-  if (item.agg === 'avg') parts.push(t('均值是各记录的算术平均，不是加权业务比率'));
+  if (item.field === '__COUNT__' || ['count','count_distinct','stddev'].includes(item.agg)) parts.push(aggregationChoiceDescription(item.agg,item.field));
+  else if (item.agg === 'avg') parts.push(t('均值是各记录的算术平均，不是加权业务比率'));
   else if (item.agg === 'median') parts.push(t('中位数取排序后的正中值'));
-  else if (item.agg === 'count_distinct') parts.push(t('去重计数统计唯一值个数'));
 
   const showAs = item.showAs || 'normal';
   if (showAs === 'pct_grand') parts.push(t('显示为占全部总计的百分比'));
@@ -42,12 +45,27 @@ function getValueMeasureHint(item) {
 }
 
 // One analysis configuration surface, independent of table/chart display mode.
-export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, isReadOnly, draggingPayload, setDraggingPayload, dragOverZone, setDragOverZone, addFieldToZone, removeZoneItem, moveZoneItem, toggleDimensionSort, setHeaderFilterSearch, setActiveHeaderFilterModal, setBinFormState, setActiveBinModal, transposeRowsAndColumns, onOpenMetricCenter, onEditCustomMetric, soundEngine, showToast}) {
+export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, isReadOnly, draggingPayload, setDraggingPayload, dragOverZone, setDragOverZone, addFieldToZone, removeZoneItem, moveZoneItem, toggleDimensionSort, setHeaderFilterSearch, setActiveHeaderFilterModal, setBinFormState, setActiveBinModal, transposeRowsAndColumns, onOpenMetricCenter, onEditCustomMetric, customMetrics = [], onAddCustomMetric, locationRequest, soundEngine, showToast}) {
+  const panelRef = useRef(null);
+  const [pickerZone, setPickerZone] = useState(null);
+  useEffect(() => { setPickerZone(null); }, [currentDataset]);
   // Narrow viewports collapse shelves by default; open them when nothing is configured so first analysis is reachable.
   const [showMobileConfig, setShowMobileConfig] = useState(() => isPivotSetupEmpty(pivotConfig));
   const [showHelpGuide, setShowHelpGuide] = useState(false);
   const setupEmpty = isPivotSetupEmpty(pivotConfig);
+  const nextStep = getAnalysisNextStep(pivotConfig);
   const mobileShelfSummary = buildMobileShelfSummary(pivotConfig);
+  useLayoutEffect(()=>{
+    if (!locationRequest) return;
+    setShowMobileConfig(true);
+  },[locationRequest]);
+  useLayoutEffect(()=>{
+    if (!locationRequest || !showMobileConfig) return;
+    const target = Array.from(panelRef.current?.querySelectorAll('[data-configured-field]') || []).find(el=>el.dataset.zone === locationRequest.zone && (el.dataset.configuredField === locationRequest.field || el.dataset.fieldId === locationRequest.field));
+    target?.scrollIntoView({block:'nearest',inline:'nearest'});
+    target?.focus({preventScroll:true});
+  },[locationRequest, showMobileConfig]);
+
 
   useEffect(() => {
     if (setupEmpty) setShowMobileConfig(true);
@@ -60,7 +78,10 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
   ];
   return (
       /* Pivot Dropzones Config (透视结构放置区: 筛选 / 列 / 行 / 值) */
-      <div className="flex flex-col flex-none md:flex-1 md:min-h-0 select-none apple-font-mono">
+      <div ref={panelRef} className="flex flex-col flex-none md:flex-1 md:min-h-0 select-none apple-font-mono">
+        {pickerZone && !isReadOnly && <FieldPickerDialog zone={pickerZone.key} label={pickerZone.label} fields={currentDataset?.fields}
+          items={pivotConfig?.[pickerZone.key] || []} customMetrics={customMetrics} onAdd={addFieldToZone} onAddCustom={onAddCustomMetric} onClose={()=>setPickerZone(null)} />}
+
         {/* Mobile Accordion Toggle for Pivot Analysis Config */}
         <div className="md:hidden pb-1">
           <button
@@ -177,7 +198,11 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
             </div>
           </div>
 
-          {/* Empty-setup guidance lives in zone hints + the table analysis-start CTA; avoid a third copy block here. */}
+          {nextStep && !isReadOnly && <div data-testid="analysis-next-step" className="shrink-0 rounded-lg bg-[#66D9EF]/10 border border-[#66D9EF]/30 p-2 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <span>{t(nextStep.message)}</span>
+            <button type="button" onClick={event=>{event.currentTarget.focus();setPickerZone(zoneConfigs.find(zone=>zone.key===nextStep.zone));}}
+              className="px-2 py-1 rounded-md bg-[#66D9EF]/15 text-ink-cyan font-semibold">{t(nextStep.action)}</button>
+          </div>}
 
           {/* 4 Dropzones Grid with Independent Scroll */}
           <div className="grid grid-cols-1 min-[340px]:grid-cols-2 gap-1.5 overflow-y-auto pr-0.5 max-h-[280px] md:max-h-none md:flex-1 md:min-h-0 content-start items-start auto-rows-max">
@@ -254,9 +279,14 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                       : 'border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7]/90 dark:bg-[#1E1F1C]/90'
                   }`}
                 >
-                  <div className="flex items-center justify-between text-xs font-semibold shrink-0 gap-1">
+                  <div className="flex flex-wrap items-center justify-between text-xs font-semibold shrink-0 gap-1">
                     <span className={z.badgeColor}>{t(z.label)}</span>
                     <div className="flex items-center gap-1">
+                      <button type="button" disabled={isReadOnly} onClick={event=>{event.currentTarget.focus();setPickerZone(z);}}
+                        aria-label={`${t('+字段')} · ${t('添加字段到')}${t(z.label)}`}
+                        className="inline-flex items-center px-1.5 py-1 min-h-[28px] rounded-md border border-[#D6D4C8] dark:border-[#49483E] text-ink-cyan hover:bg-[#66D9EF]/10 text-[10px] font-semibold disabled:opacity-40">
+                        {t('+字段')}
+                      </button>
                       {z.key === 'values' && onOpenMetricCenter && (
                         <button
                           type="button"
@@ -275,13 +305,13 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                     <div className="min-w-0 space-y-1 flex-1">
                     {items.length === 0 ? (
                       <div className="py-1 px-1 border border-dashed border-[#D6D4C8]/70 dark:border-[#3E3D32]/70 rounded text-center select-none flex flex-col items-center justify-center gap-1">
-                        <div className="space-y-0.5">
+                        {(!nextStep || isReadOnly) && <div className="space-y-0.5">
                           <span className="text-[10px] text-ink-muted font-semibold block leading-snug">
                             {t({
-                              filters: '只分析哪些记录？从字段列表点击 +筛。',
-                              columns: '要并排比较什么？从字段列表点击 +列。',
-                              rows: '要按什么分组？从字段列表点击 +行。',
-                              values: '要计算什么？从字段列表点击 +值，或统计记录数。',
+                              filters: '只分析哪些记录？点 +字段选择筛选条件。',
+                              columns: '要并排比较什么？点 +字段选择。',
+                              rows: '要按什么分组？点 +字段选择。',
+                              values: '要计算什么？点 +字段选择指标或记录数。',
                             }[z.key])}
                           </span>
                           {/* Examples only after the user starts configuring — full empty setup already has table CTA. */}
@@ -295,7 +325,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                               }[z.key])}
                             </span>
                           )}
-                        </div>
+                        </div>}
                         {z.key === 'values' && (pivotConfig?.rows?.length || 0) > 0 && !isReadOnly && (
                           <button
                             type="button"
@@ -336,7 +366,8 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                               setDragOverZone?.(null);
                             }}
                             data-testid="configured-field"
-                            className="min-w-0 flex flex-col gap-1 p-1.5 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs font-medium cursor-grab active:cursor-grabbing hover:border-[#F92672] transition"
+                            data-configured-field={it.field} data-field-id={it.id} data-zone={z.key} tabIndex={-1}
+                            className="focus:ring-2 focus:ring-[#66D9EF] focus:outline-none min-w-0 flex flex-col gap-1 p-1.5 rounded bg-[#EFECE1] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-xs font-medium cursor-grab active:cursor-grabbing hover:border-[#F92672] transition"
                           >
                             <div className="flex items-start gap-1.5 min-w-0">
                               <GripVertical className="w-3 h-3 mt-0.5 text-ink-muted shrink-0" />
@@ -349,9 +380,9 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between gap-1 min-w-0 whitespace-nowrap">
+                            <div className="flex flex-wrap items-center justify-between gap-1 min-w-0">
                               {/* Left Controls: Zone-specific configuration */}
-                              <div className="flex items-center gap-1 min-w-0 shrink-0">
+                              <div className="flex flex-wrap items-center gap-1 min-w-0">
                                 {z.key === 'filters' && (
                                   <button
                                     onClick={() => {
@@ -370,7 +401,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                 )}
 
                                 {z.key === 'values' && (
-                                  <div className="flex items-center gap-1 min-w-0 shrink-0">
+                                  <div className="flex flex-wrap items-center gap-1 min-w-0 max-w-full">
                                     {it.isCalculated ? (
                                       <button
                                         type="button"
@@ -392,7 +423,8 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                             values: prev.values.map((v) => (v.id === it.id ? { ...v, agg: nextAgg } : v)),
                                           }));
                                         }}
-                                        className="bg-transparent text-ink-orange apple-font-mono font-bold focus:outline-none cursor-pointer disabled:opacity-40 text-[11px] shrink-0"
+                                        className="bg-transparent text-ink-orange apple-font-mono font-bold focus:outline-none cursor-pointer disabled:opacity-40 text-[11px] max-w-full"
+                                        aria-description={aggregationChoiceDescription(it.agg,it.field) || undefined}
                                         title={
                                           it.agg === 'avg'
                                             ? t('均值是各记录的算术平均，不是加权业务比率')
@@ -407,7 +439,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                           if (!isNumeric && ['sum', 'avg', 'median', 'stddev', 'max', 'min'].includes(m.value)) return false;
                                           return true;
                                         }).map((m) => (
-                                          <option key={m.value} value={m.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{t(m.short)}</option>
+                                          <option key={m.value} value={m.value} className="bg-[#FFFDF7] dark:bg-[#272822] text-[#272822] dark:text-[#F8F8F2]">{aggregationChoiceLabel(m.value,it.field) || t(m.short)}</option>
                                         ))}
                                       </select>
                                     )}
@@ -516,7 +548,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                             {valueHint ? (
                               <p
                                 data-testid="value-measure-hint"
-                                className="pl-4 text-[8.5px] leading-snug text-ink-muted/80 whitespace-normal"
+                                className="pl-4 text-[11px] leading-relaxed text-ink-muted whitespace-normal"
                               >
                                 {valueHint}
                               </p>

@@ -39,7 +39,7 @@ export function normalizeMetricDefinitions(input, fields) {
 export function getMetricCatalogKey(dataset) {
   const source = dataset?.metricCatalogSource;
   if (source) return JSON.stringify(['file', source.fileName, source.sheetName,
-    (dataset.fields || []).map(({name, type}) => [name, type])]);
+    (dataset.fields || []).map(({name, type, percentScale}) => ['fraction','whole'].includes(percentScale) ? [name, type, 'percent'] : [name, type])]);
   return dataset?.id || dataset?.name || 'default';
 }
 

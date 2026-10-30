@@ -107,7 +107,7 @@ test('quality: table options stay collapsed by default and preserve settings',as
 test('quality: English command search finds and executes exports by keyboard',async({page})=>{
   await page.goto('/?demo=retail'); await ready(page);
   await page.getByLabel('界面语言',{exact:true}).selectOption('en');
-  await page.getByRole('button',{name:'Open command palette',exact:true}).click();
+  await page.getByRole('button',{name:'Command ⌘K · Open command palette',exact:true}).click();
   const search=page.getByRole('combobox',{name:'Search commands',exact:true});
   await search.fill('Export');
   await expect(page.getByRole('dialog').getByRole('option')).toHaveCount(3);
@@ -147,7 +147,7 @@ test('quality: core dialogs expose named controls and readable text',async({page
   const openers=[
     ()=>page.getByRole('button',{name:'格式与数值',exact:true}).click(),
     async()=>{await clickMoreItem(page,/工作区/);},
-    ()=>page.getByRole('button',{name:'打开指令面板',exact:true}).click(),
+    ()=>page.getByRole('button',{name:'指令 ⌘K · 打开指令面板',exact:true}).click(),
   ];
   for(const open of openers) {
     await open();
@@ -214,7 +214,7 @@ test('quality: sidebar equal height split resizer and Metric Center studio workf
   await expect(metricCenter).toBeVisible();
   await expect(page.getByTestId('metric-live-preview')).toContainText('实时全表试算:');
   // 3. Switch to compound margin mode, submit, and verify in table, zone-values, and schema fields
-  await metricCenter.getByRole('button',{name:'复合净率 ((A - B) ÷ A)',exact:true}).click();
+  await metricCenter.getByRole('button',{name:'差额比 ((A - B) ÷ A)',exact:true}).click();
   await page.getByTestId('metric-center-submit').click(); await ready(page);
   await expect(page.getByTestId('zone-values')).toContainText('FX 公式');
   await expect(page.locator('#pivot-schema-fields')).toContainText('FX');
