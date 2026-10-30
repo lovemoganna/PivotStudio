@@ -71,6 +71,7 @@ test('trust: saved configuration survives reload, rejects incompatible source an
  await expect(linking.getByRole('button',{name:'确认关联并恢复',exact:true})).toBeDisabled();
  await linking.getByRole('combobox').selectOption({label:'capacity-updated.csv (2行)'});
  await expect(linking.getByRole('button',{name:'确认关联并恢复',exact:true})).toBeEnabled();
+ await expect(linking.getByRole('button',{name:'确认关联并恢复',exact:true})).toHaveCSS('opacity','1');
  expect((await new AxeBuilder({page}).include('[role=dialog]').analyze()).violations).toEqual([]);
  await page.screenshot({path:info.outputPath('link.png')});
  await linking.getByRole('button',{name:'确认关联并恢复',exact:true}).click();await ready(page);
