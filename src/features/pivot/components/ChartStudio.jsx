@@ -20,6 +20,7 @@ import {
   CV,
   chartInk,
   chartLabelInk,
+  chartMarkStroke,
   chartMuted,
   chartPaper,
   chartGridStroke,
@@ -132,6 +133,8 @@ export function ChartStudio({
   const inkFill = chartInk(darkMode);
   const paperFill = chartPaper(darkMode);
   const gridStroke = chartGridStroke(darkMode);
+  const markStroke = chartMarkStroke(darkMode);
+  const hoverCursor = { fill: darkMode ? '#F8F8F2' : '#272822', fillOpacity: 0.045, stroke: gridStroke };
   const valueTick = chartValueTick(darkMode);
   const legendStyle = chartLegendStyle();
   const renderLegendText = (value) => <span style={{color: inkFill}}>{value}</span>;
@@ -960,7 +963,7 @@ export function ChartStudio({
                     aria-label={`${item.name}: ${item.formattedValue}`}
                   >
                     <text x="8" y={y + 24} fontSize={CV.typography.tickFunnel} fill={inkFill}>{formatAxisTickLabel(item.name, 16)}</text>
-                    {width > 0 && <polygon points={`${x},${y + 22} ${x + width},${y + 22} ${x + width - Math.min(8, width / 2)},${y + 42} ${x + Math.min(8, width / 2)},${y + 42}`} fill={item.fill} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'} strokeWidth={CV.stroke.highlight} />}
+                    {width > 0 && <polygon points={`${x},${y + 22} ${x + width},${y + 22} ${x + width - Math.min(8, width / 2)},${y + 42} ${x + Math.min(8, width / 2)},${y + 42}`} fill={item.fill} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : markStroke} strokeWidth={highlightedRowKey === item.rowKey ? CV.stroke.highlight : 0.75} />}
                     {chartSpecConfig.showDataLabels && <text data-value-label="true" x={455} y={y + (labelPosition === 'inside' ? 32 : labelPosition === 'bottom' ? 49 : 14)} textAnchor="middle" dominantBaseline="central" fontSize={CV.typography.tickFunnel} fill={labelPosition === 'inside' && width > 0 ? chartLabelInk(item.fill) : inkFill}>{item.formattedValue} · {item.conversionFormatted}</text>}
                   </g>
                 );
@@ -990,7 +993,7 @@ export function ChartStudio({
                     label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, darkMode)}
                   />
                 )}
-                <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
+                <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
                   <Line isAnimationActive={false}
@@ -1051,7 +1054,7 @@ export function ChartStudio({
                     label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, darkMode)}
                   />
                 )}
-                <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
+                <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
                   <Area isAnimationActive={false}
@@ -1092,7 +1095,7 @@ export function ChartStudio({
                     label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, darkMode)}
                   />
                 )}
-                <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
+                <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Bar isAnimationActive={false}
                   yAxisId="left"
@@ -1108,8 +1111,8 @@ export function ChartStudio({
                       key={item.rowKey}
                       data-highlighted={highlightedRowKey === item.rowKey || (highlightedRowKey && typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(item.rowKey + '||'))}
                       fill={seriesColor(0)}
-                      stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'}
-                      strokeWidth={CV.stroke.highlight}
+                      stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : markStroke}
+                      strokeWidth={highlightedRowKey === item.rowKey ? CV.stroke.highlight : 0.75}
                       fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== item.rowKey))}
                     />
                   ))}
@@ -1132,7 +1135,7 @@ export function ChartStudio({
               </ComposedChart>
             ) : chartType === 'pie' || chartType === 'donut' ? (
               <PieChart>
-                <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
+                <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Pie isAnimationActive={false}
                   data={unifiedChartSpec.pieItems}
@@ -1201,15 +1204,15 @@ export function ChartStudio({
                 <XAxis dataKey="name" tick={valueTick} tickFormatter={(v) => formatAxisTickLabel(v, 10)} />
                 <YAxis tick={valueTick} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                 <ReferenceLine y={0} stroke={CV.semantic.zero} strokeWidth={CV.stroke.zero} />
-                <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
+                <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Bar isAnimationActive={false} dataKey="range" name="增减桥接区间" radius={CV.radius.waterfall} cursor="pointer" onClick={(d) => handleChartPointClick(d)}>
                   {unifiedChartSpec.waterfallItems.map((entry, idx) => (
                     <Cell
                       key={`wf_${idx}`}
                       data-highlighted={highlightedRowKey === entry.rowKey}
                       fill={entry.fill}
-                      stroke={highlightedRowKey === entry.rowKey ? CV.semantic.highlight : 'none'}
-                      strokeWidth={highlightedRowKey === entry.rowKey ? CV.stroke.highlight : 0}
+                      stroke={highlightedRowKey === entry.rowKey ? CV.semantic.highlight : markStroke}
+                      strokeWidth={highlightedRowKey === entry.rowKey ? CV.stroke.highlight : 0.75}
                       fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== entry.rowKey))}
                     />
                   ))}
@@ -1251,7 +1254,7 @@ export function ChartStudio({
                     label={{ value: 'OLS 拟合趋势线', position: 'insideTopLeft', fontSize: CV.typography.avgLabel, fill: inkFill }}
                   />
                 )}
-                <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
+                <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Scatter isAnimationActive={false}
                   name={`${unifiedChartSpec.primarySeriesKey} × ${unifiedChartSpec.secondarySeriesKey}`}
@@ -1284,12 +1287,13 @@ export function ChartStudio({
                 <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
                 <XAxis dataKey="name" tick={{ fontSize: CV.typography.tickCategory, fill: mutedFill }} />
                 <YAxis allowDecimals={false} tick={valueTick} />
-                <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
+                <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Bar isAnimationActive={false}
                   dataKey="count"
                   name={`${t('频数分布')} (${unifiedChartSpec.primaryValCfg.field} · ${t('点击柱体下钻明细')})`}
                   fill="url(#monokaiHistGrad)"
+                  stroke={markStroke} strokeWidth={0.75}
                   radius={CV.radius.bar}
                   cursor="pointer"
                   onClick={(d) => {
@@ -1365,7 +1369,7 @@ export function ChartStudio({
                     />
                   )
                 )}
-                <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
+                <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => {
                   const isStacked = (chartType === 'stacked_bar' || chartType === 'pct_stacked_bar') && (unifiedChartSpec.canStack || chartType === 'pct_stacked_bar');
@@ -1383,7 +1387,7 @@ export function ChartStudio({
                         handleChartPointClick({ ...d, rowKey: targetRowKey, colKey: sm.colKey, seriesKey: sm.key });
                       }}
                     >
-                      {unifiedChartSpec.items.map((item) => <Cell key={item.rowKey} data-highlighted={highlightedRowKey === item.rowKey || (highlightedRowKey && typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(item.rowKey + '||'))} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'} strokeWidth={CV.stroke.highlight} fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== item.rowKey))} />)}
+                      {unifiedChartSpec.items.map((item) => <Cell key={item.rowKey} data-highlighted={highlightedRowKey === item.rowKey || (highlightedRowKey && typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(item.rowKey + '||'))} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : markStroke} strokeWidth={highlightedRowKey === item.rowKey ? CV.stroke.highlight : 0.75} fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== item.rowKey))} />)}
                       {chartSpecConfig.showDataLabels && (
                         <LabelList
                           dataKey={sm.key}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHART_COLORS } from '../src/constants/pivotConstants.js';
-import { CV, chartLabelInk, chartPaper } from '../src/constants/chartVisual.js';
+import { CV, chartLabelInk, chartPaper, chartMarkStroke } from '../src/constants/chartVisual.js';
 
 function luminance(hex) {
   return hex.slice(1).match(/../g).map(v => parseInt(v,16)/255)
@@ -12,9 +12,11 @@ function contrast(a,b) {
   const x=luminance(a), y=luminance(b);
   return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
 }
-test('chart marks contrast with both papers and interior labels meet 4.5:1',()=>{
+test('Monokai fills retain theme identity, ink edges separate light marks and labels meet 4.5:1',()=>{
+  assert.deepEqual(CHART_COLORS.slice(0,6),['#F92672','#A6E22E','#66D9EF','#FD971F','#AE81FF','#E6DB74']);
+  assert.ok(contrast(chartMarkStroke(false),chartPaper(false)) >= 3);
   for (const color of [...CHART_COLORS,CV.semantic.positive,CV.semantic.negative]) {
-    for (const dark of [false,true]) assert.ok(contrast(color,chartPaper(dark)) >= 3, color);
+    assert.ok(contrast(color,chartPaper(true)) >= 3, color);
     assert.ok(contrast(color,chartLabelInk(color)) >= 4.5,color);
   }
   assert.equal(CV.fill.barGradFrom,1);

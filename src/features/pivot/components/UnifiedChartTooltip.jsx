@@ -4,7 +4,7 @@ import { seriesColor } from '../../../constants/chartVisual';
 import { UnifiedFormatter } from '../../../utils/formatters';
 import { cellEvidence } from '../../../utils/resultEvidence.js';
 
-export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMode, clickLinkMode = 'drill' }) {
+export function UnifiedChartTooltip({ active, payload, label, viewBox, chartSpec, darkMode, clickLinkMode = 'drill' }) {
   if (!active || !payload || payload.length === 0) return null;
   const primaryValCfg = chartSpec?.primaryValCfg;
   const secondaryValCfg = chartSpec?.secondaryValCfg || primaryValCfg;
@@ -39,22 +39,22 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
   const meanDiffPct = showMeanDiff ? ((primaryVal - primaryMean) / Math.abs(primaryMean)) * 100 : 0;
 
   return (
-    <div className={`p-3 rounded-xl border text-xs max-w-xs ${darkMode ? 'bg-[#1E1F1C]/96 text-[#F8F8F2] border-[#49483E] shadow-[0_16px_40px_rgba(0,0,0,0.55)]' : 'bg-[#FFFDF7]/96 text-[#272822] border-[#D6D4C8] shadow-[0_12px_28px_rgba(39,40,34,0.12)]'} backdrop-blur-xl`}>
-      <div className="font-semibold tracking-tight border-b border-[#D6D4C8]/50 dark:border-[#49483E]/50 pb-1.5 mb-2 truncate flex items-center justify-between gap-3">
-        <span className="truncate text-[#272822] dark:text-[#F8F8F2] apple-font-mono">{rawPoint?.name || label}</span>
+    <div role="tooltip" style={{maxWidth: viewBox?.width > 0 ? Math.min(352, viewBox.width) : undefined}} className={`p-3 rounded-xl border text-xs leading-5 w-max max-w-[calc(100vw-2rem)] ${darkMode ? 'bg-[#1E1F1C] text-[#F8F8F2] border-[#49483E] shadow-[0_16px_40px_rgba(0,0,0,0.55)]' : 'bg-[#FFFDF7] text-[#272822] border-[#D6D4C8] shadow-[0_12px_28px_rgba(39,40,34,0.12)]'}`}>
+      <div className="font-semibold tracking-tight border-b border-[#D6D4C8]/50 dark:border-[#49483E]/50 pb-1.5 mb-2 flex items-start justify-between gap-3">
+        <span className="min-w-0 [overflow-wrap:anywhere] text-[#272822] dark:text-[#F8F8F2] apple-font-mono">{rawPoint?.name || label}</span>
         <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-black/[0.04] dark:bg-white/[0.06] text-ink-muted apple-font-mono shrink-0">{actionBadgeText}</span>
       </div>
 
       {chartType === 'scatter' && rawPoint ? (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-4">
-            <span className="text-ink-muted truncate">{chartSpec?.primarySeriesKey} [X]:</span>
+            <span className="min-w-0 text-ink-muted [overflow-wrap:anywhere]">{chartSpec?.primarySeriesKey} [X]:</span>
             <span className="apple-font-mono font-semibold text-ink-cyan">
               {UnifiedFormatter.formatValue(rawPoint.x, primaryValCfg, { compact: false })}
             </span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="text-ink-muted truncate">{chartSpec?.secondarySeriesKey} [Y]:</span>
+            <span className="min-w-0 text-ink-muted [overflow-wrap:anywhere]">{chartSpec?.secondarySeriesKey} [Y]:</span>
             <span className="apple-font-mono font-semibold text-ink-green">
               {UnifiedFormatter.formatValue(rawPoint.y, secondaryValCfg, { compact: false })}
             </span>
@@ -104,11 +104,11 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
       ) : (chartType === 'pie' || chartType === 'donut') && payload[0] ? (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex min-w-0 items-start gap-2">
               <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: payload[0].payload?.fill || payload[0].fill || seriesColor(0) }} />
-              <span className="text-ink-muted truncate">{payload[0].name}:</span>
+              <span className="min-w-0 text-ink-muted [overflow-wrap:anywhere]">{payload[0].name}:</span>
             </div>
-            <span className="apple-font-mono font-semibold">
+            <span className="apple-font-mono font-semibold shrink-0">
               {UnifiedFormatter.formatValue(payload[0].value, primaryValCfg, { compact: false })}
             </span>
           </div>
@@ -144,11 +144,11 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
             return (
               <div key={`tip_${idx}`}>
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 truncate">
-                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color || item.fill || seriesColor(0) }} />
-                  <span className="text-ink-muted truncate">{seriesKey}:</span>
+                <div className="flex min-w-0 items-start gap-2">
+                  <span className="mt-1 w-2.5 h-2.5 rounded-sm shrink-0 border border-black/20 dark:border-white/20" style={{ backgroundColor: meta?.color || (typeof item.color === 'string' && !item.color.startsWith('url(') ? item.color : null) || item.fill || seriesColor(0) }} />
+                  <span className="min-w-0 text-ink-muted [overflow-wrap:anywhere]">{seriesKey}:</span>
                 </div>
-                <span className="apple-font-mono font-semibold">{formatted}</span>
+                <span className="apple-font-mono font-semibold shrink-0">{formatted}</span>
               </div>
               {rawPoint?._seriesEvidence?.[seriesKey] && <p className="text-[10px] leading-4 mt-0.5 text-ink-muted [overflow-wrap:anywhere]">{cellEvidence(rawPoint._seriesEvidence[seriesKey])}</p>}
               </div>

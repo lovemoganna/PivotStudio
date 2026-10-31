@@ -1,5 +1,5 @@
 /**
- * Shared chart visual language: quiet surfaces, distinct data marks, readable labels.
+ * Monokai chart fills with surface-aware ink and readable internal labels.
  * Series palette stays CHART_COLORS; this module owns chrome, geometry, and semantic accents.
  */
 import { CHART_COLORS } from './pivotConstants.js';
@@ -8,16 +8,16 @@ export const CV = {
   series: CHART_COLORS,
 
   semantic: {
-    positive: '#338879',
-    negative: '#B96170',
-    start: '#427AAD',
-    total: '#9871B3',
-    highlight: '#B07835',
-    derived: '#9871B3',
-    mean: '#B07835',
+    positive: '#A6E22E',
+    negative: '#F92672',
+    start: '#66D9EF',
+    total: '#AE81FF',
+    highlight: '#FD971F',
+    derived: '#E6DB74',
+    mean: '#FD971F',
     zero: '#75715E',
-    ols: '#338879',
-    scatterMean: '#4E8799',
+    ols: '#A6E22E',
+    scatterMean: '#66D9EF',
     paperLight: '#FFFDF7',
     paperDark: '#272822',
     inkLight: '#272822',
@@ -27,16 +27,16 @@ export const CV = {
   },
 
   heatmap: {
-    pos: '#427AAD',
-    neg: '#B96170',
+    pos: '#66D9EF',
+    neg: '#F92672',
     opacityMin: 0.22,
     opacitySpan: 0.78,
     cellRx: 4,
   },
 
   histogram: {
-    from: '#427AAD',
-    to: '#427AAD',
+    from: '#66D9EF',
+    to: '#66D9EF',
     opacityFrom: 1,
     opacityTo: 1,
   },
@@ -178,4 +178,9 @@ export function chartLabelInk(fill = CHART_COLORS[0], opacity = 1, darkMode = fa
     .map((c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
     .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
   return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? '#000000' : '#FFFFFF';
+}
+
+// Bright Monokai fills need an ink edge on light paper; dark paper already separates them.
+export function chartMarkStroke(darkMode) {
+  return darkMode ? CV.semantic.paperDark : CV.semantic.mutedLight;
 }

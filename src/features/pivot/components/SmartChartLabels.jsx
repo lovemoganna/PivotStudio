@@ -26,7 +26,7 @@ export function renderSmartPieLabel(props, primaryValCfg, darkMode, position = '
     const iy = cy + midR * sin;
     // Interior labels follow the actual slice color, independently of theme.
     return (
-      <g data-value-label="true">
+      <g data-value-label="true" pointerEvents="none">
         <text x={ix} y={iy - 5} fill={chartLabelInk(fill)} textAnchor="middle" dominantBaseline="central" fontSize={9.5} fontWeight={700}>
           {formatAxisTickLabel(name, 7)}
         </text>
@@ -38,7 +38,7 @@ export function renderSmartPieLabel(props, primaryValCfg, darkMode, position = '
   }
 
   return (
-    <g data-value-label="true">
+    <g data-value-label="true" pointerEvents="none">
       <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill || seriesColor(0)} strokeWidth={CV.stroke.leader} fill="none" opacity={0.85} />
       <circle cx={ex} cy={ey} r={2} fill={fill || seriesColor(0)} />
       <text data-value-label="true"
