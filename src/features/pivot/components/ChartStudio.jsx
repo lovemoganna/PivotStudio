@@ -1483,7 +1483,6 @@ export function ChartStudio({
                   <Lightbulb className="w-3.5 h-3.5 shrink-0 text-ink-muted" />
                   {t("怎么读这张图")}
                 </span>
-                <p className="text-ink-muted leading-relaxed">{t(methodGuide?.purpose || '')}</p>
                 <p className="text-ink-muted leading-relaxed">{t(methodGuide?.howToRead || '')}</p>
                 {chartSpecConfig.showAvgReferenceLine && hasValidMean && ['bar','horizontal_bar','line','area','combo'].includes(chartType) && <p data-testid="reference-mean-reading" className="text-ink-muted leading-relaxed">{t('AVG 参考线是当前图中主指标各组展示值的简单平均，不一定等于按原始记录重新计算的总体结果。')}</p>}
                 <details data-testid="chart-metric-reading" className="text-ink-muted">

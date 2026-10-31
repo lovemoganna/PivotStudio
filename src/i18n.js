@@ -1,5 +1,18 @@
 // UI copy only: never translate dataset field names or record values.
 const english = {
+  "计算与数据说明": "Calculation and data",
+  "总计口径": "Total calculation",
+  "添加数据集": "Add dataset",
+  "计算指标": "Measures",
+  "限定范围": "Scope",
+  "对比": "Compare",
+  "分组": "Group",
+  "计算": "Calculate",
+  "显示为": "Show as",
+  "添加分组字段": "Add grouping fields",
+  "可选 · 添加对比字段": "Optional · Add comparison fields",
+  "添加要计算的字段": "Add fields to calculate",
+  "可选 · 添加筛选字段": "Optional · Add filter fields",
   "添加": "Add",
   "去重计数": "Distinct count",
   "统计全部记录，字段为空也计入。": "Count every record, including records with empty fields.",

@@ -71,10 +71,10 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
     if (setupEmpty) setShowMobileConfig(true);
   }, [setupEmpty]);
   const zoneConfigs = [
-    { key: 'filters', label: '筛选（限定范围）', badgeColor: 'text-ink-green', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
-    { key: 'columns', label: '列（横向对比）', badgeColor: 'text-ink-cyan', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
-    { key: 'rows', label: '行（纵向分组）', badgeColor: 'text-ink-pink', borderAccent: 'border-l-2 border-l-[#F92672]' },
-    { key: 'values', label: '值（要算的数）', badgeColor: 'text-ink-orange', borderAccent: 'border-l-2 border-l-[#FD971F]' },
+    { key: 'rows', title: '行', hint: '分组', label: '行（纵向分组）', badgeColor: 'text-ink-pink', borderAccent: 'border-l-2 border-l-[#F92672]' },
+    { key: 'columns', title: '列', hint: '对比', label: '列（横向对比）', badgeColor: 'text-ink-cyan', borderAccent: 'border-l-2 border-l-[#66D9EF]' },
+    { key: 'values', title: '值', hint: '计算指标', label: '值（要算的数）', badgeColor: 'text-ink-orange', borderAccent: 'border-l-2 border-l-[#FD971F]' },
+    { key: 'filters', title: '筛选', hint: '限定范围', label: '筛选（限定范围）', badgeColor: 'text-ink-green', borderAccent: 'border-l-2 border-l-[#A6E22E]' },
   ];
   return (
       /* Pivot Dropzones Config (透视结构放置区: 筛选 / 列 / 行 / 值) */
@@ -107,7 +107,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
           <div className="relative flex items-center justify-between gap-1.5 flex-wrap shrink-0">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-[11px] font-bold tracking-tight text-[#272822] dark:text-[#F8F8F2]">
-                {t("透视结构放置区")}
+                {t("分析配置")}
               </span>
               <details
                 open={showHelpGuide}
@@ -205,7 +205,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
           </div>}
 
           {/* 4 Dropzones Grid with Independent Scroll */}
-          <div className="grid grid-cols-1 min-[340px]:grid-cols-2 gap-1.5 overflow-y-auto pr-0.5 max-h-[280px] md:max-h-none md:flex-1 md:min-h-0 content-start items-start auto-rows-max">
+          <div data-testid="config-zones" style={{gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))'}} className="grid gap-2 overflow-y-auto pr-0.5 max-h-[min(55vh,520px)] md:max-h-none md:flex-1 md:min-h-0 content-start items-start auto-rows-max">
             {zoneConfigs.map((z) => {
               const items = pivotConfig?.[z.key] || [];
               const isOver = dragOverZone === z.key;
@@ -213,6 +213,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                 <div
                   key={z.key}
                   data-testid={`zone-${z.key}`}
+                  style={{gridColumn: z.key === 'values' || z.key === 'filters' ? '1 / -1' : undefined}}
                   role="group"
                   aria-label={t(z.label)}
                   onDragOver={(e) => { e.preventDefault(); setDragOverZone?.(z.key); }}
@@ -273,14 +274,14 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                     }
                     setDraggingPayload?.(null);
                   }}
-                  className={`shrink-0 min-h-[56px] min-w-0 p-1.5 rounded-lg border ${z.borderAccent} apple-transition flex flex-col gap-1 ${
+                  className={`shrink-0 min-h-[56px] min-w-0 p-2 rounded-lg border ${z.borderAccent} apple-transition flex flex-col gap-1 ${
                     isOver
                       ? 'border-[#F92672] bg-[#F92672]/10 scale-[1.01]'
                       : 'border-[#D6D4C8] dark:border-[#3E3D32] bg-[#FFFDF7]/90 dark:bg-[#1E1F1C]/90'
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between text-xs font-semibold shrink-0 gap-1">
-                    <span className={z.badgeColor}>{t(z.label)}</span>
+                    <span className={z.badgeColor}>{t(z.title)}<span className="ml-1.5 text-[10px] font-normal text-ink-muted">{t(z.hint)}</span></span>
                     <div className="flex items-center gap-1">
                       <button type="button" disabled={isReadOnly} onClick={event=>{event.currentTarget.focus();setPickerZone(z);}}
                         aria-label={`${t('+字段')} · ${t('添加字段到')}${t(z.label)}`}
@@ -298,34 +299,17 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                           {t("+自定义")}
                         </button>
                       )}
-                      <span className="text-ink-muted text-[10px]">[{items.length}]</span>
+                      <span className="text-ink-muted text-[10px] tabular-nums">{items.length}</span>
                     </div>
                   </div>
 
-                                    <div className="min-w-0 space-y-1 flex-1">
+                  <div className="min-w-0 space-y-1 flex-1">
                     {items.length === 0 ? (
-                      <div className="py-1 px-1 border border-dashed border-[#D6D4C8]/70 dark:border-[#3E3D32]/70 rounded text-center select-none flex flex-col items-center justify-center gap-1">
-                        {(!nextStep || isReadOnly) && <div className="space-y-0.5">
-                          <span className="text-[10px] text-ink-muted font-semibold block leading-snug">
-                            {t({
-                              filters: '只分析哪些记录？点 +字段选择筛选条件。',
-                              columns: '要并排比较什么？点 +字段选择。',
-                              rows: '要按什么分组？点 +字段选择。',
-                              values: '要计算什么？点 +字段选择指标或记录数。',
-                            }[z.key])}
-                          </span>
-                          {/* Examples only after the user starts configuring — full empty setup already has table CTA. */}
-                          {!setupEmpty && (
-                            <span className="text-[8.5px] text-ink-muted/65 block">
-                              {t({
-                                filters: '例如只看华东或线上渠道',
-                                columns: '例如按年份或月份并排比较',
-                                rows: '例如按地区或类别列出',
-                                values: '例如销售额求和、记录数',
-                              }[z.key])}
-                            </span>
-                          )}
-                        </div>}
+                      <div className="min-w-0 flex flex-col gap-1">
+                        <button type="button" disabled={isReadOnly} onClick={event=>{event.currentTarget.focus();setPickerZone(z);}}
+                          className="w-full min-h-[32px] rounded border border-dashed border-[#D6D4C8] dark:border-[#49483E] px-2 py-1.5 text-left text-[11px] text-ink-muted hover:text-ink-cyan hover:border-[#66D9EF] focus-visible:ring-2 focus-visible:ring-[#66D9EF] disabled:opacity-50">
+                          {t({rows:'添加分组字段',columns:'可选 · 添加对比字段',values:'添加要计算的字段',filters:'可选 · 添加筛选字段'}[z.key])}
+                        </button>
                         {z.key === 'values' && (pivotConfig?.rows?.length || 0) > 0 && !isReadOnly && (
                           <button
                             type="button"
@@ -402,6 +386,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
 
                                 {z.key === 'values' && (
                                   <div className="flex flex-wrap items-center gap-1 min-w-0 max-w-full">
+                                    <span className="text-[10px] text-ink-muted">{t('计算')}</span>
                                     {it.isCalculated ? (
                                       <button
                                         type="button"
@@ -423,7 +408,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                             values: prev.values.map((v) => (v.id === it.id ? { ...v, agg: nextAgg } : v)),
                                           }));
                                         }}
-                                        className="bg-transparent text-ink-orange apple-font-mono font-bold focus:outline-none cursor-pointer disabled:opacity-40 text-[11px] max-w-full"
+                                        className="min-w-0 max-w-[140px] bg-transparent text-ink-orange apple-font-mono font-bold focus-visible:ring-2 focus-visible:ring-[#66D9EF] cursor-pointer disabled:opacity-40 text-[11px]"
                                         aria-description={aggregationChoiceDescription(it.agg,it.field) || undefined}
                                         title={
                                           it.agg === 'avg'
@@ -443,6 +428,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                         ))}
                                       </select>
                                     )}
+                                    <span className="ml-1 text-[10px] text-ink-muted">{t('显示为')}</span>
                                     <select
                                       disabled={isReadOnly}
                                       value={it.showAs || 'normal'}
@@ -453,7 +439,7 @@ export function PivotConfigPanel({pivotConfig, setPivotConfig, currentDataset, i
                                           values: prev.values.map((v) => (v.id === it.id ? { ...v, showAs: nextShowAs } : v)),
                                         }));
                                       }}
-                                      className={`text-[11px] rounded px-0.5 py-0.2 apple-font-mono font-semibold focus:outline-none cursor-pointer disabled:opacity-40 border transition shrink-0 ${
+                                      className={`text-[11px] rounded px-0.5 py-0.2 apple-font-mono font-semibold focus-visible:ring-2 focus-visible:ring-[#66D9EF] cursor-pointer disabled:opacity-40 border transition min-w-0 max-w-full ${
                                         it.showAs && it.showAs !== 'normal'
                                           ? 'bg-[#AE81FF]/20 text-ink-purple border-[#AE81FF]/40'
                                           : 'bg-black/[0.04] dark:bg-white/[0.06] text-ink-muted border-transparent'

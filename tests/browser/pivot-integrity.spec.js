@@ -49,7 +49,7 @@ for(const width of [360,768,1440]) {
   await start(page,{rows:[{field:'G'}],filters:[{field:'G',selectedValues:['A']}],values:[{id:'x',field:'X',agg:'avg'},{id:'q',field:'Ratio',isCalculated:true,agg:'calc',formula:'SUM([X])/SUM([Y])'}]});
   await upload(page,'G,X,Y\nA,10,0\nA,bad,0\nA,,0\nB,0,2');
   await preview(page).getByRole('combobox',{name:'X · 字段类型',exact:true}).selectOption('number');await confirm(page);
-  const evidence=page.getByTestId('sample-evidence');await evidence.locator('summary').press('Enter');
+  const evidence=page.getByTestId('sample-evidence');await page.getByTestId('total-reading').locator('summary').press('Enter');
   await expect(evidence).toContainText('记录总数 3 · 有效记录 1 · 空值排除 1 · 无效数值排除 1');
   await expect(page.locator('[data-value-status=zero_denominator]').first()).toHaveAttribute('aria-label',/分母为 0/);
   await page.locator('#pivot-main-html-table tbody [data-value-status=zero_denominator]').first().dblclick();

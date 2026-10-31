@@ -523,24 +523,27 @@ export function PivotTable({
         </div>
       )}
       {resultQuestion ? (
-        <div
-          data-testid="result-reading"
-          className="shrink-0 px-3 py-1.5 border-b border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 bg-[#FFFDF7]/90 dark:bg-[#22231E]/90 text-[11px] leading-5"
-        >
-          <p className="text-[#57584B] dark:text-[#C4C4B8] [overflow-wrap:anywhere]">
+        <div data-testid="result-reading" role="region" aria-label={t('计算与数据说明')} tabIndex={0} className="shrink-0 max-h-[40%] overflow-y-auto focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#66D9EF] px-3 py-1.5 border-b border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 bg-[#FFFDF7]/90 dark:bg-[#22231E]/90 text-[11px] leading-5 flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+          <p className="flex-1 min-w-[180px] text-[#57584B] dark:text-[#C4C4B8] [overflow-wrap:anywhere]">
             <span className="font-semibold text-[#272822] dark:text-[#F8F8F2]">{t('这张表：')}</span>
             {resultQuestion}
           </p>
-          <details data-testid="total-reading" className="mt-0.5 text-[#57584B] dark:text-[#C4C4B8] [overflow-wrap:anywhere]">
-            <summary className="w-fit cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] text-ink-cyan font-medium">{t('总计怎么算？')}</summary>
-            <ul className="mt-1 space-y-1 list-disc pl-4">
-              {buildTotalReading(pivotResult.valConfigs).map(note => <li key={note}>{note}</li>)}
-            </ul>
-          </details>
-          <details data-testid="sample-evidence" className="mt-0.5 text-ink-muted [overflow-wrap:anywhere]">
-            <summary className="w-fit cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] text-ink-cyan font-medium">{t('有效样本与排除项')}{Object.values(pivotResult.sampleStatsByValId || {}).some(s=>s.missing || s.invalid) ? ` · ${t('有排除项')}` : ''}</summary>
-            <p>{t('以下数量基于当前筛选范围；有效记录数不等于去重后的数量。')}</p>
-            <ul className="mt-1 space-y-1 list-disc pl-4">{pivotResult.valConfigs.map(metric => <li key={metric.id}>{metric.field === '__COUNT__' ? t('记录数') : metric.field} · {metric.isCalculated ? t('公式按各操作数分别聚合，不能用单一有效样本数代表；查看单元格明细了解不可计算的原因。') : sampleEvidence(pivotResult.sampleStatsByValId?.[metric.id])}</li>)}</ul>
+          <details data-testid="total-reading" className="shrink-0 open:basis-full min-w-0 text-ink-muted [overflow-wrap:anywhere]">
+            <summary className="w-fit cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#66D9EF] font-medium hover:text-ink-cyan">
+              {t('计算与数据说明')}
+              {Object.values(pivotResult.sampleStatsByValId || {}).some(s=>s.missing || s.invalid) && <span className="ml-1 text-ink-orange"> · {t('有排除项')}</span>}
+            </summary>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 py-2">
+              <section>
+                <h2 className="font-semibold text-[#272822] dark:text-[#F8F8F2]">{t('总计口径')}</h2>
+                <ul className="mt-1 space-y-1 list-disc pl-4">{buildTotalReading(pivotResult.valConfigs).map(note => <li key={note}>{note}</li>)}</ul>
+              </section>
+              <section data-testid="sample-evidence">
+                <h2 className="font-semibold text-[#272822] dark:text-[#F8F8F2]">{t('有效样本与排除项')}</h2>
+                <p>{t('以下数量基于当前筛选范围；有效记录数不等于去重后的数量。')}</p>
+                <ul className="mt-1 space-y-1 list-disc pl-4">{pivotResult.valConfigs.map(metric => <li key={metric.id}>{metric.field === '__COUNT__' ? t('记录数') : metric.field} · {metric.isCalculated ? t('公式按各操作数分别聚合，不能用单一有效样本数代表；查看单元格明细了解不可计算的原因。') : sampleEvidence(pivotResult.sampleStatsByValId?.[metric.id])}</li>)}</ul>
+              </section>
+            </div>
           </details>
         </div>
       ) : null}

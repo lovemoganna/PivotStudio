@@ -63,7 +63,7 @@ test('understanding: count and average advice tracks changed definitions, includ
   await page.getByLabel('快捷表计算',{exact:true}).selectOption('pct_grand');await ready(page);
   await expect(help).toContainText('显示值不一定能直接相加');
   await page.getByLabel('界面语言',{exact:true}).selectOption('en');
-  await expect(help.locator('summary')).toHaveText('How are totals calculated?');
+  await expect(help.locator('summary')).toHaveText('Calculation and data · Some records excluded');
   await expect(help).toContainText('zero is included');await expect(help).toContainText('not a simple average');
   expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
 });

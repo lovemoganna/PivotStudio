@@ -578,7 +578,7 @@ export function FieldShelf({
                     <option value="">{t("+ 新建 / 介绍主页")}</option>
                     {datasets.map((d) => (
                       <option key={d.id} value={d.id}>
-                        {d.name} ({(d.rows?.length || 0).toLocaleString()} {t("行")})
+                        {d.name}
                       </option>
                     ))}
                   </select>
