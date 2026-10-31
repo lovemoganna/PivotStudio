@@ -1,5 +1,5 @@
 /**
- * Unified chart visual language — one Monokai product surface across all chart types.
+ * Shared chart visual language: quiet surfaces, distinct data marks, readable labels.
  * Series palette stays CHART_COLORS; this module owns chrome, geometry, and semantic accents.
  */
 import { CHART_COLORS } from './pivotConstants.js';
@@ -8,37 +8,37 @@ export const CV = {
   series: CHART_COLORS,
 
   semantic: {
-    positive: '#A6E22E',
-    negative: '#F92672',
-    start: '#66D9EF',
-    total: '#AE81FF',
-    highlight: '#FD971F',
-    derived: '#E6DB74',
-    mean: '#FD971F',
+    positive: '#338879',
+    negative: '#B96170',
+    start: '#427AAD',
+    total: '#9871B3',
+    highlight: '#B07835',
+    derived: '#9871B3',
+    mean: '#B07835',
     zero: '#75715E',
-    ols: '#A6E22E',
-    scatterMean: '#66D9EF',
+    ols: '#338879',
+    scatterMean: '#4E8799',
     paperLight: '#FFFDF7',
     paperDark: '#272822',
     inkLight: '#272822',
     inkDark: '#F8F8F2',
     mutedLight: '#75715E',
-    mutedDark: '#908E80',
+    mutedDark: '#AAA99D',
   },
 
   heatmap: {
-    pos: '#66D9EF',
-    neg: '#F92672',
+    pos: '#427AAD',
+    neg: '#B96170',
     opacityMin: 0.22,
     opacitySpan: 0.78,
     cellRx: 4,
   },
 
   histogram: {
-    from: '#66D9EF',
-    to: '#AE81FF',
-    opacityFrom: 0.92,
-    opacityTo: 0.68,
+    from: '#427AAD',
+    to: '#427AAD',
+    opacityFrom: 1,
+    opacityTo: 1,
   },
 
   stroke: {
@@ -79,8 +79,8 @@ export const CV = {
   },
 
   fill: {
-    barGradFrom: 0.95,
-    barGradTo: 0.72,
+    barGradFrom: 1,
+    barGradTo: 1,
     areaGradFrom: 0.55,
     areaGradTo: 0.06,
     dim: 0.36,
@@ -145,12 +145,12 @@ export function chartLegendStyle() {
   return { fontSize: CV.typography.legend, paddingTop: CV.typography.legendPadTop };
 }
 
-export function chartAvgLabel(text) {
+export function chartAvgLabel(text, darkMode = false) {
   return {
     value: text,
     position: 'insideTopRight',
     fontSize: CV.typography.avgLabel,
-    fill: CV.semantic.mean,
+    fill: chartInk(darkMode),
   };
 }
 
@@ -166,4 +166,16 @@ export function chartBarRadius(chartType) {
 
 export function seriesColor(index = 0) {
   return CV.series[index % CV.series.length];
+}
+
+// Choose text against the actual rendered fill, including translucent heat cells.
+// Black/white maximize contrast; unlike a theme-based choice, this works inside marks.
+export function chartLabelInk(fill = CHART_COLORS[0], opacity = 1, darkMode = false) {
+  const rgb = (hex) => hex.replace('#', '').match(/../g).map((v) => parseInt(v, 16));
+  const foreground = rgb(fill);
+  const paper = rgb(chartPaper(darkMode));
+  const luminance = foreground.map((c, i) => (c * opacity + paper[i] * (1 - opacity)) / 255)
+    .map((c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+  return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05) ? '#000000' : '#FFFFFF';
 }

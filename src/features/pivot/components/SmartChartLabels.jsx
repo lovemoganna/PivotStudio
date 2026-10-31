@@ -1,6 +1,6 @@
 import React from 'react';
 import { UnifiedFormatter, formatAxisTickLabel } from '../../../utils/formatters';
-import { CV, chartInk, seriesColor } from '../../../constants/chartVisual';
+import { CV, chartInk, chartLabelInk, seriesColor } from '../../../constants/chartVisual';
 
 export function renderSmartPieLabel(props, primaryValCfg, darkMode, position = 'auto') {
   const { cx, cy, midAngle, innerRadius, outerRadius, value, percent, name, fill } = props;
@@ -24,13 +24,13 @@ export function renderSmartPieLabel(props, primaryValCfg, darkMode, position = '
     const midR = innerRadius + (outerRadius - innerRadius) * 0.62;
     const ix = cx + midR * cos;
     const iy = cy + midR * sin;
-    // Neon Monokai fills stay bright — dark ink remains readable on-slice.
+    // Interior labels follow the actual slice color, independently of theme.
     return (
       <g data-value-label="true">
-        <text x={ix} y={iy - 5} fill="#1E1F1C" textAnchor="middle" dominantBaseline="central" fontSize={9.5} fontWeight={700}>
+        <text x={ix} y={iy - 5} fill={chartLabelInk(fill)} textAnchor="middle" dominantBaseline="central" fontSize={9.5} fontWeight={700}>
           {formatAxisTickLabel(name, 7)}
         </text>
-        <text x={ix} y={iy + 7} fill="#1E1F1C" textAnchor="middle" dominantBaseline="central" fontSize={9} fontWeight={700} className="apple-font-mono">
+        <text x={ix} y={iy + 7} fill={chartLabelInk(fill)} textAnchor="middle" dominantBaseline="central" fontSize={9} fontWeight={700} className="apple-font-mono">
           {`${formattedVal}, ${pctStr}`}
         </text>
       </g>
@@ -57,7 +57,7 @@ export function renderSmartPieLabel(props, primaryValCfg, darkMode, position = '
   );
 }
 
-export function renderSmartBarLabel(props, darkMode, isHorizontal = false, position = 'auto') {
+export function renderSmartBarLabel(props, darkMode, isHorizontal = false, position = 'auto', markFill = seriesColor(0)) {
   const { x, y, width, height, value } = props;
   if (value === null || value === undefined || value === '') return null;
   const textStr = String(value);
@@ -71,8 +71,8 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false, posit
     if (position === 'insideBottom') ty = bottom - 8;
     if (position === 'left' || position === 'insideLeft') { tx = left + (position === 'left' ? -6 : 6); anchor = position === 'left' ? 'end' : 'start'; }
     if (position === 'right' || position === 'insideRight') { tx = right + (position === 'right' ? 6 : -6); anchor = position === 'right' ? 'start' : 'end'; }
-    const inside = position === 'inside' || position.startsWith('inside');
-    return <text data-value-label="true" x={tx} y={ty} fill={inside ? '#1E1F1C' : chartInk(darkMode)} textAnchor={anchor} dominantBaseline="central" fontSize={CV.typography.dataLabel} fontWeight={700} className="apple-font-mono">{textStr}</text>;
+    const inside = (position === 'inside' || position.startsWith('inside')) && Math.abs(width * height) > 0;
+    return <text data-value-label="true" x={tx} y={ty} fill={inside ? chartLabelInk(markFill) : chartInk(darkMode)} textAnchor={anchor} dominantBaseline="central" fontSize={CV.typography.dataLabel} fontWeight={700} className="apple-font-mono">{textStr}</text>;
   }
   const isNeg = textStr.startsWith('-');
   const labelSize = CV.typography.dataLabel;
@@ -85,7 +85,7 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false, posit
         <text data-value-label="true"
           x={x + width / 2}
           y={y + height / 2}
-          fill="#1E1F1C"
+          fill={chartLabelInk(markFill)}
           textAnchor="middle"
           dominantBaseline="central"
           fontSize={labelSize}
@@ -102,7 +102,7 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false, posit
       <text data-value-label="true"
         x={tx}
         y={y + height / 2}
-        fill={placeInside ? '#1E1F1C' : outsideInk}
+        fill={placeInside ? chartLabelInk(markFill) : outsideInk}
         textAnchor={placeInside ? 'end' : 'start'}
         dominantBaseline="central"
         fontSize={labelSize}
@@ -118,7 +118,7 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false, posit
   if (isNeg && Math.abs(height) < 18) return null;
   const nearTopEdge = y < 18;
   const ty = isNeg ? Math.max(y, y + height) - 9 : nearTopEdge ? y + 12 : y - 6;
-  const fillCol = isNeg || nearTopEdge ? '#1E1F1C' : outsideInk;
+  const fillCol = isNeg || nearTopEdge ? chartLabelInk(markFill) : outsideInk;
 
   return (
     <text data-value-label="true"

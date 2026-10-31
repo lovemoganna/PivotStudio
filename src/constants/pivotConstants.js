@@ -57,7 +57,9 @@ export const DATE_GRANULARITIES = [
   { value: 'day_of_week', label: '按星期几 (Day of Week)' },
 ];
 
-export const CHART_COLORS = ['#F92672', '#A6E22E', '#66D9EF', '#FD971F', '#AE81FF', '#E6DB74', '#FF6188', '#78DCE8'];
+// Mid-tone categorical colors retain their identity on both chart papers.
+// Keep this order shared by marks, legends, KPI cards and exported SVGs.
+export const CHART_COLORS = ['#427AAD', '#B07835', '#338879', '#9871B3', '#B96170', '#71833B', '#4E8799', '#99745E'];
 
 export const VISUAL_CHART_TYPES = [
   { value: 'heatmap', label: '矩阵热力图', short: '热力图', category: 'heatmap', intent: 'compare' },

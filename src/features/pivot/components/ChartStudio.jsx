@@ -19,6 +19,7 @@ import {
 import {
   CV,
   chartInk,
+  chartLabelInk,
   chartMuted,
   chartPaper,
   chartGridStroke,
@@ -133,6 +134,7 @@ export function ChartStudio({
   const gridStroke = chartGridStroke(darkMode);
   const valueTick = chartValueTick(darkMode);
   const legendStyle = chartLegendStyle();
+  const renderLegendText = (value) => <span style={{color: inkFill}}>{value}</span>;
   const cartesianMargin = chartMargin({ rotate: shouldRotateTicks, compact: compactAxis });
   const dualMargin = chartMargin({ rotate: shouldRotateTicks, compact: compactAxis, dual: true });
   const hbarMargin = chartMargin({ horizontal: true });
@@ -922,7 +924,7 @@ export function ChartStudio({
                         onClick={() => handleChartPointClick({ rowKey: row.rowKey, colKey: group.key, name: (!rows.length && group.pathLabels?.join(' / ')) || group.label || row.label, formattedValue: formatted })}
                         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleChartPointClick({ rowKey: row.rowKey, colKey: group.key, name: row.label, formattedValue: formatted }); } }}>
                         <rect x={160 + c * 110} y={34 + r * 38} width="106" height="34" rx={CV.heatmap.cellRx} fill={cell?.display < 0 ? CV.heatmap.neg : CV.heatmap.pos} fillOpacity={CV.heatmap.opacityMin + CV.heatmap.opacitySpan * Math.abs(cell?.display || 0) / magnitude} stroke={highlightedRowKey === row.rowKey ? CV.semantic.highlight : 'transparent'} strokeWidth={CV.stroke.highlight} />
-                        {chartSpecConfig.showDataLabels && <text data-value-label="true" x={213 + c * 110} y={(labelPosition === 'insideTop' ? 43 : labelPosition === 'insideBottom' ? 60 : 51) + r * 38} textAnchor="middle" dominantBaseline="central" fontSize={CV.typography.tickHeat} fill={inkFill}>{formatted}</text>}
+                        {chartSpecConfig.showDataLabels && <text data-value-label="true" x={213 + c * 110} y={(labelPosition === 'insideTop' ? 43 : labelPosition === 'insideBottom' ? 60 : 51) + r * 38} textAnchor="middle" dominantBaseline="central" fontSize={CV.typography.tickHeat} fill={chartLabelInk(cell?.display < 0 ? CV.heatmap.neg : CV.heatmap.pos, CV.heatmap.opacityMin + CV.heatmap.opacitySpan * Math.abs(cell?.display || 0) / magnitude, darkMode)}>{formatted}</text>}
                       </g>;
                     })}
                   </g>)}
@@ -959,7 +961,7 @@ export function ChartStudio({
                   >
                     <text x="8" y={y + 24} fontSize={CV.typography.tickFunnel} fill={inkFill}>{formatAxisTickLabel(item.name, 16)}</text>
                     {width > 0 && <polygon points={`${x},${y + 22} ${x + width},${y + 22} ${x + width - Math.min(8, width / 2)},${y + 42} ${x + Math.min(8, width / 2)},${y + 42}`} fill={item.fill} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : 'none'} strokeWidth={CV.stroke.highlight} />}
-                    {chartSpecConfig.showDataLabels && <text data-value-label="true" x={455} y={y + (labelPosition === 'inside' ? 32 : labelPosition === 'bottom' ? 49 : 14)} textAnchor="middle" dominantBaseline="central" fontSize={CV.typography.tickFunnel} fill={labelPosition === 'inside' ? '#1E1F1C' : inkFill}>{item.formattedValue} · {item.conversionFormatted}</text>}
+                    {chartSpecConfig.showDataLabels && <text data-value-label="true" x={455} y={y + (labelPosition === 'inside' ? 32 : labelPosition === 'bottom' ? 49 : 14)} textAnchor="middle" dominantBaseline="central" fontSize={CV.typography.tickFunnel} fill={labelPosition === 'inside' && width > 0 ? chartLabelInk(item.fill) : inkFill}>{item.formattedValue} · {item.conversionFormatted}</text>}
                   </g>
                 );
               })}
@@ -985,11 +987,11 @@ export function ChartStudio({
                     y={unifiedChartSpec.primaryStats.mean}
                     stroke={CV.semantic.mean}
                     strokeDasharray={CV.refDash.avg}
-                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
+                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, darkMode)}
                   />
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
                   <Line isAnimationActive={false}
                     key={sm.key}
@@ -1003,7 +1005,7 @@ export function ChartStudio({
                     activeDot={{ r: CV.dot.active, onClick: (_, payload) => handleChartPointClick({ ...payload?.payload, colKey: sm.colKey }) }}
                   >
                     {chartSpecConfig.showDataLabels && idx === 0 && unifiedChartSpec.items.length <= 24 && (
-                      <LabelList dataKey="_compactPrimaryLabel" position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill }} />
+                      <LabelList dataKey="_compactPrimaryLabel" position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill, stroke: paperFill, strokeWidth: 3, paintOrder: 'stroke', strokeLinejoin: 'round' }} />
                     )}
                   </Line>
                 ))}
@@ -1046,11 +1048,11 @@ export function ChartStudio({
                     y={unifiedChartSpec.primaryStats.mean}
                     stroke={CV.semantic.mean}
                     strokeDasharray={CV.refDash.avg}
-                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
+                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, darkMode)}
                   />
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => (
                   <Area isAnimationActive={false}
                     key={sm.key}
@@ -1063,7 +1065,7 @@ export function ChartStudio({
                     activeDot={{ r: CV.dot.areaActive, onClick: (_, payload) => handleChartPointClick(payload?.payload || payload) }}
                   >
                     {chartSpecConfig.showDataLabels && idx === 0 && unifiedChartSpec.items.length <= 24 && (
-                      <LabelList dataKey={sm.key} position={rectLabelPosition} formatter={(value) => chartType === 'pct_area' ? `${Number(value).toFixed(1)}%` : UnifiedFormatter.formatValue(value, sm.valCfg, {compact:true})} style={{fontSize: CV.typography.dataLabel, fill: inkFill}} />
+                      <LabelList dataKey={sm.key} position={rectLabelPosition} formatter={(value) => chartType === 'pct_area' ? `${Number(value).toFixed(1)}%` : UnifiedFormatter.formatValue(value, sm.valCfg, {compact:true})} style={{fontSize: CV.typography.dataLabel, fill: inkFill, stroke: paperFill, strokeWidth: 3, paintOrder: 'stroke', strokeLinejoin: 'round'}} />
                     )}
                   </Area>
                 ))}
@@ -1087,11 +1089,11 @@ export function ChartStudio({
                     y={unifiedChartSpec.primaryStats.mean}
                     stroke={CV.semantic.mean}
                     strokeDasharray={CV.refDash.avg}
-                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
+                    label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, darkMode)}
                   />
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Bar isAnimationActive={false}
                   yAxisId="left"
                   dataKey={unifiedChartSpec.primarySeriesKey}
@@ -1131,7 +1133,7 @@ export function ChartStudio({
             ) : chartType === 'pie' || chartType === 'donut' ? (
               <PieChart>
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Pie isAnimationActive={false}
                   data={unifiedChartSpec.pieItems}
                   dataKey="value"
@@ -1212,7 +1214,7 @@ export function ChartStudio({
                     />
                   ))}
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="formattedDelta" position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill }} />
+                    <LabelList dataKey="formattedDelta" position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill, stroke: paperFill, strokeWidth: 3, paintOrder: 'stroke', strokeLinejoin: 'round' }} />
                   )}
                 </Bar>
               </BarChart>
@@ -1246,11 +1248,11 @@ export function ChartStudio({
                     stroke={CV.semantic.ols}
                     strokeWidth={CV.stroke.series}
                     strokeDasharray={CV.refDash.ols}
-                    label={{ value: 'OLS 拟合趋势线', position: 'insideTopLeft', fontSize: CV.typography.avgLabel, fill: CV.semantic.ols }}
+                    label={{ value: 'OLS 拟合趋势线', position: 'insideTopLeft', fontSize: CV.typography.avgLabel, fill: inkFill }}
                   />
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Scatter isAnimationActive={false}
                   name={`${unifiedChartSpec.primarySeriesKey} × ${unifiedChartSpec.secondarySeriesKey}`}
                   data={unifiedChartSpec.scatterPoints}
@@ -1267,7 +1269,7 @@ export function ChartStudio({
                     />
                   ))}
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="y" formatter={(value) => UnifiedFormatter.formatValue(value, unifiedChartSpec.secondaryValCfg, {compact:true})} position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill }} />
+                    <LabelList dataKey="y" formatter={(value) => UnifiedFormatter.formatValue(value, unifiedChartSpec.secondaryValCfg, {compact:true})} position={rectLabelPosition} style={{ fontSize: CV.typography.dataLabel, fontWeight: CV.typography.dataLabelWeight, fill: inkFill, stroke: paperFill, strokeWidth: 3, paintOrder: 'stroke', strokeLinejoin: 'round' }} />
                   )}
                 </Scatter>
               </ScatterChart>
@@ -1283,7 +1285,7 @@ export function ChartStudio({
                 <XAxis dataKey="name" tick={{ fontSize: CV.typography.tickCategory, fill: mutedFill }} />
                 <YAxis allowDecimals={false} tick={valueTick} />
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Bar isAnimationActive={false}
                   dataKey="count"
                   name={`${t('频数分布')} (${unifiedChartSpec.primaryValCfg.field} · ${t('点击柱体下钻明细')})`}
@@ -1297,7 +1299,7 @@ export function ChartStudio({
                   }}
                 >
                   {chartSpecConfig.showDataLabels && (
-                    <LabelList dataKey="count" position={rectLabelPosition} formatter={(v) => `${v}笔`} style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill }} />
+                    <LabelList dataKey="count" position={rectLabelPosition} formatter={(v) => `${v}笔`} style={{ fontSize: CV.typography.dataLabel, fontWeight: 700, fill: inkFill, stroke: paperFill, strokeWidth: 3, paintOrder: 'stroke', strokeLinejoin: 'round' }} />
                   )}
                 </Bar>
               </BarChart>
@@ -1352,19 +1354,19 @@ export function ChartStudio({
                       x={unifiedChartSpec.primaryStats.mean}
                       stroke={CV.semantic.mean}
                       strokeDasharray={CV.refDash.avg}
-                      label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
+                      label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, darkMode)}
                     />
                   ) : (
                     <ReferenceLine
                       y={unifiedChartSpec.primaryStats.mean}
                       stroke={CV.semantic.mean}
                       strokeDasharray={CV.refDash.avg}
-                      label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`)}
+                      label={chartAvgLabel(`AVG ${UnifiedFormatter.formatValue(unifiedChartSpec.primaryStats.mean, unifiedChartSpec.primaryValCfg, { compact: true })}`, darkMode)}
                     />
                   )
                 )}
                 <RechartsTooltip content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
-                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} />
+                <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 {unifiedChartSpec.seriesMetaList.map((sm, idx) => {
                   const isStacked = (chartType === 'stacked_bar' || chartType === 'pct_stacked_bar') && (unifiedChartSpec.canStack || chartType === 'pct_stacked_bar');
                   return (
@@ -1385,7 +1387,7 @@ export function ChartStudio({
                       {chartSpecConfig.showDataLabels && (
                         <LabelList
                           dataKey={sm.key}
-                          content={(p) => renderSmartBarLabel({...p, value: chartType === 'pct_stacked_bar' ? `${Number(p.value).toFixed(1)}%` : UnifiedFormatter.formatValue(p.value, sm.valCfg, {compact:true})}, darkMode, chartType === 'horizontal_bar', labelPosition)}
+                          content={(p) => renderSmartBarLabel({...p, value: chartType === 'pct_stacked_bar' ? `${Number(p.value).toFixed(1)}%` : UnifiedFormatter.formatValue(p.value, sm.valCfg, {compact:true})}, darkMode, chartType === 'horizontal_bar', labelPosition, sm.color)}
                         />
                       )}
                     </Bar>

@@ -1,5 +1,6 @@
 import { t } from '../../../i18n.js';
 import React from 'react';
+import { seriesColor } from '../../../constants/chartVisual';
 import { UnifiedFormatter } from '../../../utils/formatters';
 import { cellEvidence } from '../../../utils/resultEvidence.js';
 
@@ -104,7 +105,7 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 truncate">
-              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: payload[0].payload?.fill || payload[0].fill || '#F92672' }} />
+              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: payload[0].payload?.fill || payload[0].fill || seriesColor(0) }} />
               <span className="text-ink-muted truncate">{payload[0].name}:</span>
             </div>
             <span className="apple-font-mono font-semibold">
@@ -144,7 +145,7 @@ export function UnifiedChartTooltip({ active, payload, label, chartSpec, darkMod
               <div key={`tip_${idx}`}>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 truncate">
-                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color || item.fill || '#F92672' }} />
+                  <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color || item.fill || seriesColor(0) }} />
                   <span className="text-ink-muted truncate">{seriesKey}:</span>
                 </div>
                 <span className="apple-font-mono font-semibold">{formatted}</span>
