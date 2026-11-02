@@ -122,6 +122,7 @@ export function formatDimensionValue(rawVal, dimCfg, fieldMeta) {
       if (dimCfg.dateGranularity === 'day') return `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       if (dimCfg.dateGranularity === 'hour') return `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hr).padStart(2, '0')}:00`;
       if (dimCfg.dateGranularity === 'minute') return `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+      if (dimCfg.dateGranularity === 'second') return `${yr}-${String(mo).padStart(2, '0')}-${String(day).padStart(2, '0')} ${String(hr).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
       if (dimCfg.dateGranularity === 'day_of_week') {
         const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
         return weekdays[d.getDay()] || '未知';
@@ -162,6 +163,7 @@ export function getDimDisplayLabel(dimCfg) {
       day: '日',
       hour: '时',
       minute: '分',
+      second: '秒',
       day_of_week: '周几',
     };
     return `${dimCfg.field} (${gMap[dimCfg.dateGranularity] || dimCfg.dateGranularity})`;

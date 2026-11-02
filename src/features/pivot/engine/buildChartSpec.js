@@ -25,10 +25,13 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   const sourceConfig = pivotResult?.analysisConfig;
   const grouped = chartSpecConfig?.groupingMode !== 'detailed';
   const rollup = grouped && (sourceConfig?.rows?.length || 0) > 1 && (sourceConfig?.columns?.length || 0) > 0 && !['histogram','heatmap','combo'].includes(chartType);
+  // Single-series charts have no column-series selector. Use the complete row
+  // aggregate instead of silently choosing the first date/category column.
+  const mergedColumnGroups = (sourceConfig?.rows?.length || 0) > 0 && (sourceConfig?.columns?.length || 0) > 0 && ['pie','donut','funnel','waterfall'].includes(chartType);
   const folded = sourceConfig && [sourceConfig.collapsedRowKeys,sourceConfig.collapsedColKeys].some(keys => Object.values(keys || {}).some(Boolean));
-  if (sourceConfig && (rollup || folded)) {
+  if (sourceConfig && (rollup || folded || mergedColumnGroups)) {
     const records = pivotResult.cellRecordsMap?.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__');
-    if (records) pivotResult = calculatePivot({...dataset,rows:records},{...sourceConfig,rows:rollup ? sourceConfig.rows.slice(0,1) : sourceConfig.rows,filters:[],collapsedRowKeys:{},collapsedColKeys:{},showSubtotals:false});
+    if (records) pivotResult = calculatePivot({...dataset,rows:records},{...sourceConfig,rows:rollup ? sourceConfig.rows.slice(0,1) : sourceConfig.rows,columns:mergedColumnGroups ? [] : sourceConfig.columns,filters:[],collapsedRowKeys:{},collapsedColKeys:{},showSubtotals:false});
   }
   const valConfigs = pivotResult?.valConfigs || [];
   const hasValues = valConfigs.length > 0;
@@ -765,6 +768,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     chartType,
     hasValues: true,
     aggregationBasis: rollup ? getDimDisplayLabel(sourceConfig.rows[0]) : null,
+    mergedColumnGroups,
     isPercentMode,
     isGroupedView: shouldGroupRows,
     groupingDimension: shouldGroupRows ? rowConfigs[0]?.field : null,

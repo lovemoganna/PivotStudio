@@ -2,7 +2,7 @@ import { t } from '../../../../i18n.js';
 import React from 'react';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { X } from 'lucide-react';
-import { DATE_GRANULARITIES } from '../../../../constants/pivotConstants';
+import { DATE_GRANULARITIES, DEFAULT_DATE_GRANULARITY } from '../../../../constants/pivotConstants';
 
 export function BinModal({
   activeBinModal,
@@ -38,10 +38,12 @@ export function BinModal({
           {activeBinModal.fieldType === 'date' ? (
             <div className="space-y-2">
               <label className="block text-[11px] text-ink-muted apple-font-mono">{t("选择日期聚合粒度:")}</label>
+              <p className="text-[11px] leading-5 text-ink-muted">{t('默认保留原始日期与时间。选择时间粒度后才合并统计；小时、分钟和秒分组都保留完整日期。')}</p>
               <div className="grid grid-cols-2 gap-2">
                 {DATE_GRANULARITIES.map((g) => (
                   <button
                     key={g.value}
+                    aria-pressed={(activeBinModal.item.dateGranularity || DEFAULT_DATE_GRANULARITY) === g.value}
                     onClick={() => {
                       soundEngine?.playClick(580);
                       setPivotConfig((prev) => ({
@@ -55,7 +57,7 @@ export function BinModal({
                       onClose();
                       showToast?.(`已将「${activeBinModal.item.field}」设为 ${g.label}`);
                     }}
-                    className={`px-3 py-2 rounded-lg border text-left apple-font-mono text-[11px] font-semibold transition ${activeBinModal.item.dateGranularity === g.value ? 'bg-[#66D9EF]/20 border-[#66D9EF] text-ink-cyan' : 'bg-[#EFECE1]/50 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32]'}`}
+                    className={`px-3 py-2 rounded-lg border text-left apple-font-mono text-[11px] font-semibold transition ${(activeBinModal.item.dateGranularity || DEFAULT_DATE_GRANULARITY) === g.value ? 'bg-[#66D9EF]/20 border-[#66D9EF] text-ink-cyan' : 'bg-[#EFECE1]/50 dark:bg-[#1E1F1C] border-[#D6D4C8] dark:border-[#3E3D32]'}`}
                   >
                     {t(g.label)}
                   </button>

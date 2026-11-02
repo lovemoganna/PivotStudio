@@ -45,8 +45,9 @@ export const SHOW_AS_MODES = [
   { value: 'running_total', label: '时序累计求和 (Running Total)' },
 ];
 
+export const DEFAULT_DATE_GRANULARITY = 'raw';
 export const DATE_GRANULARITIES = [
-  { value: 'raw', label: '原始日期 (Raw)' },
+  { value: 'raw', label: '原始日期与时间 (Raw)' },
   { value: 'year', label: '按年 (Year)' },
   { value: 'quarter', label: '按季度 (Quarter)' },
   { value: 'month', label: '按月 (Month)' },
@@ -54,6 +55,7 @@ export const DATE_GRANULARITIES = [
   { value: 'day', label: '按日 (Day)' },
   { value: 'hour', label: '按小时 (Hour)' },
   { value: 'minute', label: '按分钟 (Minute)' },
+  { value: 'second', label: '按秒 (Second)' },
   { value: 'day_of_week', label: '按星期几 (Day of Week)' },
 ];
 
@@ -407,7 +409,7 @@ export function buildDefaultPivotConfig(dataset) {
       id: `c_init_1`,
       field: dateFields[0].name,
       sort: 'asc',
-      dateGranularity: 'year',
+      dateGranularity: DEFAULT_DATE_GRANULARITY,
       excludedValues: [],
     });
   }
@@ -497,7 +499,7 @@ export function generateDynamicKeynoteShots(dataset) {
   const hasDateCol = dates.length > 0;
   const colDimName = hasDateCol ? dateDim : (dim2 !== dim1 ? dim2 : null);
   const colDimConfig = colDimName
-    ? [{ id: 'c_k1', field: colDimName, sort: hasDateCol ? 'asc' : 'none', dateGranularity: hasDateCol ? 'year' : 'raw', excludedValues: [] }]
+    ? [{ id: 'c_k1', field: colDimName, sort: hasDateCol ? 'asc' : 'none', dateGranularity: DEFAULT_DATE_GRANULARITY, excludedValues: [] }]
     : [];
 
   return [

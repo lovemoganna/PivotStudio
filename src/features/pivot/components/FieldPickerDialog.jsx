@@ -3,7 +3,7 @@ import {Search, X} from 'lucide-react';
 import {t} from '../../../i18n.js';
 import {useDialogFocus} from '../../../utils/useDialogFocus';
 import {getMeasureDefaults} from '../../../utils/fieldSemantics.js';
-import {AGG_METHODS} from '../../../constants/pivotConstants';
+import {AGG_METHODS,DATE_GRANULARITIES,DEFAULT_DATE_GRANULARITY} from '../../../constants/pivotConstants';
 import {aggregationChoiceLabel, aggregationChoiceDescription} from '../../../utils/aggregationChoice.js';
 
 /** A destination-first alternative to switching palettes or dragging a field. */
@@ -20,7 +20,7 @@ export function FieldPickerDialog({zone, label, fields, items, customMetrics = [
     ...(fields || []).map(field => {
       const used = items.filter(item => item.field === field.name);
       const isDateGroup = field.type === 'date' && ['rows','columns'].includes(zone);
-      const disabled = zone !== 'values' && (isDateGroup ? ['year','quarter','month','day','raw'].every(gran=>used.some(item=>item.dateGranularity===gran)) : used.length > 0);
+      const disabled = zone !== 'values' && (isDateGroup ? DATE_GRANULARITIES.every(g=>used.some(item=>(item.dateGranularity || DEFAULT_DATE_GRANULARITY)===g.value)) : used.length > 0);
       return {key:`field:${field.name}`, name:field.name, field:field.name, disabled, meta:field,
         kind:zone === 'values' ? t(AGG_METHODS.find(method=>method.value===getMeasureDefaults(field).agg)?.short || '计数') : t(field.type === 'date' ? '日期' : field.type === 'number' ? '数值' : '文本')};
     }),

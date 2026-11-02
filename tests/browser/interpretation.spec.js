@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import {encodeView} from '../../src/utils/viewConfig.js';
+import {RETAIL_TEST_DATASET} from '../../src/constants/pivotConstants.js';
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 const negativeGeometry=chart=>chart.evaluate(el=>{
  const bar=el.querySelectorAll('.recharts-bar-rectangle')[1].getBoundingClientRect();
@@ -105,8 +106,12 @@ test('interpretation: chart studio guide & notes, donut highlight value, and len
  const chart=page.locator('#pivot-chart-container');
  await expect(chart).not.toContainText('TOTAL_SUM');
  // Leaf-row highlight (e.g. 华东/上海) maps to its pie-slice ancestor (华东), not the grand total.
- await expect(chart).toContainText('301.1K');
- await expect(chart).toContainText('25.1%');
+ // The slice includes all date columns; the first calendar bucket is not a scope filter.
+ const regionTotal=RETAIL_TEST_DATASET.rows.filter(row=>row.销售大区==='华东').reduce((sum,row)=>sum+row.销售额,0);
+ const overall=RETAIL_TEST_DATASET.rows.reduce((sum,row)=>sum+row.销售额,0);
+ await expect(chart).toContainText((regionTotal/1000).toFixed(1)+'K');
+ await expect(chart).toContainText((regionTotal/overall*100).toFixed(1)+'%');
+ await expect(page.getByTestId('chart-column-basis')).toContainText('合并全部列分组');
  await expect(chart).not.toContainText('图中合计');
  // Switch to chart-only mode: reading tips stay collapsed so the chart stays primary
  await page.getByRole('button',{name:'仅图表',exact:true}).click();

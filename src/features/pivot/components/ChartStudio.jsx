@@ -16,6 +16,7 @@ import {
   KEYNOTE_STORYBOARD_SHOTS,
   CHART_METHOD_GUIDES,
   AGG_METHODS,
+  DEFAULT_DATE_GRANULARITY,
 } from '../../../constants/pivotConstants';
 import {
   CV,
@@ -282,12 +283,11 @@ export function ChartStudio({
     }`;
 
   const makeDimItem = (fieldName) => {
-    const fMeta = (currentDataset?.fields || []).find((f) => f.name === fieldName);
     return {
       id: `d_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       field: fieldName,
       sort: 'none',
-      dateGranularity: fMeta?.type === 'date' ? 'year' : 'raw',
+      dateGranularity: DEFAULT_DATE_GRANULARITY,
       excludedValues: [],
     };
   };
@@ -804,6 +804,7 @@ export function ChartStudio({
       </div>
 
       {/* Disclaimers & Context Warnings */}
+      {unifiedChartSpec.mergedColumnGroups && <p data-testid="chart-column-basis" className="text-xs leading-5 mb-2 text-ink-muted [overflow-wrap:anywhere]">{t('合并全部列分组，按所选指标的行总计绘图；筛选条件仍然生效。')}</p>}
       {unifiedChartSpec.aggregationBasis && <p data-testid="aggregation-basis" className="text-xs leading-5 mb-2 text-ink-muted [overflow-wrap:anywhere]">{t('图表按以下维度从原始记录重新聚合：')}{unifiedChartSpec.aggregationBasis}{t('；表格展开或折叠不会改变图表统计口径。')}</p>}
       {chartType === 'line' && unifiedChartSpec.derivedIssue && <p role="status" data-testid="derived-guidance" className="text-xs leading-5 mb-2 text-ink-orange">{t(unifiedChartSpec.derivedIssue)}</p>}
       {chartType === 'line' && unifiedChartSpec.temporalBasis && <p data-testid="temporal-basis" className="text-xs leading-5 mb-2 text-ink-muted">{t('按时间升序计算。环比 =（本期 − 前期）÷ |前期|；首期、缺期、无有效数值或前期为 0 时不显示。3 期均线为连续 3 个周期聚合值的等权平均。')}{unifiedChartSpec.hasPeriodGaps && t('当前存在缺期，未跨缺期计算。')}</p>}

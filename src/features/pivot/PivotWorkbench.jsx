@@ -2,6 +2,8 @@ import { t, getLocale, setLocale } from '../../i18n.js';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   AGG_METHODS,
+  DATE_GRANULARITIES,
+  DEFAULT_DATE_GRANULARITY,
   RETAIL_TEST_DATASET,
   KEYNOTE_STORYBOARD_SHOTS,
   generateDynamicKeynoteShots,
@@ -784,8 +786,8 @@ export default function PivotWorkbench() {
 
       if (zone !== 'values' && list.some((it) => it.field === fieldName)) {
         if ((zone === 'rows' || zone === 'columns') && fMeta?.type === 'date') {
-          const usedGrans = new Set(list.filter((it) => it.field === fieldName).map((it) => it.dateGranularity));
-          const nextGranOrder = ['year', 'quarter', 'month', 'day', 'raw'];
+          const usedGrans = new Set(list.filter((it) => it.field === fieldName).map((it) => it.dateGranularity || DEFAULT_DATE_GRANULARITY));
+          const nextGranOrder = DATE_GRANULARITIES.map(g => g.value);
           const nextGran = nextGranOrder.find((g) => !usedGrans.has(g));
           if (!nextGran) {
             showToast(`「${fieldName}」的所有日期粒度均已添加`, 'error');
@@ -830,7 +832,7 @@ export default function PivotWorkbench() {
         ...prev,
         [zone]: [
           ...list,
-          { id, field: fieldName, sort: 'none', dateGranularity: fMeta?.type === 'date' ? 'year' : 'raw', excludedValues: [] },
+          { id, field: fieldName, sort: 'none', dateGranularity: DEFAULT_DATE_GRANULARITY, excludedValues: [] },
         ],
         collapsedRowKeys: {},
         collapsedColKeys: {},
