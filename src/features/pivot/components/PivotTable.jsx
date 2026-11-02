@@ -5,11 +5,11 @@ import {
   RotateCcw, Columns, Rows, AlignCenter, AlignLeft, AlignRight, Copy, Check,
   Maximize2, Minimize2, Filter, Palette, GripVertical, X, Info, ChevronDown
 } from 'lucide-react';
-import { AGG_METHODS, SHOW_AS_MODES, buildDefaultPivotConfig } from '../../../constants/pivotConstants';
+import { buildDefaultPivotConfig } from '../../../constants/pivotConstants';
 import { decodeGroupPath } from '../../../utils/groupKeys.js';
 import { getColorScaleStyle, formatCellNumber, getDimDisplayLabel } from '../../../utils/formatters';
 import { calculateAutoFitColumnWidths, calculateSingleColumnAutoFit } from '../../../utils/tableAutoFit';
-import { buildResultQuestion, buildTotalReading } from '../../../utils/analysisReading.js';
+import { buildResultQuestion, buildTotalReading, describeAnalysisMeasure } from '../../../utils/analysisReading.js';
 import { cellEvidence, sampleEvidence } from '../../../utils/resultEvidence.js';
 
 export function PivotTable({
@@ -1173,7 +1173,6 @@ export function PivotTable({
               {/* Value Metric Headers - Centered by default matching data */}
               {pivotResult.allColGroups.map((cGroup) =>
                 pivotResult.valConfigs.map((vCfg) => {
-                  const aggShort = AGG_METHODS.find((m) => m.value === vCfg.agg)?.short || vCfg.agg;
                   const isSortedCol = pivotConfig.valueSort?.colKey === cGroup.key && pivotConfig.valueSort?.valueId === vCfg.id && pivotConfig.valueSort?.direction !== 'none';
                   const isColAxisHovered = hoveredCellTelemetry?.colKey === cGroup.key && hoveredCellTelemetry?.valId === vCfg.id;
                   const valColKey = `${cGroup.key}_${vCfg.id}`;
@@ -1207,7 +1206,7 @@ export function PivotTable({
                       }`}
                     >
                       <span className={`inline-flex items-center gap-1 ${dataFlexAlignCls} w-full`}>
-                        <span className="truncate">{vCfg.field === '__COUNT__' ? t('记录数') : vCfg.field} ({aggShort})</span>
+                        <span className="truncate" title={describeAnalysisMeasure(vCfg)}>{describeAnalysisMeasure(vCfg)}</span>
                         {isSortedCol && (
                           pivotConfig.valueSort.direction === 'asc' ? (
                             <ArrowUp className="w-3 h-3 text-ink-green shrink-0" />

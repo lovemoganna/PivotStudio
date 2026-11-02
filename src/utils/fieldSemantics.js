@@ -3,6 +3,7 @@ export function isIdentifierField(name) {
   return /(?:^|[_\s-])(?:id|uuid|guid|code|no|number)$/i.test(name)
     || /(?:ID|Id|Code|No|Number)$/.test(name)
     || /(?:customer|invoice|order|stock|product|transaction|account)(?:id|no|code|number)$/i.test(name)
+    || /[\u4e00-\u9fff](?:id|uuid|guid)$/i.test(name)
     || /编号|代码|工号|序号/.test(name);
 }
 

@@ -61,7 +61,13 @@ for(const width of [360,768,1440])test(`count tasks: manual selection, missing/d
   await expect(totals(page)).toHaveText(['4 笔','2 笔','2 笔']);
   await page.getByRole('button',{name:'撤销',exact:true}).press('Enter');await ready(page);
   await expect(totals(page)).toHaveText(['4 笔','3 笔','2 笔']);
-  await expect(page.locator('#pivot-chart-container .recharts-label-list text')).toHaveText(['4 笔','3 笔','2 笔']);
+  // Ordinary charts now follow the selected measure instead of drawing every
+  // table metric. Check all three definitions explicitly, retaining each oracle.
+  await page.getByRole('button',{name:/调整图表字段:/}).click();
+  for(const [label,expected] of [['记录数','4 笔'],['Token（有效值计数）','3 笔'],['Token（去重计数）','2 笔']]) {
+    await page.getByLabel('值字段',{exact:true}).selectOption({label});await ready(page);
+    await expect(page.locator('#pivot-chart-container .recharts-label-list text')).toHaveText([expected]);
+  }
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
   await page.screenshot({path:info.outputPath(`count-task-${width}.png`),fullPage:true});

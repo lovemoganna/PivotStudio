@@ -7,6 +7,7 @@ import { decodeGroupPath, encodeGroupSegment } from '../../../utils/groupKeys.js
 import { computeAggregation, calculatePivot } from './calculatePivot.js';
 import { buildHistogramBins } from './histogram.js';
 import { periodIndex, temporalAxisIssue } from '../../../utils/temporalAnalysis.js';
+import { describeAnalysisMeasure } from '../../../utils/analysisReading.js';
 
 function summarizeValues(values) {
   const total = values.reduce((sum, value) => sum + value, 0);
@@ -41,7 +42,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     format: { thousands: true, decimals: 0, currency: '', isPercent: false },
   };
   // If only 1 metric is configured, search dataset for a distinct 2nd numeric field for scatter/dual-axis correlation
-  let secondaryValCfg = valConfigs.find((v) => v.id === chartSpecConfig?.secondaryValueId) || valConfigs[1];
+  let secondaryValCfg = valConfigs.find((v) => v.id === chartSpecConfig?.secondaryValueId && v.id !== primaryValCfg.id) || valConfigs.find(v => v.id !== primaryValCfg.id);
   if (!secondaryValCfg) {
     const candidateField = dataset?.fields?.find((f) => isMeasureField(f) && f.name !== primaryValCfg.field);
     if (candidateField) {
@@ -60,7 +61,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   const colConfigs = pivotResult?.colConfigs || [];
   const groupingMode = chartSpecConfig?.groupingMode || 'grouped';
   const dataRows = (pivotResult?.tableRows || []).filter((r) => !r.isTotal && !r.isSubtotal);
-  const shouldGroupRows = !['histogram', 'heatmap'].includes(chartType)
+  const shouldGroupRows = !['histogram', 'heatmap', 'combo', 'scatter'].includes(chartType)
     && groupingMode !== 'detailed'
     && rowConfigs.length >= 2
     && dataRows.length > 0;
@@ -149,6 +150,22 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   // 2. Build Series Metadata & Items
   const hasColGroups = chartType !== 'histogram' && pivotResult.leafColGroups && pivotResult.leafColGroups.length > 0;
   const seriesMetaList = [];
+  // Ordinary charts answer the selected measure's question. Stacked charts retain
+  // explicit multi-measure comparison; combo/scatter bind the selected pair.
+  const metricValues = ['combo', 'scatter'].includes(chartType)
+    ? [primaryValCfg, ...valConfigs.filter(v => v.id === secondaryValCfg.id && v.id !== primaryValCfg.id)]
+    : ['stacked_bar', 'stacked_area', 'pct_stacked_bar', 'pct_area'].includes(chartType)
+      ? [primaryValCfg, ...valConfigs.filter(v => v.id !== primaryValCfg.id)]
+      : [primaryValCfg];
+  const addMetricSeries = (vc, idx) => seriesMetaList.push({
+    key: `metric:${vc.id}`,
+    label: describeAnalysisMeasure(vc),
+    colKey: '__GRAND_TOTAL_COL__',
+    valCfg: vc,
+    color: CHART_COLORS[idx % CHART_COLORS.length],
+    gradId: `appleGrad_${idx % CHART_COLORS.length}`,
+    yAxisId: idx === 0 ? 'left' : 'right',
+  });
 
   if (shouldGroupRows && (!hasColGroups || chartType === 'combo')) {
     // Multi-row dimensions without column dimension: group by 1st row dim, cluster by 2nd row dim
@@ -176,20 +193,9 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
         });
       });
     } else {
-      valConfigs.forEach((vc, idx) => {
-        const aggShort = AGG_METHODS.find((m) => m.value === vc.agg)?.short || vc.agg;
-        const sKey = `${vc.field === '__COUNT__' ? '记录数' : vc.field}(${aggShort})`;
-        seriesMetaList.push({
-          key: sKey,
-          colKey: '__GRAND_TOTAL_COL__',
-          valCfg: vc,
-          color: CHART_COLORS[idx % CHART_COLORS.length],
-          gradId: `appleGrad_${idx % CHART_COLORS.length}`,
-          yAxisId: idx === 0 ? 'left' : 'right',
-        });
-      });
+      metricValues.forEach(addMetricSeries);
     }
-  } else if (hasColGroups && chartType !== 'combo' && dataRows.length > 0) {
+  } else if (hasColGroups && !['combo', 'scatter'].includes(chartType) && dataRows.length > 0) {
     pivotResult.leafColGroups.forEach((cg, idx) => {
       const sKey = cg.pathLabels.join(' / ');
       seriesMetaList.push({
@@ -202,18 +208,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       });
     });
   } else {
-    valConfigs.forEach((vc, idx) => {
-      const aggShort = AGG_METHODS.find((m) => m.value === vc.agg)?.short || vc.agg;
-      const sKey = `${vc.field === '__COUNT__' ? '记录数' : vc.field}(${aggShort})`;
-      seriesMetaList.push({
-        key: sKey,
-        colKey: '__GRAND_TOTAL_COL__',
-        valCfg: vc,
-        color: CHART_COLORS[idx % CHART_COLORS.length],
-        gradId: `appleGrad_${idx % CHART_COLORS.length}`,
-        yAxisId: idx === 0 ? 'left' : 'right',
-      });
-    });
+    metricValues.forEach(addMetricSeries);
   }
 
   if (seriesMetaList.length === 0) {
@@ -763,7 +758,7 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
     min: primaryValues.length > 0 ? Math.min(...primaryValues) : 0,
   };
   const canStack = hasColGroups || (valConfigs.length > 1 && valConfigs.every((v) => UnifiedFormatter.inferUnit(v) === UnifiedFormatter.inferUnit(valConfigs[0])));
-  const hasDualAxis = !hasColGroups && valConfigs.length > 1;
+  const hasDualAxis = chartType === 'combo' && seriesMetaList.length > 1;
   const isPrimaryAdditive = isAdditive(primaryValCfg) && !primaryHasNegative;
 
   return {

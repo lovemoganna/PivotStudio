@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { Palette, X, AlignCenter, AlignLeft, AlignRight, Rows, Table, Calculator, Plus, Trash2, Sparkles, HelpCircle } from 'lucide-react';
 import { SHOW_AS_MODES } from '../../../../constants/pivotConstants';
+import {metricUnitInput,withMetricUnit} from '../../../../utils/formatters.js';
 
 const COLOR_SCALE_PREVIEWS = {
   none: 'bg-transparent border border-dashed border-[#D6D4C8] dark:border-[#49483E]',
@@ -494,13 +495,13 @@ export function FormatModal({
                         type="text"
                         placeholder={t("单位(如¥,ms,MB)")}
                         aria-label={`${vItem.field} · ${t("单位/符号")}`}
-                        value={vItem.format?.currency ?? ''}
+                        value={metricUnitInput(vItem)}
                         onChange={(e) => {
                           const cur = e.target.value;
                           setPivotConfig((prev) => ({
                             ...prev,
                             values: prev.values.map((v) =>
-                              v.id === vItem.id ? { ...v, format: { ...v.format, currency: cur } } : v
+                              v.id === vItem.id ? withMetricUnit(v,cur) : v
                             ),
                           }));
                         }}
@@ -520,9 +521,7 @@ export function FormatModal({
                         }}
                         className="px-1.5 py-1 rounded bg-[#FFFDF7] dark:bg-[#272822] border border-[#D6D4C8] dark:border-[#49483E] text-[10px]"
                       >
-                        <option value={0}>{t("0位小数")}</option>
-                        <option value={1}>{t("1位小数")}</option>
-                        <option value={2}>{t("2位小数")}</option>
+                        {Array.from({length:13},(_,places)=><option key={places} value={places}>{places}{t('位小数')}</option>)}
                       </select>
                     </div>
                   </div>

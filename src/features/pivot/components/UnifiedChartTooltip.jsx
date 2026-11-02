@@ -3,6 +3,7 @@ import React from 'react';
 import { seriesColor } from '../../../constants/chartVisual';
 import { UnifiedFormatter } from '../../../utils/formatters';
 import { cellEvidence } from '../../../utils/resultEvidence.js';
+import { describeAnalysisMeasure } from '../../../utils/analysisReading.js';
 
 export function UnifiedChartTooltip({ active, payload, label, viewBox, chartSpec, darkMode, clickLinkMode = 'drill' }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -48,13 +49,13 @@ export function UnifiedChartTooltip({ active, payload, label, viewBox, chartSpec
       {chartType === 'scatter' && rawPoint ? (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-4">
-            <span className="min-w-0 text-ink-muted [overflow-wrap:anywhere]">{chartSpec?.primarySeriesKey} [X]:</span>
+            <span className="min-w-0 text-ink-muted [overflow-wrap:anywhere]">{describeAnalysisMeasure(primaryValCfg)} [X]:</span>
             <span className="apple-font-mono font-semibold text-ink-cyan">
               {UnifiedFormatter.formatValue(rawPoint.x, primaryValCfg, { compact: false })}
             </span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="min-w-0 text-ink-muted [overflow-wrap:anywhere]">{chartSpec?.secondarySeriesKey} [Y]:</span>
+            <span className="min-w-0 text-ink-muted [overflow-wrap:anywhere]">{describeAnalysisMeasure(secondaryValCfg)} [Y]:</span>
             <span className="apple-font-mono font-semibold text-ink-green">
               {UnifiedFormatter.formatValue(rawPoint.y, secondaryValCfg, { compact: false })}
             </span>
@@ -150,7 +151,7 @@ export function UnifiedChartTooltip({ active, payload, label, viewBox, chartSpec
                 </div>
                 <span className="apple-font-mono font-semibold shrink-0">{formatted}</span>
               </div>
-              {rawPoint?._seriesEvidence?.[seriesKey] && <p className="text-[10px] leading-4 mt-0.5 text-ink-muted [overflow-wrap:anywhere]">{cellEvidence(rawPoint._seriesEvidence[seriesKey])}</p>}
+              {rawPoint?._seriesEvidence?.[item.dataKey] && <p className="text-[10px] leading-4 mt-0.5 text-ink-muted [overflow-wrap:anywhere]">{cellEvidence(rawPoint._seriesEvidence[item.dataKey])}</p>}
               </div>
             );
           })}

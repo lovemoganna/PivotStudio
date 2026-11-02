@@ -15,6 +15,7 @@ import {
   VISUAL_CHART_TYPES,
   KEYNOTE_STORYBOARD_SHOTS,
   CHART_METHOD_GUIDES,
+  AGG_METHODS,
 } from '../../../constants/pivotConstants';
 import {
   CV,
@@ -34,11 +35,12 @@ import {
 } from '../../../constants/chartVisual';
 import { UnifiedFormatter, formatAxisTickLabel, formatCellNumber } from '../../../utils/formatters';
 import { isMeasureField, isIdentifierField, getMeasureDefaults } from '../../../utils/fieldSemantics';
-import { buildResultQuestion, buildTotalReading, resolveChartNote } from '../../../utils/analysisReading.js';
+import { buildResultQuestion, buildTotalReading, resolveChartNote, describeAnalysisMeasure } from '../../../utils/analysisReading.js';
 import { UnifiedChartTooltip } from './UnifiedChartTooltip';
 import { renderSmartPieLabel, renderSmartBarLabel } from './SmartChartLabels';
 import { getLabelPositions, resolveLabelPosition } from '../../../utils/chartLabels.js';
 import { StoryShotDialog } from './modals/StoryShotDialog';
+import {aggregationChoiceLabel} from '../../../utils/aggregationChoice.js';
 
 export function ChartStudio({
   chartType,
@@ -236,7 +238,8 @@ export function ChartStudio({
   }, [candidateMeasureFields, pivotResult?.valConfigs]);
 
   const candidateDimensionFields = React.useMemo(
-    () => (currentDataset?.fields || []).filter((f) => f.role === 'dimension' || (!isMeasureField(f) && f.name !== '__COUNT__')),
+    // Recommendations may rank fields; explicit analysis must not exclude numeric dimensions.
+    () => currentDataset?.fields || [],
     [currentDataset]
   );
 
@@ -252,6 +255,12 @@ export function ChartStudio({
     const byId = configValues.find((v) => v.id === chartSpecConfig.primaryValueId);
     return byId?.field || configValues[0]?.field || '';
   })();
+  const primaryValue = configValues.find(v=>v.id===chartSpecConfig.primaryValueId) || configValues[0];
+  const encodingAggLabel=metric=>metric.isCalculated ? t('公式') : (aggregationChoiceLabel(metric.agg,metric.field) || t(AGG_METHODS.find(method=>method.value===metric.agg)?.short || metric.agg));
+  // A missing first category/series must not hide valid observations in other series.
+  const hasChartValues = ['pie','donut','funnel','waterfall','scatter'].includes(chartType)
+    ? unifiedChartSpec.primaryStats.validCount > 0
+    : unifiedChartSpec.items.some(item=>unifiedChartSpec.seriesMetaList.some(series=>Number.isFinite(item._rawSeriesValues?.[series.key])));
 
   const preferCompactEncoding = viewMode === 'split';
   const encodingIncomplete = !primaryRowField || !primaryValueField;
@@ -321,7 +330,7 @@ export function ChartStudio({
   const handleSetValueField = (fieldName) => {
     if (isReadOnly || !fieldName) return;
     soundEngine?.playClick?.(520);
-    const existing = configValues.find((v) => v.field === fieldName);
+    const existing = configValues.find((v) => `metric:${v.id}` === fieldName) || configValues.find((v) => v.field === fieldName);
     if (existing) {
       setChartSpecConfig((p) => ({ ...p, primaryValueId: existing.id }));
       return;
@@ -485,23 +494,23 @@ export function ChartStudio({
               <select
                 aria-label={t('值字段')}
                 disabled={isReadOnly}
-                value={primaryValueField}
+                value={primaryValue ? `metric:${primaryValue.id}` : ''}
                 onChange={(e) => handleSetValueField(e.target.value)}
                 className={fieldSelectClass}
                 title={primaryValueField || t('选择字段')}
               >
                 {!primaryValueField && <option value="" className={optionClass}>{t('选择字段')}</option>}
-                {candidateMeasureFields.map((f) => (
-                  <option key={f.name} value={f.name} className={optionClass}>{f.name}</option>
-                ))}
-                {!candidateMeasureFields.some((f) => f.name === '__COUNT__') && (
+                {configValues.length > 0 && <optgroup label={t('已配置指标')}>
+                  {configValues.map(metric=><option key={metric.id} value={`metric:${metric.id}`} className={optionClass}>
+                    {describeAnalysisMeasure(metric)}
+                  </option>)}
+                </optgroup>}
+                <optgroup label={t('源字段')}>
+                  {(currentDataset?.fields || []).map(field=><option key={field.name} value={field.name} className={optionClass}>
+                    {field.name}（{encodingAggLabel(getMeasureDefaults(field))}）
+                  </option>)}
                   <option value="__COUNT__" className={optionClass}>{t('记录数')}</option>
-                )}
-                {primaryValueField
-                  && primaryValueField !== '__COUNT__'
-                  && !candidateMeasureFields.some((f) => f.name === primaryValueField) && (
-                  <option value={primaryValueField} className={optionClass}>{primaryValueField}</option>
-                )}
+                </optgroup>
               </select>
             </label>
 
@@ -677,12 +686,12 @@ export function ChartStudio({
                       <label className="block text-[10px] text-ink-muted mb-1">{t("主指标绑定:")}</label>
                       <select
                         aria-label={t("主指标绑定:")}
-                        value={chartSpecConfig.primaryValueId || pivotResult.valConfigs[0]?.id || ''}
+                        value={unifiedChartSpec.primaryValCfg.id}
                         onChange={(e) => setChartSpecConfig((p) => ({ ...p, primaryValueId: e.target.value }))}
                         className={optSelectClass}
                       >
                         {pivotResult.valConfigs.map((vc) => (
-                          <option key={vc.id} value={vc.id} className={optionClass}>{vc.field} ({vc.agg})</option>
+                          <option key={vc.id} value={vc.id} className={optionClass}>{describeAnalysisMeasure(vc)}</option>
                         ))}
                       </select>
                     </div>
@@ -690,12 +699,12 @@ export function ChartStudio({
                       <label className="block text-[10px] text-ink-muted mb-1">{t("次轴/Y轴指标:")}</label>
                       <select
                         aria-label={t("次轴/Y轴指标:")}
-                        value={chartSpecConfig.secondaryValueId || pivotResult.valConfigs[1]?.id || ''}
+                        value={unifiedChartSpec.secondaryValCfg.id}
                         onChange={(e) => setChartSpecConfig((p) => ({ ...p, secondaryValueId: e.target.value }))}
                         className={optSelectClass}
                       >
                         {pivotResult.valConfigs.map((vc) => (
-                          <option key={vc.id} value={vc.id} className={optionClass}>{vc.field} ({vc.agg})</option>
+                          <option key={vc.id} value={vc.id} disabled={vc.id === unifiedChartSpec.primaryValCfg.id} className={optionClass}>{describeAnalysisMeasure(vc)}</option>
                         ))}
                       </select>
                     </div>
@@ -894,7 +903,7 @@ export function ChartStudio({
               )}
             </div>
           </div>
-        ) : unifiedChartSpec.items.length === 0 || (chartType === 'histogram' ? (!unifiedChartSpec.histogramItems.length || unifiedChartSpec.histogramSummary?.valid === 0) : unifiedChartSpec.primaryStats.validCount === 0) ? (
+        ) : unifiedChartSpec.items.length === 0 || (chartType === 'histogram' ? (!unifiedChartSpec.histogramItems.length || unifiedChartSpec.histogramSummary?.valid === 0) : !hasChartValues) ? (
           <div className="text-center text-sm text-ink-muted py-12 px-4">{t('当前没有可展示的有效数值。请检查筛选条件、字段类型和计算依据。')}</div>
         ) : chartType === 'heatmap' ? (
           <div className="w-full h-full overflow-auto">
@@ -1002,6 +1011,7 @@ export function ChartStudio({
                     connectNulls={chartSpecConfig.missingValueMode !== 'connect'}
                     type="monotone"
                     dataKey={sm.key}
+                    name={sm.label || sm.key}
                     stroke={sm.color}
                     strokeWidth={CV.stroke.series}
                     dot={({ cx, cy, payload }) => <circle cx={cx} cy={cy} r={highlightedRowKey === payload?.rowKey ? CV.dot.highlight : CV.dot.base} fill={highlightedRowKey === payload?.rowKey ? CV.semantic.highlight : sm.color} data-highlighted={highlightedRowKey === payload?.rowKey} onClick={() => handleChartPointClick({ ...payload, colKey: sm.colKey })} />}
@@ -1061,6 +1071,7 @@ export function ChartStudio({
                     key={sm.key}
                     type="monotone"
                     dataKey={sm.key}
+                    name={sm.label || sm.key}
                     stackId={chartType === 'area' || (!unifiedChartSpec.canStack && chartType !== 'pct_area') ? undefined : 'stack_1'}
                     stroke={sm.color}
                     strokeWidth={CV.stroke.series}
@@ -1100,7 +1111,7 @@ export function ChartStudio({
                 <Bar isAnimationActive={false}
                   yAxisId="left"
                   dataKey={unifiedChartSpec.primarySeriesKey}
-                  name={`${unifiedChartSpec.primarySeriesKey} [左轴]`}
+                  name={`${describeAnalysisMeasure(unifiedChartSpec.primaryValCfg)} [左轴]`}
                   fill={seriesColor(0)}
                   radius={CV.radius.bar}
                   cursor="pointer"
@@ -1125,7 +1136,7 @@ export function ChartStudio({
                     yAxisId="right"
                     type="monotone"
                     dataKey={unifiedChartSpec.secondarySeriesKey}
-                    name={`${unifiedChartSpec.secondarySeriesKey} [右轴]`}
+                    name={`${describeAnalysisMeasure(unifiedChartSpec.secondaryValCfg)} [右轴]`}
                     stroke={seriesColor(1)}
                     strokeWidth={CV.stroke.series}
                     dot={{ r: CV.dot.base, fill: seriesColor(1), style: { pointerEvents: 'none' } }}
@@ -1227,14 +1238,14 @@ export function ChartStudio({
                 <XAxis
                   type="number"
                   dataKey="x"
-                  name={unifiedChartSpec.primarySeriesKey}
+                  name={describeAnalysisMeasure(unifiedChartSpec.primaryValCfg)}
                   tick={valueTick}
                   allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })}
                 />
                 <YAxis
                   type="number"
                   dataKey="y"
-                  name={unifiedChartSpec.secondarySeriesKey}
+                  name={describeAnalysisMeasure(unifiedChartSpec.secondaryValCfg)}
                   tick={valueTick}
                   tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.secondaryValCfg, { compact: true })}
                 />
@@ -1257,7 +1268,7 @@ export function ChartStudio({
                 <RechartsTooltip isAnimationActive={false} cursor={hoverCursor} content={<UnifiedChartTooltip chartSpec={unifiedChartSpec} darkMode={darkMode} clickLinkMode={chartSpecConfig.clickLinkMode} />} />
                 <Legend verticalAlign="bottom" align="center" wrapperStyle={legendStyle} formatter={renderLegendText} />
                 <Scatter isAnimationActive={false}
-                  name={`${unifiedChartSpec.primarySeriesKey} × ${unifiedChartSpec.secondarySeriesKey}`}
+                  name={`${describeAnalysisMeasure(unifiedChartSpec.primaryValCfg)} × ${describeAnalysisMeasure(unifiedChartSpec.secondaryValCfg)}`}
                   data={unifiedChartSpec.scatterPoints}
                   cursor="pointer"
                   onClick={(d) => handleChartPointClick(d)}
@@ -1377,6 +1388,7 @@ export function ChartStudio({
                     <Bar isAnimationActive={false}
                       key={sm.key}
                       dataKey={sm.key}
+                      name={sm.label || sm.key}
                       stackId={isStacked ? 'stack_bar' : undefined}
                       fill={`url(#${sm.gradId})`}
                       radius={isStacked ? CV.radius.stacked : chartBarRadius(chartType === 'stacked_bar' ? 'bar' : chartType)}

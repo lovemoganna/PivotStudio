@@ -10,7 +10,8 @@ export function projectView(source) {
     fullConfig[zone] = (config[zone] || []).map((item) => {
       if (!item || typeof item.field !== 'string') throw new Error('配置缺少字段名称');
       const projected = pick(item,zone === 'values' ? ['id','field','agg','showAs','format','isCalculated','operandA','op','operandB','operandAField','operandAAgg','operandBField','operandBAgg','formula','description','builderMode','constantValue','category'] : dimensionKeys);
-      if (projected.format) projected.format = pick(projected.format,['thousands','decimals','currency','unit','isPercent']);
+      if (projected.format) projected.format = pick(projected.format,['thousands','decimals','currency','unit','countUnit','isPercent']);
+      if (projected.format?.countUnit !== undefined && (typeof projected.format.countUnit !== 'string' || projected.format.countUnit.length > 40)) throw new Error('计数单位必须为不超过 40 字的文本');
       if (projected.builderMode !== undefined && !['binary','margin','constant','expression'].includes(projected.builderMode)) throw new Error('指标构建模式无效');
       if (projected.constantValue !== undefined && !Number.isFinite(projected.constantValue)) throw new Error('指标折算常数必须为有限数值');
       if (projected.category !== undefined && typeof projected.category !== 'string') throw new Error('指标分类必须是文本');

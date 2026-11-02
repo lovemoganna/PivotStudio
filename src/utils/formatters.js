@@ -1,11 +1,24 @@
+export const isCountMetric = metric => ['count','count_distinct'].includes(metric?.agg) || metric?.field === '__COUNT__';
+
+export function metricUnitInput(metric) {
+  return isCountMetric(metric) ? (metric.format?.countUnit ?? '笔') : UnifiedFormatter.inferUnit(metric);
+}
+
+export function withMetricUnit(metric, unit) {
+  const value = String(unit).trim().slice(0,40);
+  return {...metric,format:{...metric.format,...(isCountMetric(metric) ? {countUnit:value} : {currency:value,unit:''})}};
+}
+
 export const UnifiedFormatter = {
   inferUnit(valCfg) {
     if (!valCfg) return '';
     if (valCfg.showAs && valCfg.showAs.startsWith('pct_')) return '%';
-    if (valCfg.agg === 'count' || valCfg.agg === 'count_distinct' || valCfg.field === '__COUNT__') return '笔';
+    // Counts describe observations, not the source field's currency/physical unit.
+    // Preserve the legacy default while allowing an explicit label or no label.
+    if (isCountMetric(valCfg)) return valCfg.format?.countUnit ?? '笔';
     if (valCfg.format?.isPercent) return '%';
     if (valCfg.format?.currency) return valCfg.format.currency;
-    if (valCfg.format?.unit) return valCfg.format.unit;
+    if (Object.hasOwn(valCfg.format || {},'unit')) return valCfg.format.unit || '';
 
     const fName = String(valCfg.field || '');
 
@@ -28,7 +41,6 @@ export const UnifiedFormatter = {
     if (/_eur$/i.test(fName)) return '€';
 
     // 3. 通用业务语义推断
-    if (valCfg.agg === 'count' || valCfg.agg === 'count_distinct' || fName === '__COUNT__') return '笔';
     // Names such as UnitPrice or Duration do not establish currency/time units.
 
     return '';

@@ -1,5 +1,12 @@
 // UI copy only: never translate dataset field names or record values.
 const english = {
+  "单位": "Unit",
+  "位小数": " decimal places",
+  "显示单位": "Display unit",
+  "未声明": "Unspecified",
+  "仅改变显示标签，不换算数值；清空可隐藏单位": "Labels only; values are not converted. Clear to hide the unit.",
+  "已配置指标": "Configured measures",
+  "源字段": "Source fields",
   "计算与数据说明": "Calculation and data",
   "总计口径": "Total calculation",
   "添加数据集": "Add dataset",

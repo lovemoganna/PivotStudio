@@ -1,6 +1,6 @@
 import { getDimDisplayLabel, formatCellNumber, UnifiedFormatter } from './formatters.js';
-import { t } from '../i18n.js';
 import { decodeGroupPath } from './groupKeys.js';
+import { describeAnalysisMeasure } from './analysisReading.js';
 
 /** All export rows originate from the complete pivot result, not the virtualized DOM. */
 export function buildPivotExportRows(pivotResult, { formatted = false } = {}) {
@@ -13,7 +13,7 @@ export function buildPivotExportRows(pivotResult, { formatted = false } = {}) {
     ...groups.flatMap((group) => metrics.map((metric) => {
       const path = group.pathLabels?.length ? group.pathLabels.join(' / ') + ' · ' : '';
       const percent = metric.showAs?.startsWith('pct_') || (!['count','count_distinct'].includes(metric.agg) && metric.format?.isPercent) ? ' [%]' : '';
-      return path + (metric.field === '__COUNT__' ? t('记录数') : metric.field) + ' (' + metric.agg + ')' + percent;
+      return path + describeAnalysisMeasure(metric) + percent;
     }))
   ];
 

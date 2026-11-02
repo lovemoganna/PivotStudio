@@ -15,7 +15,7 @@ export function normalizeMetricDefinitions(input, fields) {
     if (item.constantValue !== undefined && !Number.isFinite(item.constantValue)) fail('折算常数必须是有限数值');
     if (item.format !== undefined) {
       if (!item.format || typeof item.format !== 'object' || Array.isArray(item.format)) fail('格式必须是对象');
-      for (const key of ['currency','unit']) if (item.format[key] !== undefined && typeof item.format[key] !== 'string') fail(`${key} 必须是文本`);
+      for (const key of ['currency','unit','countUnit']) if (item.format[key] !== undefined && typeof item.format[key] !== 'string') fail(`${key} 必须是文本`);
       for (const key of ['isPercent','thousands']) if (item.format[key] !== undefined && typeof item.format[key] !== 'boolean') fail(`${key} 必须是布尔值`);
     }
     // Existing format-panel metrics store operand fields rather than an AST formula.
