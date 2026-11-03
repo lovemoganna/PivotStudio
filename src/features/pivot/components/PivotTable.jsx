@@ -47,6 +47,8 @@ export function PivotTable({
   viewMode,
   setViewMode,
   copyTextToClipboard,
+  onCopyAll,
+  copyAllDisabled,
   showToast,
   onAddRecordCount,
   isReadOnly,
@@ -647,6 +649,12 @@ export function PivotTable({
           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDisplaySettings ? 'rotate-180' : ''}`} aria-hidden="true" />
         </button>
         <div className="flex items-center gap-2 text-[10px] min-w-0 flex-1 justify-end">
+          <button type="button" onClick={onCopyAll} disabled={copyAllDisabled}
+            aria-label={t('复制完整透视表')}
+            title={t('复制表头、全部结果行和总计，不受滚动位置影响；可直接粘贴到 Excel')}
+            className="shrink-0 inline-flex items-center gap-1 px-2 py-1 min-h-[28px] rounded-md border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-ink-cyan hover:bg-[#66D9EF]/10 disabled:opacity-40 disabled:cursor-not-allowed">
+            <Copy className="w-3 h-3" aria-hidden="true" /><span className="hidden sm:inline">{t('复制完整透视表')}</span><span className="sm:hidden">{t('复制')}</span>
+          </button>
           {selectionRange && (
             <div className="flex min-w-0 items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#66D9EF]/15 border border-[#66D9EF]/30 text-ink-cyan font-semibold">
               <span className="truncate">{' ' + t("选区:") + ' '}{Math.abs((selectionRange?.endRow || 0) - (selectionRange?.startRow || 0)) + 1}{t("行 ×") + ' '}{Math.abs((selectionRange?.endCol || 0) - (selectionRange?.startCol || 0)) + 1}{t("列") + ' '}</span>

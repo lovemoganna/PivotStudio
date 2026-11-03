@@ -15,6 +15,9 @@ import { decodeView, projectView } from '../../utils/viewConfig';
 import { startImportTask } from '../../utils/workerTask';
 import { getMeasureDefaults, isMeasureField } from '../../utils/fieldSemantics.js';
 import { viewCompatibility } from '../../utils/viewCompatibility.js';
+import { datasetSchema } from '../../utils/viewCompatibility.js';
+import { createAnalysisFile, parseAnalysisFile } from '../../utils/analysisFile.js';
+import { buildPivotClipboard, writePivotClipboard } from '../../utils/pivotClipboard.js';
 import { updateConfigHistory } from '../../utils/configHistory.js';
 import { decodeGroupPath } from '../../utils/groupKeys.js';
 import { hasOpenDialog } from '../../utils/useDialogFocus.js';
@@ -185,6 +188,9 @@ export default function PivotWorkbench() {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [newWorkspaceNameInput, setNewWorkspaceNameInput] = useState('');
   const pendingViewRef = useRef(null);
+  const reusableDatasetIdsRef = useRef(new Set());
+  const [analysisImportError,setAnalysisImportError] = useState('');
+  const [copyingPivot,setCopyingPivot] = useState(false);
   const [pendingViewStatus,setPendingViewStatus] = useState(null);
   const [shareTokenInput, setShareTokenInput] = useState('');
   const workspaceLoadErrorRef = useRef(null);
@@ -241,7 +247,7 @@ export default function PivotWorkbench() {
       showToast('已暂存分析配置，尚未恢复结果；请导入对应数据');
       return true;
     }
-    const issues = viewCompatibility(view.fullConfig,view.schema,dataset);
+    const issues = viewCompatibility(view.fullConfig,view.schema,dataset,{allFields:view.schemaMode==='all'});
     if (issues.length) { showToast(`无法恢复配置：${issues.join('；')}`,'error'); return false; }
     setActiveDatasetId(dataset.id);
     applyRestoredView(view,dataset.id !== activeDatasetId || readOnlyRef.current);
@@ -252,7 +258,7 @@ export default function PivotWorkbench() {
   const consumePendingView = useCallback((dataset) => {
     const view = pendingViewRef.current;
     if (!view) return false;
-    const issues = viewCompatibility(view.fullConfig,view.schema,dataset);
+    const issues = viewCompatibility(view.fullConfig,view.schema,dataset,{allFields:view.schemaMode==='all'});
     if (issues.length) {
       setPendingViewStatus(`配置仍待关联：${issues.join('；')}。已保留导入数据，请选择正确文件后重试，或取消恢复。`);
       return false;
@@ -680,6 +686,57 @@ export default function PivotWorkbench() {
   const pivotResult = activeResults.pivotResult;
   const unifiedChartSpec = activeResults.unifiedChartSpec;
 
+  const captureAnalysisView = () => projectView({fullConfig:pivotConfig,schema:datasetSchema(currentDataset),vm:viewMode,ct:chartType,cf:condFormat,csc:chartSpecConfig,ts:tableSettings});
+  const reuseCandidateView = pendingViewRef.current
+    ? (pendingViewRef.current.schemaMode==='all' ? pendingViewRef.current : null)
+    : reusableDatasetIdsRef.current.has(currentDataset?.id) ? {...captureAnalysisView(),schemaMode:'all'} : null;
+  const previewSheet=uploadPreviewModal?.sheets[uploadPreviewModal.activeSheetIdx ?? 0];
+  const reuseIssues = reuseCandidateView && previewSheet ? viewCompatibility(reuseCandidateView.fullConfig,reuseCandidateView.schema,{fields:previewSheet.fields},{allFields:true}) : [];
+
+  const saveAnalysisFile = () => {
+    if(!currentDataset || isReadOnly)return;
+    try {
+      const content=JSON.stringify(createAnalysisFile(currentDataset,captureAnalysisView()));
+      const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
+      const link=document.createElement('a');link.href=url;
+      link.download=currentDataset.name.replace(/[^\p{L}\p{N}_. -]/gu,'_')+'.pivotstudio.json';
+      link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      reusableDatasetIdsRef.current.add(currentDataset.id);
+      showToast('已保存数据与透视配置；导入同字段新数据时将自动复用');
+    }catch(error){showToast(`保存失败：${error.message}`,'error');}
+  };
+  const openAnalysisFile = async file => {
+    if(!file || isReadOnly)return false;
+    setAnalysisImportError('');
+    try {
+      const limit=Math.max(32,Math.min(256,(navigator.deviceMemory || 4)*32))*1024*1024;
+      if(file.size>limit)throw new Error('分析文件超过本机内存保护上限，请减少数据后重试');
+      const {dataset,view}=parseAnalysisFile(await file.text());
+      if(readOnlyRef.current)throw new Error('当前为只读模式，无法打开分析文件');
+      const loaded={...dataset,id:`ds_analysis_${Date.now()}_${Math.random().toString(36).slice(2,7)}`};
+      setDatasets(prev=>[...prev,loaded]);setActiveDatasetId(loaded.id);
+      reusableDatasetIdsRef.current.add(loaded.id);
+      setHighlightedRowKey(null);setHoveredCellTelemetry(null);
+      applyRestoredView(view);
+      showToast('已打开分析文件；数据与透视配置已恢复');
+      return true;
+    }catch(error){setAnalysisImportError(`打开失败：${error.message}`);return false;}
+  };
+  const prepareDataReuse = () => {
+    if(!currentDataset || isReadOnly)return false;
+    return restoreView({...captureAnalysisView(),schemaMode:'all'},null);
+  };
+  const copyCompletePivot = async () => {
+    if(!resultIsCurrent || isWorkerComputing || activeResults.error || copyingPivot)return;
+    setCopyingPivot(true);
+    try {
+      const payload=buildPivotClipboard(pivotResult);
+      const mode=await writePivotClipboard(payload);
+      showToast(mode==='html' ? `已复制完整透视表：${payload.rowCount} 行 × ${payload.columnCount} 列，可粘贴到 Excel` : '已复制纯文本表格，可粘贴到 Excel；当前浏览器不支持表格格式');
+    }catch(error){showToast(`复制失败：${error.message}；可使用导出 Excel`,'error');}
+    finally {setCopyingPivot(false);}
+  };
+
   const saveCurrentViewAsShot = useCallback((title, subtitle) => {
     if (!currentDataset) {
       showToast('当前未加载数据集，无法保存分析笔记', 'error');
@@ -1070,10 +1127,14 @@ export default function PivotWorkbench() {
     if (!consumePendingView(newDs)) replacePivotConfig(buildDefaultPivotConfig(autoInitPivot ? newDs : null));
   }, [replacePivotConfig,consumePendingView]);
 
-  const confirmUploadDataset = useCallback(async (autoInitPivot = true) => {
+  const confirmUploadDataset = async (autoInitPivot = true, reuse = true) => {
     if (!uploadPreviewModal) return;
     const activeIdx = uploadPreviewModal.activeSheetIdx ?? 0;
     const sheet = uploadPreviewModal.sheets[activeIdx] || uploadPreviewModal.sheets[0];
+    if(reuse && reuseCandidateView) {
+      const issues=viewCompatibility(reuseCandidateView.fullConfig,reuseCandidateView.schema,{fields:sheet.fields},{allFields:true});
+      if(issues.length){showToast(`字段不匹配：${issues.join('；')}`,'error');return;}
+    }
     const sheetSuffix = uploadPreviewModal.sheets.length > 1 ? ` - ${sheet.name || ('Sheet ' + (activeIdx + 1))}` : '';
     let normalizedRows;
     try { normalizedRows = (await runImport({ sheets: [sheet], normalize: true }, uploadPreviewModal.fileName))[0].rows; }
@@ -1086,11 +1147,17 @@ export default function PivotWorkbench() {
       fields: sheet.fields,
       rows: normalizedRows,
     };
+    if(reuse && reuseCandidateView) {
+      pendingViewRef.current=reuseCandidateView;
+      reusableDatasetIdsRef.current.add(newDs.id);
+    } else if(!reuse && pendingViewRef.current?.schemaMode==='all') {
+      pendingViewRef.current=null;setPendingViewStatus(null);
+    }
     commitImportedDataset(newDs, autoInitPivot);
     setUploadPreviewModal(null);
     soundEngine.playTransitionChord();
     showToast(`成功导入数据集「${newDs.name}」`);
-  }, [uploadPreviewModal, showToast, runImport, commitImportedDataset]);
+  };
 
   const generate100kDataset = useCallback((count = 100000) => {
     const regions = ['华东', '华南', '华北', '西南', '华中', '西北'];
@@ -1545,6 +1612,8 @@ export default function PivotWorkbench() {
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-2xl border border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col w-full min-h-0 overflow-hidden apple-transition ${viewMode === 'split' && !isPrintingReport ? 'flex-1' : 'flex-1'} ${isPrintingReport ? 'overflow-visible h-auto' : ''}`}
             >
               <PivotTable
+                onCopyAll={copyCompletePivot}
+                copyAllDisabled={!resultIsCurrent || isWorkerComputing || Boolean(activeResults.error) || copyingPivot || !pivotConfig.values.length}
                 isReadOnly={isReadOnly}
                 onAddRecordCount={() => addFieldToZone('values', '__COUNT__')}
                 requestProfile={requestProfile}
@@ -1723,6 +1792,8 @@ export default function PivotWorkbench() {
         />
 
         <UploadModal
+          isReusing={Boolean(reuseCandidateView)}
+          reuseIssues={reuseIssues}
           onReparse={reparseImport}
           isImporting={Boolean(uploadProgress)}
           uploadPreviewModal={uploadPreviewModal}
@@ -1782,6 +1853,11 @@ export default function PivotWorkbench() {
         />
 
         <WorkspaceModal
+          onSaveAnalysisFile={saveAnalysisFile}
+          onOpenAnalysisFile={openAnalysisFile}
+          onPrepareReuse={prepareDataReuse}
+          onReuseUpload={handleFileUpload}
+          analysisImportError={analysisImportError}
           restoreView={restoreView}
           isOpen={showWorkspaceModal}
           onClose={() => setShowWorkspaceModal(false)}

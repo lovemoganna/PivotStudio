@@ -5,7 +5,7 @@ import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { normalizeImportedValue } from '../../../../utils/percentScale.js';
 import { isRateField } from '../../../../utils/fieldSemantics.js';
 
-export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirmUploadDataset, onClose, onReparse, isImporting }) {
+export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirmUploadDataset, onClose, onReparse, isImporting, isReusing=false, reuseIssues=[] }) {
   const dialogRef = useDialogFocus(Boolean(uploadPreviewModal), onClose);
   if (!uploadPreviewModal) return null;
   const activeSheetIdx = uploadPreviewModal.activeSheetIdx ?? 0;
@@ -45,6 +45,11 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
 
         {/* Scrollable Body */}
         <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 text-xs">
+          {isReusing && <section data-testid="reuse-compatibility" role={reuseIssues.length ? 'alert' : 'status'} className={`p-3 rounded-lg border leading-5 ${reuseIssues.length ? 'border-[#F92672]/50 text-ink-pink' : 'border-[#66D9EF]/40 text-ink-cyan'}`}>
+            <p className="font-semibold">{reuseIssues.length ? t('字段不匹配，原数据和透视配置尚未更改') : t('字段匹配，将复用原透视配置')}</p>
+            {reuseIssues.map(issue=><p key={issue}>{issue}</p>)}
+            <p className="text-ink-muted">{t('按字段名称和类型匹配，不限制数据行数与列顺序。')}</p>
+          </section>}
           {/* Worksheet Selection for Excel */}
           {isExcel && (
             <section className="space-y-2">
@@ -167,14 +172,14 @@ export function UploadModal({ uploadPreviewModal, setUploadPreviewModal, confirm
 
         {/* Footer Actions */}
         <div className="shrink-0 px-4 sm:px-6 py-3 border-t border-[#D6D4C8] dark:border-[#3E3D32] flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 bg-[#FFFDF7] dark:bg-[#272822]">
-          <button disabled={isImporting} onClick={() => confirmUploadDataset(false)}
+          <button disabled={isImporting} onClick={() => confirmUploadDataset(false,false)}
             className="px-3.5 py-2 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] text-xs font-semibold hover:bg-black/5 dark:hover:bg-white/5 apple-font-mono transition">
-            {t('仅导入数据（清空当前透视）')}
+            {isReusing ? t('仅导入数据（新建分析）') : t('仅导入数据（清空当前透视）')}
           </button>
-          <button disabled={isImporting} onClick={() => confirmUploadDataset(true)}
+          <button disabled={isImporting || (isReusing && reuseIssues.length>0)} onClick={() => confirmUploadDataset(true)}
             className="px-4 py-2 rounded-lg bg-action text-[#F8F8F2] text-xs font-semibold shadow-xs hover:opacity-90 apple-font-mono transition flex items-center justify-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>{t('确认导入并自动构建推荐透视')}</span>
+            <span>{isReusing ? t('使用原配置导入数据') : t('确认导入并自动构建推荐透视')}</span>
           </button>
         </div>
       </div>

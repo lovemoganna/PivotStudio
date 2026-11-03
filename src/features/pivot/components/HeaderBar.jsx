@@ -278,6 +278,11 @@ export function HeaderBar({
 
             {!hasDataset && hasSavedViews && <button onClick={() => setShowWorkspaceModal(true)} className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg border border-[#D6D4C8] dark:border-[#3E3D32] text-xs text-ink-cyan shrink-0"><FolderOpen className="w-3.5 h-3.5" />{t('恢复分析配置')}</button>}
 
+            <button type="button" onClick={() => setShowWorkspaceModal(true)}
+              className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg border border-[#D6D4C8] dark:border-[#3E3D32] text-xs text-ink-cyan shrink-0 hover:bg-[#66D9EF]/10">
+              <FolderOpen className="w-3.5 h-3.5" aria-hidden="true" />{t('保存与复用')}
+            </button>
+
             {/* ---------------------------------------------------------------------
                 CLUSTER 2: 分析操作与全局指令 (Analysis Operations & Commands)
                 --------------------------------------------------------------------- */}

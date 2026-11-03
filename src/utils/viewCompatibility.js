@@ -25,9 +25,10 @@ function referencedFields(config, problems = []) {
   return required;
 }
 
-export function viewCompatibility(config, schema, dataset) {
+export function viewCompatibility(config, schema, dataset, {allFields=false} = {}) {
   const problems = [];
   const required = referencedFields(config,problems);
+  if(allFields)for(const field of schema || [])required.add(field.name);
   const expected = new Map((schema || []).map(f => [f.name,f]));
   const actual = new Map(datasetSchema(dataset).map(f => [f.name,f]));
   for (const name of required) {

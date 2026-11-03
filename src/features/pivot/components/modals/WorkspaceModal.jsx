@@ -1,11 +1,16 @@
 import { t } from '../../../../i18n.js';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { createShareLink } from '../../../../utils/viewConfig';
 import { datasetSchema, viewCompatibility } from '../../../../utils/viewCompatibility.js';
 import { useDialogFocus } from '../../../../utils/useDialogFocus';
 import { FolderOpen, X, Share2, Download, UserCheck, Shield, Layers, HelpCircle, FileCheck } from 'lucide-react';
 
 export function WorkspaceModal({
+  onSaveAnalysisFile,
+  onOpenAnalysisFile,
+  onPrepareReuse,
+  onReuseUpload,
+  analysisImportError,
   isOpen,
   restoreView,
   onClose,
@@ -41,6 +46,8 @@ export function WorkspaceModal({
 }) {
   const [linkingWorkspace,setLinkingWorkspace] = useState(null);
   const [linkDatasetId,setLinkDatasetId] = useState('');
+  const analysisInputRef=useRef(null),reuseInputRef=useRef(null);
+  const [openingAnalysis,setOpeningAnalysis]=useState(false);
   const dialogRef = useDialogFocus(Boolean(isOpen), onClose);
   if (!isOpen) return null;
 
@@ -64,7 +71,7 @@ export function WorkspaceModal({
         <div className="px-5 py-3.5 border-b border-[#D6D4C8] dark:border-[#3E3D32] flex items-center justify-between shrink-0">
           <h2 className="text-xs font-bold apple-font-mono text-[#272822] dark:text-[#F8F8F2] flex items-center gap-2">
             <FolderOpen className="w-4 h-4 text-ink-pink" />
-            <span>{t("WORKSPACE_HUB // 本机快照与配置分享")}</span>
+            <span>{t('保存与复用分析')}</span>
           </h2>
           <button
             onClick={onClose}
@@ -77,6 +84,31 @@ export function WorkspaceModal({
 
         {/* Content Body */}
         <div className="p-5 space-y-4 overflow-y-auto text-xs apple-font-mono flex-1">
+          <section className="p-3.5 rounded-xl border border-[#66D9EF]/40 space-y-3">
+            <h3 className="font-semibold text-ink-cyan">{t('分析文件：保存数据与透视配置')}</h3>
+            <p className="text-ink-muted leading-5">{t('文件包含当前数据、行列、指标、筛选和计算方式，仅保存到你的设备。后续导入同字段的新数据时会自动复用配置，行数和列顺序可变化。')}</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={!currentDatasetObj || isReadOnly || openingAnalysis} onClick={onSaveAnalysisFile}
+                className="px-3 py-2 rounded-lg bg-action text-[#F8F8F2] font-semibold disabled:opacity-40">{t('保存分析文件')}</button>
+              <button type="button" disabled={isReadOnly || openingAnalysis} onClick={()=>analysisInputRef.current?.click()}
+                className="px-3 py-2 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] text-ink-cyan disabled:opacity-40">{openingAnalysis ? t('正在打开…') : t('打开分析文件')}</button>
+              <button type="button" disabled={!currentDatasetObj || isReadOnly || openingAnalysis} onClick={()=>{
+                if(onPrepareReuse?.())reuseInputRef.current?.click();
+              }} className="px-3 py-2 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] text-ink-cyan disabled:opacity-40">{t('用新数据复用当前配置')}</button>
+            </div>
+            <input ref={analysisInputRef} type="file" className="hidden" accept=".json,.pivotstudio.json,application/json" aria-label={t('选择分析文件')} disabled={isReadOnly || openingAnalysis}
+              onChange={async event=>{
+                const file=event.target.files?.[0];event.target.value='';if(!file)return;
+                setOpeningAnalysis(true);
+                try {if(await onOpenAnalysisFile?.(file))onClose();}finally{setOpeningAnalysis(false);}
+              }} />
+            <input ref={reuseInputRef} type="file" className="hidden" accept=".csv,.tsv,.txt,.xlsx,.xls" aria-label={t('选择用于复用的新数据')} disabled={isReadOnly || openingAnalysis} onChange={async event=>{
+              if(!event.target.files?.length)return;
+              setOpeningAnalysis(true);
+              try {await onReuseUpload?.(event);onClose();}finally{setOpeningAnalysis(false);}
+            }} />
+            {analysisImportError && <p role="alert" className="text-ink-pink leading-5 [overflow-wrap:anywhere]">{analysisImportError}</p>}
+          </section>
           {/* Section 1: Role Switcher */}
           <div className="p-3.5 rounded-xl bg-[#EFECE1]/60 dark:bg-[#1E1F1C] border border-[#D6D4C8] dark:border-[#3E3D32] space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
