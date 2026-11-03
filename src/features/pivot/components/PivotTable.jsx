@@ -652,7 +652,7 @@ export function PivotTable({
           <button type="button" onClick={onCopyAll} disabled={copyAllDisabled}
             aria-label={t('复制完整透视表')}
             title={t('复制表头、全部结果行和总计，不受滚动位置影响；可直接粘贴到 Excel')}
-            className="shrink-0 inline-flex items-center gap-1 px-2 py-1 min-h-[28px] rounded-md border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-ink-cyan hover:bg-[#66D9EF]/10 disabled:opacity-40 disabled:cursor-not-allowed">
+            className="shrink-0 inline-flex items-center gap-1 px-2 py-1 min-h-[28px] rounded-md border border-[#D6D4C8] dark:border-[#3E3D32] text-[11px] text-ink-cyan hover:bg-[#66D9EF]/10 disabled:cursor-not-allowed">
             <Copy className="w-3 h-3" aria-hidden="true" /><span className="hidden sm:inline">{t('复制完整透视表')}</span><span className="sm:hidden">{t('复制')}</span>
           </button>
           {selectionRange && (
