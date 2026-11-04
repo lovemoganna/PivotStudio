@@ -232,7 +232,7 @@ export default function PivotWorkbench() {
     if (resetHistory) replacePivotConfig(view.fullConfig);
     else setPivotConfig(view.fullConfig);
     if (view.cf) setCondFormat(view.cf);
-    if (view.csc) setChartSpecConfig(p => ({...p,...view.csc}));
+    setChartSpecConfig(p => ({...p,...view.csc,analysisConfig:view.csc?.analysisConfig}));
     if (view.vm) setViewMode(view.vm);
     if (view.ct) setChartType(view.ct);
     if (view.ts) setTableSettings(p => ({...p,...view.ts}));
@@ -247,7 +247,7 @@ export default function PivotWorkbench() {
       showToast('已暂存分析配置，尚未恢复结果；请导入对应数据');
       return true;
     }
-    const issues = viewCompatibility(view.fullConfig,view.schema,dataset,{allFields:view.schemaMode==='all'});
+    const issues = viewCompatibility(view.fullConfig,view.schema,dataset,{allFields:view.schemaMode==='all',chartConfig:view.csc?.analysisConfig});
     if (issues.length) { showToast(`无法恢复配置：${issues.join('；')}`,'error'); return false; }
     setActiveDatasetId(dataset.id);
     applyRestoredView(view,dataset.id !== activeDatasetId || readOnlyRef.current);
@@ -258,7 +258,7 @@ export default function PivotWorkbench() {
   const consumePendingView = useCallback((dataset) => {
     const view = pendingViewRef.current;
     if (!view) return false;
-    const issues = viewCompatibility(view.fullConfig,view.schema,dataset,{allFields:view.schemaMode==='all'});
+    const issues = viewCompatibility(view.fullConfig,view.schema,dataset,{allFields:view.schemaMode==='all',chartConfig:view.csc?.analysisConfig});
     if (issues.length) {
       setPendingViewStatus(`配置仍待关联：${issues.join('；')}。已保留导入数据，请选择正确文件后重试，或取消恢复。`);
       return false;
@@ -396,6 +396,7 @@ export default function PivotWorkbench() {
       ...prev,
       primaryValueId: '',
       secondaryValueId: '',
+      analysisConfig: undefined,
     }));
   }, [datasets, replacePivotConfig]);
 
@@ -638,7 +639,7 @@ export default function PivotWorkbench() {
         setIsWorkerComputing(false);
         if (data.success) {
           data.pivotResult.cellRecordsMap = new Map();
-          setActiveResults({ pivotResult: data.pivotResult, unifiedChartSpec: data.unifiedChartSpec, dataset: currentDataset, config: pivotConfig, chartType, chartSpecConfig });
+          setActiveResults({ pivotResult: data.pivotResult, chartPivotResult:data.chartPivotResult, unifiedChartSpec: data.unifiedChartSpec, dataset: currentDataset, config: pivotConfig, chartType, chartSpecConfig });
         } else { const message = `计算失败：${data.error}；请减少分组字段或拆分数据后重试`; setComputeError(message); showToast(message, 'error'); }
       };
       worker.onerror = (event) => {
@@ -685,13 +686,21 @@ export default function PivotWorkbench() {
   const resultIsCurrent = activeResults.dataset === currentDataset && activeResults.config === pivotConfig && activeResults.chartType === chartType && activeResults.chartSpecConfig === chartSpecConfig;
   const pivotResult = activeResults.pivotResult;
   const unifiedChartSpec = activeResults.unifiedChartSpec;
+  const chartAnalysisConfig = chartSpecConfig.analysisConfig || pivotConfig;
+  const chartPivotResult = activeResults.chartPivotResult || pivotResult;
+  const setChartAnalysisConfig = useCallback(updater => {
+    if(isReadOnly)return;
+    setChartSpecConfig(previous => ({...previous,analysisConfig:typeof updater === 'function' ? updater(previous.analysisConfig || pivotConfig) : updater}));
+  },[isReadOnly,pivotConfig]);
+  const addChartMeasure = field => setChartAnalysisConfig(previous => ({...previous,values:[...previous.values,{id:'chart_'+Date.now(),field,showAs:'normal',...getMeasureDefaults(currentDataset?.fields?.find(item=>item.name===field) || {name:field,type:field==='__COUNT__'?'text':'number'})}]}));
+
 
   const captureAnalysisView = () => projectView({fullConfig:pivotConfig,schema:datasetSchema(currentDataset),vm:viewMode,ct:chartType,cf:condFormat,csc:chartSpecConfig,ts:tableSettings});
   const reuseCandidateView = pendingViewRef.current
     ? (pendingViewRef.current.schemaMode==='all' ? pendingViewRef.current : null)
     : reusableDatasetIdsRef.current.has(currentDataset?.id) ? {...captureAnalysisView(),schemaMode:'all'} : null;
   const previewSheet=uploadPreviewModal?.sheets[uploadPreviewModal.activeSheetIdx ?? 0];
-  const reuseIssues = reuseCandidateView && previewSheet ? viewCompatibility(reuseCandidateView.fullConfig,reuseCandidateView.schema,{fields:previewSheet.fields},{allFields:true}) : [];
+  const reuseIssues = reuseCandidateView && previewSheet ? viewCompatibility(reuseCandidateView.fullConfig,reuseCandidateView.schema,{fields:previewSheet.fields},{allFields:true,chartConfig:reuseCandidateView.csc?.analysisConfig}) : [];
 
   const saveAnalysisFile = () => {
     if(!currentDataset || isReadOnly)return;
@@ -988,23 +997,24 @@ export default function PivotWorkbench() {
     });
   }, [currentDataset,isWorkerComputing]);
 
-  const requestDrillDown = useCallback((rowKey, colKey = '__GRAND_TOTAL_COL__', metadata = {}, histogramBin) => {
+  const requestDrillDown = useCallback((rowKey, colKey = '__GRAND_TOTAL_COL__', metadata = {}, histogramBin, scope = 'table') => {
     if (busyRef.current || !workerRef.current || computeError || !resultIsCurrent) { showToast('请等待本次计算完成后再查看明细', 'error'); return; }
     setDrillSearch(''); setDrillPage(1);
-    workerRef.current.postMessage({ kind: 'drill', generation: reqIdRef.current, rowKey: rowKey.replace('__SUBTOTAL__', ''), colKey, metadata, histogramBin });
+    workerRef.current.postMessage({ kind: 'drill', generation: reqIdRef.current, scope, rowKey: rowKey.replace('__SUBTOTAL__', ''), colKey, metadata, histogramBin });
   }, [showToast,computeError,resultIsCurrent]);
 
   const handleTablePointClick = useCallback((point) => {
     setHighlightedRowKey(point.rowKey);
   }, []);
 
+  const requestChartDrillDown = useCallback((rowKey,colKey,metadata,histogramBin) => requestDrillDown(rowKey,colKey,metadata,histogramBin,'chart'),[requestDrillDown]);
   const handleChartPointClick = useCallback(async (pointData) => {
     const now = Date.now();
     if (now - lastChartClickRef.current < 90) return;
     lastChartClickRef.current = now;
     const point = pointData?.payload || pointData;
     if (Number.isInteger(point?.histogramBin)) {
-      requestDrillDown('__GRAND_TOTAL_ROW__', '__GRAND_TOTAL_COL__', {
+      requestChartDrillDown('__GRAND_TOTAL_ROW__', '__GRAND_TOTAL_COL__', {
         rowLabel: `区间 ${point.rangeFull}`, colLabel: '直方图频数分箱',
         valLabel: `${point.count} 笔 (${point.pct}%)`, valueFormatted: `${point.count} 笔`,
       }, point.histogramBin);
@@ -1013,35 +1023,35 @@ export default function PivotWorkbench() {
     const rk = pointData?.rowKey || pointData?.payload?.rowKey;
     if (!rk) return;
 
-    const onlyColumns = !pivotConfig.rows.length && pivotConfig.columns.length > 0;
+    const onlyColumns = !chartAnalysisConfig.rows.length && chartAnalysisConfig.columns.length > 0;
     const filterColKey = pointData?.colKey || point?.colKey || null;
     // Columns-only heatmaps click with rowKey=__GRAND_TOTAL_ROW__; filter by the column key instead.
     const canChartFilter = chartSpecConfig.clickLinkMode === 'filter'
       && (rk !== '__GRAND_TOTAL_ROW__' || (onlyColumns && filterColKey && filterColKey !== '__GRAND_TOTAL_COL__'));
 
     if (canChartFilter) {
-      const activeDim = pivotConfig.rows.length > 0 ? pivotConfig.rows[0] : (pivotConfig.columns.length > 0 ? pivotConfig.columns[0] : null);
+      const activeDim = chartAnalysisConfig.rows.length > 0 ? chartAnalysisConfig.rows[0] : (chartAnalysisConfig.columns.length > 0 ? chartAnalysisConfig.columns[0] : null);
       if (!activeDim) return;
 
-      const dimKey = pivotConfig.rows.length ? rk : (filterColKey || rk);
+      const dimKey = chartAnalysisConfig.rows.length ? rk : (filterColKey || rk);
       const firstSeg = decodeGroupPath(dimKey)[0];
       let matchingRawVals;
       try { matchingRawVals = (await requestProfile(activeDim.field, activeDim, firstSeg))?.matchingRawValues; }
-      catch(error) { if(error.name!=='AbortError') showToast(`联动筛选失败：${error.message}；请重试`,'error'); return; }
+      catch(error) { if(error.name!=='AbortError') showToast(`图表筛选失败：${error.message}；请重试`,'error'); return; }
       if (!matchingRawVals) { showToast('请等待计算完成后再筛选','error'); return; }
 
 
-      setPivotConfig((prev) => {
+      setChartAnalysisConfig((prev) => {
         const existing = prev.filters.find((f) => f.field === activeDim.field);
         const isSame = existing && existing.selectedValues.length === matchingRawVals.length && existing.selectedValues.every((v) => matchingRawVals.includes(v));
         if (isSame) {
-          showToast(`已清除「${activeDim.field}」的联动筛选`);
+          showToast(`已清除「${activeDim.field}」的图表筛选`);
           return {
             ...prev,
             filters: prev.filters.filter((f) => f.field !== activeDim.field),
           };
         }
-        showToast(`已触发图表全局筛选联动: ${firstSeg}`);
+        showToast(`已筛选图表: ${firstSeg}`);
         return {
           ...prev,
           filters: [
@@ -1051,7 +1061,7 @@ export default function PivotWorkbench() {
         };
       });
     } else {
-      setHighlightedRowKey(rk);
+
       const rawPoint = pointData?.payload || pointData;
       const rawColKey = pointData?.colKey || rawPoint?.colKey || '__GRAND_TOTAL_COL__';
       const decodedRowLabel = rk === '__GRAND_TOTAL_ROW__'
@@ -1071,14 +1081,14 @@ export default function PivotWorkbench() {
             : typeof rawPoint?.x === 'number' && typeof rawPoint?.y === 'number'
               ? `${UnifiedFormatter.formatValue(rawPoint.x, unifiedChartSpec.primaryValCfg, { compact: true })} / ${UnifiedFormatter.formatValue(rawPoint.y, unifiedChartSpec.secondaryValCfg, { compact: true })}`
               : '');
-      requestDrillDown(onlyColumns ? '__GRAND_TOTAL_ROW__' : rk, onlyColumns ? (pointData?.colKey || rk) : rawColKey, {
+      requestChartDrillDown(onlyColumns ? '__GRAND_TOTAL_ROW__' : rk, onlyColumns ? (pointData?.colKey || rk) : rawColKey, {
         rowLabel: onlyColumns ? '总计' : decodedRowLabel,
         colLabel: onlyColumns ? decodedRowLabel : decodedColLabel,
         valLabel: unifiedChartSpec.primarySeriesKey,
         valueFormatted: formattedVal,
       });
     }
-  }, [chartSpecConfig.clickLinkMode, currentDataset, pivotConfig.rows, pivotConfig.columns, pivotResult, showToast, requestDrillDown, unifiedChartSpec.primarySeriesKey, unifiedChartSpec.primaryValCfg, unifiedChartSpec.secondaryValCfg, requestProfile]);
+  }, [chartSpecConfig.clickLinkMode, currentDataset, chartAnalysisConfig.rows, chartAnalysisConfig.columns, pivotResult, showToast, requestChartDrillDown,setChartAnalysisConfig, unifiedChartSpec.primarySeriesKey, unifiedChartSpec.primaryValCfg, unifiedChartSpec.secondaryValCfg, requestProfile]);
 
   const handleFileUpload = useCallback(async (e) => {
     let file = null;
@@ -1123,7 +1133,7 @@ export default function PivotWorkbench() {
     setHighlightedRowKey(null);
     setHoveredCellTelemetry(null);
     setKeynoteShotIdx(0);
-    setChartSpecConfig(prev => ({...prev, primaryValueId:'', secondaryValueId:''}));
+    setChartSpecConfig(prev => ({...prev, primaryValueId:'', secondaryValueId:'', analysisConfig:undefined}));
     if (!consumePendingView(newDs)) replacePivotConfig(buildDefaultPivotConfig(autoInitPivot ? newDs : null));
   }, [replacePivotConfig,consumePendingView]);
 
@@ -1132,7 +1142,7 @@ export default function PivotWorkbench() {
     const activeIdx = uploadPreviewModal.activeSheetIdx ?? 0;
     const sheet = uploadPreviewModal.sheets[activeIdx] || uploadPreviewModal.sheets[0];
     if(reuse && reuseCandidateView) {
-      const issues=viewCompatibility(reuseCandidateView.fullConfig,reuseCandidateView.schema,{fields:sheet.fields},{allFields:true});
+      const issues=viewCompatibility(reuseCandidateView.fullConfig,reuseCandidateView.schema,{fields:sheet.fields},{allFields:true,chartConfig:reuseCandidateView.csc?.analysisConfig});
       if(issues.length){showToast(`字段不匹配：${issues.join('；')}`,'error');return;}
     }
     const sheetSuffix = uploadPreviewModal.sheets.length > 1 ? ` - ${sheet.name || ('Sheet ' + (activeIdx + 1))}` : '';
@@ -1714,12 +1724,13 @@ export default function PivotWorkbench() {
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-2xl border border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col min-w-0 min-h-0 p-3.5 sm:p-5 apple-transition ${isChartFullscreen ? '' : 'w-full flex-1'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
               <ChartStudio
+                onResetChartAnalysis={() => setChartSpecConfig(previous=>({...previous,analysisConfig:undefined}))}
                 isReadOnly={isReadOnly}
-                requestDrillDown={requestDrillDown}
+                requestDrillDown={requestChartDrillDown}
                 chartType={chartType}
                 setChartType={setChartType}
                 unifiedChartSpec={unifiedChartSpec}
-                pivotResult={pivotResult}
+                pivotResult={chartPivotResult}
                 chartSpecConfig={chartSpecConfig}
                 setChartSpecConfig={setChartSpecConfig}
                 darkMode={darkMode}
@@ -1740,13 +1751,13 @@ export default function PivotWorkbench() {
                 onUpdateStoryShot={updateStoryShot}
                 onDeleteStoryShot={deleteStoryShot}
                 onResetStoryShots={resetStoryShots}
-                hasCustomStoryShots={Boolean(activeDatasetId && customStoryShotsByDataset[activeDatasetId])} setPivotConfig={setPivotConfig} addFieldToZone={addFieldToZone} removeZoneItem={removeZoneItem}
-                pivotConfig={pivotConfig}
+                hasCustomStoryShots={Boolean(activeDatasetId && customStoryShotsByDataset[activeDatasetId])} setPivotConfig={setChartAnalysisConfig} addFieldToZone={addFieldToZone} removeZoneItem={removeZoneItem}
+                pivotConfig={chartAnalysisConfig}
                 soundEngine={soundEngine}
                 viewMode={viewMode}
                 setViewMode={setViewMode}
-                onAddRecordCount={() => addFieldToZone('values', '__COUNT__')}
-                onAddMeasure={(field) => addFieldToZone('values', field)}
+                onAddRecordCount={() => addChartMeasure('__COUNT__')}
+                onAddMeasure={addChartMeasure}
                 currentDataset={currentDataset}
                 showToast={showToast}
                 copyTextToClipboard={copyTextToClipboard}
@@ -1761,7 +1772,6 @@ export default function PivotWorkbench() {
       {/* Telemetry Status Bar */}
       <StatusBar
         hoveredCellTelemetry={hoveredCellTelemetry}
-        unifiedChartSpec={unifiedChartSpec}
         pivotConfig={pivotConfig}
         pivotResult={pivotResult}
         duckdbThreshold={duckdbThreshold}

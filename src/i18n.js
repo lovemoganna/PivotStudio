@@ -1,5 +1,10 @@
 // UI copy only: never translate dataset field names or record values.
 const english = {
+  "图表独立配置": "Independent chart configuration",
+  "沿用透视表配置": "Using table configuration",
+  "使用透视表配置": "Use table configuration",
+  "调整图表字段，不改变透视表": "Change chart fields without changing the pivot table",
+  "收起图表字段调整": "Collapse chart field controls",
   "保存与复用": "Save and reuse",
   "保存与复用分析": "Save and reuse analysis",
   "复制完整透视表": "Copy complete pivot table",

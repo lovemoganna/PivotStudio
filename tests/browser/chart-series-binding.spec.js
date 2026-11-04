@@ -59,11 +59,9 @@ for(const width of [360,768,1440]) test(`binding: counterparty sum/share/count r
   await expect(chart.locator('.recharts-label-list')).toHaveText(['1 笔3 笔']);
   const row=page.getByLabel('行字段',{exact:true});
   await row.selectOption('用户id');await ready(page);
-  await page.getByRole('button',{name:'撤销',exact:true}).press('Enter');await ready(page);
-  await expect(row).toHaveValue('对手用户id');
-  await page.getByRole('button',{name:'重做',exact:true}).press('Enter');await ready(page);
   await expect(row).toHaveValue('用户id');
-  await page.getByRole('button',{name:'撤销',exact:true}).press('Enter');await ready(page);
+  await page.getByRole('button',{name:'使用透视表配置',exact:true}).click();await ready(page);
+  await expect(row).toHaveValue('对手用户id');
   await measure.selectOption('metric:sum');await ready(page);
   await page.getByLabel('选择图表类型',{exact:true}).selectOption('combo');
   await page.getByRole('button',{name:'图表选项',exact:true}).click();

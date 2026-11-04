@@ -25,7 +25,7 @@ function referencedFields(config, problems = []) {
   return required;
 }
 
-export function viewCompatibility(config, schema, dataset, {allFields=false} = {}) {
+export function viewCompatibility(config, schema, dataset, {allFields=false,chartConfig} = {}) {
   const problems = [];
   const required = referencedFields(config,problems);
   if(allFields)for(const field of schema || [])required.add(field.name);
@@ -42,5 +42,6 @@ export function viewCompatibility(config, schema, dataset, {allFields=false} = {
       if ((numberRequired && a.type !== 'number') || (dateRequired && a.type !== 'date')) problems.push(`字段类型不适合当前配置：${name}`);
     }
   }
+  if(chartConfig)problems.push(...viewCompatibility(chartConfig,schema,dataset).map(problem=>'图表：'+problem));
   return problems;
 }

@@ -23,6 +23,7 @@ export function projectView(source) {
     });
   }
   if (fullConfig.valueSort) fullConfig.valueSort = pick(fullConfig.valueSort,['colKey','valueId','direction']);
+  const chartAnalysis = source?.csc?.analysisConfig;
   return {
     version: 1, fullConfig,
     schema: Array.isArray(source?.schema) ? source.schema.map(field => {
@@ -33,7 +34,7 @@ export function projectView(source) {
     vm: ['split','chart','table'].includes(source?.vm) ? source.vm : 'split',
     ct: source?.ct || 'bar',
     cf: pick(source?.cf,['colorScale','showDataBar','customRuleEnabled','customRuleOp','customRuleValue','customRuleColor']),
-    csc: pick(source?.csc,['primaryValueId','secondaryValueId','sortMode','topN','missingValueMode','lineDerivedMetric','showDataLabels','dataLabelPosition','showAvgReferenceLine','clickLinkMode','histogramBins','stickyRowHeaders']),
+    csc: {...(chartAnalysis ? {analysisConfig:projectView({fullConfig:chartAnalysis}).fullConfig} : {}),...pick(source?.csc,['primaryValueId','secondaryValueId','sortMode','topN','missingValueMode','lineDerivedMetric','showDataLabels','dataLabelPosition','showAvgReferenceLine','clickLinkMode','histogramBins','stickyRowHeaders'])},
     ts: pick(source?.ts,['density','colWidthMode','dataAlignment','showZebra','wrapText','showExtremes','customColWidths']),
   };
 }

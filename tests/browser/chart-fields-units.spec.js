@@ -72,14 +72,15 @@ for(const width of [360,768,1440]) test(`chart freedom: complete fields, units, 
  expect(csvExport).toContain('4 项');expect(csvExport).toContain('报价单位');
  await values.selectOption('metric:v1');await ready(page);
  await expect(chart.locator('.recharts-label-list')).toContainText(['项']);
+ const tableBeforeChartEdits=await page.locator('#pivot-main-html-table').innerText();
  await values.selectOption('委托类型');await ready(page);
- await expect(page.getByTestId('zone-values').getByTestId('configured-field-name').first()).toHaveText('委托类型');
- await expect(page.locator('#pivot-main-html-table tfoot td').nth(1)).toHaveText('4 笔');
+ await expect(page.getByTestId('zone-values').getByTestId('configured-field-name').first()).toHaveText('买入数量');
+ await expect(page.locator('#pivot-main-html-table')).toHaveText(tableBeforeChartEdits,{useInnerText:true});
  await rows.selectOption('买入金额');await ready(page);await expect(rows).toHaveValue('买入金额');
  await cols.selectOption('用户id');await ready(page);await expect(cols).toHaveValue('用户id');
- await page.getByRole('button',{name:'撤销',exact:true}).press('Enter');await ready(page);await expect(cols).toHaveValue('');
+ await expect(cols).toHaveValue('用户id');
  await rows.selectOption('订单id');await ready(page);
- await expect(page.locator('#pivot-main-html-table')).toContainText(raw[0][11]);
+ await expect(page.locator('#pivot-main-html-table')).toHaveText(tableBeforeChartEdits,{useInnerText:true});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
  await page.screenshot({path:info.outputPath(`trade-fields-${width}.png`),fullPage:true});
@@ -87,14 +88,16 @@ for(const width of [360,768,1440]) test(`chart freedom: complete fields, units, 
 
 test('chart freedom: source price fields retain explicitly chosen six-place display',async({page})=>{
  await start(page,1440);
- await page.getByLabel('值字段',{exact:true}).selectOption('买入均价_折U');await ready(page);
+ await page.getByRole('button',{name:'分栏',exact:true}).click();
+ await page.getByRole('button',{name:'+值 · 添加「买入均价_折U」到计算指标',exact:true}).press('Enter');await ready(page);
  await page.getByRole('button',{name:'格式与数值',exact:true}).click();
  const format=page.getByRole('dialog',{name:'数值与条件格式设置',exact:true});
  await format.getByLabel('买入均价_折U · 小数位数',{exact:true}).selectOption('6');
  await page.getByRole('button',{name:'关闭数值与条件格式设置',exact:true}).click();await ready(page);
+ await page.getByLabel('值字段',{exact:true}).selectOption('买入均价_折U');await ready(page);
  const prices=raw.map(row=>row[19]).filter(value=>value!=='').map(numeric);
  const average=prices.reduce((sum,value)=>sum+value,0)/prices.length;
- await expect(page.locator('#pivot-main-html-table tfoot td').nth(1)).toHaveText(average.toFixed(6));
+ await expect(page.locator('#pivot-main-html-table tfoot td').last()).toHaveText(average.toFixed(6));
  await expect(page.locator('#pivot-chart-container .recharts-label-list')).toContainText([average.toFixed(6)]);
 });
 

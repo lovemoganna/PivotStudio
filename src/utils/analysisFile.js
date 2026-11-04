@@ -28,7 +28,7 @@ function projectDataset(dataset) {
 export function createAnalysisFile(dataset,sourceView) {
   const data=projectDataset(dataset);
   const view=projectView({...sourceView,schema:datasetSchema(data)});
-  const problems=viewCompatibility(view.fullConfig,view.schema,data,{allFields:true});
+  const problems=viewCompatibility(view.fullConfig,view.schema,data,{allFields:true,chartConfig:view.csc?.analysisConfig});
   if(problems.length)throw new Error(problems.join('；'));
   return {kind:'pivotstudio-analysis',version:1,dataset:data,view};
 }
@@ -40,7 +40,7 @@ export function parseAnalysisFile(text) {
   if(!source.view?.fullConfig || !Array.isArray(source.view.schema))throw new Error('分析文件缺少透视配置或字段结构');
   const dataset=projectDataset(source.dataset);
   const view=projectView(source.view);
-  const problems=viewCompatibility(view.fullConfig,view.schema,dataset,{allFields:true});
+  const problems=viewCompatibility(view.fullConfig,view.schema,dataset,{allFields:true,chartConfig:view.csc?.analysisConfig});
   if(problems.length)throw new Error('分析文件中的数据与配置不匹配：'+problems.join('；'));
   return {dataset,view:{...view,schemaMode:'all'}};
 }

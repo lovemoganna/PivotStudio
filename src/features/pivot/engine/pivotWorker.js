@@ -1,10 +1,12 @@
 import { profileField } from './profileField.js';
 import { calculatePivot } from './calculatePivot.js';
-import { buildUnifiedChartSpec } from './buildChartSpec.js';
+import { buildChartAnalysis } from './chartAnalysis.js';
 import { isMissingValue } from '../../../utils/normalizeScalar.js';
 import { matchesHistogramBin } from './histogram.js';
 let cachedDataset = null;
 let cachedPivot = null;
+let cachedChartPivot = null;
+let cachedConfigKey = null;
 let cachedChartSpec = null;
 let resultId = null;
 self.onmessage = (e) => {
@@ -15,9 +17,10 @@ self.onmessage = (e) => {
     const bin = Number.isInteger(e.data.histogramBin)
       ? cachedChartSpec?.histogramItems?.[e.data.histogramBin]
       : (metadata?.histogramBin !== undefined ? cachedChartSpec?.histogramItems?.[metadata.histogramBin] : null);
+    const source = e.data.scope === 'chart' ? cachedChartPivot : cachedPivot;
     let records = bin
-      ? (cachedPivot?.cellRecordsMap.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || []).filter((record) => matchesHistogramBin(record, bin))
-      : cachedPivot?.cellRecordsMap.get(`${rowKey}@@${colKey}`) || [];
+      ? (source?.cellRecordsMap.get('__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__') || []).filter((record) => matchesHistogramBin(record, bin))
+      : source?.cellRecordsMap.get(`${rowKey}@@${colKey}`) || [];
     const range = metadata?.histogramRange;
     if (!bin && range) {
       records = records.filter(record => {
@@ -36,11 +39,14 @@ self.onmessage = (e) => {
   }
   if (!payload) return;
   const { dataset, pivotConfig, chartType, chartSpecConfig } = payload;
-  if (dataset !== undefined) cachedDataset = dataset;
+  if (dataset !== undefined) {cachedDataset = dataset; cachedPivot = null;}
   try {
-    const pivotResult = calculatePivot(cachedDataset, pivotConfig, (progress) => self.postMessage({ id, progress }));
+    const configKey = JSON.stringify(pivotConfig);
+    const pivotResult = cachedPivot && cachedConfigKey === configKey ? cachedPivot : calculatePivot(cachedDataset, pivotConfig, (progress) => self.postMessage({ id, progress }));
+    cachedConfigKey = configKey;
     cachedPivot = pivotResult; resultId = id;
-    const unifiedChartSpec = buildUnifiedChartSpec(cachedDataset, pivotResult, chartType, chartSpecConfig);
+    const {chartResult, spec:unifiedChartSpec} = buildChartAnalysis(cachedDataset, pivotResult, chartType, chartSpecConfig);
+    cachedChartPivot = chartResult;
     cachedChartSpec = unifiedChartSpec;
     // cellRecordsMap holds a reference to every raw record bucket and is large for big datasets.
     // Transferring it via postMessage (Structured Clone) dominates message cost for 100k+ rows.
@@ -52,7 +58,8 @@ self.onmessage = (e) => {
     for (const key of ['items', 'waterfallItems', 'funnelItems', 'scatterPoints', 'histogramItems']) {
       chartTransferable[key] = (unifiedChartSpec[key] || []).map(({ matchedRows: _records, ...point }) => point);
     }
-    self.postMessage({ id, success: true, pivotResult: pivotResultTransferable, unifiedChartSpec: chartTransferable });
+    const {cellRecordsMap:_chartRecords, analysisConfig:_chartConfig, ...chartPivotResult} = chartResult;
+    self.postMessage({ id, success: true, pivotResult: pivotResultTransferable, chartPivotResult:chartResult === pivotResult ? undefined : chartPivotResult, unifiedChartSpec: chartTransferable });
   } catch (err) {
     self.postMessage({ id, success: false, error: err?.message || String(err) });
   }

@@ -44,6 +44,7 @@ import { StoryShotDialog } from './modals/StoryShotDialog';
 import {aggregationChoiceLabel} from '../../../utils/aggregationChoice.js';
 
 export function ChartStudio({
+  onResetChartAnalysis,
   chartType,
   setChartType,
   unifiedChartSpec,
@@ -337,7 +338,7 @@ export function ChartStudio({
     }
     if (!setPivotConfig) return;
     const fMeta = (currentDataset?.fields || []).find((f) => f.name === fieldName);
-    const defaults = getMeasureDefaults(fMeta || { name: fieldName, type: 'number' });
+    const defaults = getMeasureDefaults(fMeta || { name: fieldName, type: fieldName === '__COUNT__' ? 'text' : 'number' });
     const newId = `v_${Date.now()}`;
     setPivotConfig((prev) => {
       const others = (prev.values || []).filter((v) => v.field !== fieldName);
@@ -522,7 +523,7 @@ export function ChartStudio({
                   setEncodingExpanded(false);
                 }}
                 className="h-7 px-1.5 mr-0.5 rounded-md text-[10px] text-ink-muted hover:text-ink-cyan transition"
-                title={t('收起字段调整（也可在左侧拖放）')}
+                title={t('收起图表字段调整')}
               >
                 {t('收起')}
               </button>
@@ -536,7 +537,7 @@ export function ChartStudio({
               setEncodingExpanded(true);
             }}
             className="inline-flex items-center gap-1.5 h-8 max-w-full min-w-0 pl-2.5 pr-2 rounded-xl bg-[#EFECE1]/45 dark:bg-[#1E1F1C]/55 ring-1 ring-[#D6D4C8]/35 dark:ring-[#3E3D32]/45 text-left hover:ring-[#66D9EF]/50 transition"
-            title={t('在此快速改字段，或继续用左侧拖放')}
+            title={t('调整图表字段，不改变透视表')}
             aria-label={`${t('调整图表字段')}: ${encodingRecipe}`}
           >
             <span className="text-[10px] text-ink-muted shrink-0 select-none">{t('字段')}</span>
@@ -545,6 +546,8 @@ export function ChartStudio({
           </button>
         )}
 
+        <span data-testid="chart-analysis-state" className="text-[10px] text-ink-muted">{chartSpecConfig.analysisConfig ? t('图表独立配置') : t('沿用透视表配置')}</span>
+        {chartSpecConfig.analysisConfig && <button type="button" disabled={isReadOnly} onClick={onResetChartAnalysis} className="text-[11px] text-ink-cyan px-2 py-1 rounded border border-[#D6D4C8] dark:border-[#3E3D32]">{t('使用透视表配置')}</button>}
         {highlightedRowKey && onClearHighlight && (
           <button
             type="button"

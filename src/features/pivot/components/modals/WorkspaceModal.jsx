@@ -157,9 +157,9 @@ export function WorkspaceModal({
                   {datasets.map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.name}</option>)}
                 </select>
               </label>
-              {linkDatasetId && viewCompatibility(linkingWorkspace.pivotConfig,linkingWorkspace.datasetSchema,datasets.find(d => d.id === linkDatasetId)).map(problem => <p role="alert" key={problem} className="text-ink-pink">{problem}</p>)}
+              {linkDatasetId && viewCompatibility(linkingWorkspace.pivotConfig,linkingWorkspace.datasetSchema,datasets.find(d => d.id === linkDatasetId),{chartConfig:linkingWorkspace.chartSpecConfig?.analysisConfig}).map(problem => <p role="alert" key={problem} className="text-ink-pink">{problem}</p>)}
               <div className="flex flex-wrap gap-2">
-                <button className="px-2 py-1 border rounded disabled:opacity-40" disabled={!linkDatasetId || viewCompatibility(linkingWorkspace.pivotConfig,linkingWorkspace.datasetSchema,datasets.find(d => d.id === linkDatasetId)).length > 0} onClick={() => {
+                <button className="px-2 py-1 border rounded disabled:opacity-40" disabled={!linkDatasetId || viewCompatibility(linkingWorkspace.pivotConfig,linkingWorkspace.datasetSchema,datasets.find(d => d.id === linkDatasetId),{chartConfig:linkingWorkspace.chartSpecConfig?.analysisConfig}).length > 0} onClick={() => {
                   const ws = linkingWorkspace;
                   if (restoreView({fullConfig:ws.pivotConfig,schema:ws.datasetSchema,vm:ws.viewMode,ct:ws.chartType,cf:ws.condFormat,csc:ws.chartSpecConfig,ts:ws.tableSettings},datasets.find(d => d.id === linkDatasetId))) { setActiveWorkspaceId(ws.id); setLinkingWorkspace(null); onClose(); }
                 }}>{t('确认关联并恢复')}</button>
@@ -199,7 +199,7 @@ export function WorkspaceModal({
                     updatedAt: new Date().toLocaleString('zh-CN'),
                     author: currentUser.name,
                     datasetId: activeDatasetId,
-                    datasetSchema: datasetSchema(currentDatasetObj,pivotConfig),
+                    datasetSchema: datasetSchema(currentDatasetObj),
                     datasetName: currentDatasetObj?.name || '未关联数据',
                     viewMode,
                     chartType,
@@ -259,7 +259,7 @@ export function WorkspaceModal({
                         onClick={() => {
                           const dataset = datasets.find(d => d.id === ws.datasetId);
                           const view = {fullConfig:ws.pivotConfig,schema:ws.datasetSchema,vm:ws.viewMode,ct:ws.chartType,cf:ws.condFormat,csc:ws.chartSpecConfig,ts:ws.tableSettings};
-                          if (!dataset || viewCompatibility(ws.pivotConfig,ws.datasetSchema,dataset).length) {
+                          if (!dataset || viewCompatibility(ws.pivotConfig,ws.datasetSchema,dataset,{chartConfig:ws.chartSpecConfig?.analysisConfig}).length) {
                             setLinkingWorkspace(ws); setLinkDatasetId(''); return;
                           }
                           if (restoreView(view,dataset)) { setActiveWorkspaceId(ws.id); onClose(); }
@@ -301,7 +301,7 @@ export function WorkspaceModal({
               let shareLink;
               try {
                 shareLink = createShareLink(
-                  { vm: viewMode, ct: chartType, cf: condFormat, csc: chartSpecConfig, fullConfig: pivotConfig, ts: tableSettings, schema: datasetSchema(currentDatasetObj,pivotConfig) },
+                  { vm: viewMode, ct: chartType, cf: condFormat, csc: chartSpecConfig, fullConfig: pivotConfig, ts: tableSettings, schema: datasetSchema(currentDatasetObj) },
                   window.location
                 );
               } catch (error) {

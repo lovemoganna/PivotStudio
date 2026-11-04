@@ -1,11 +1,11 @@
 import { t } from '../../../i18n.js';
 import React from 'react';
 import { Crosshair } from 'lucide-react';
-import { buildAnalysisReading } from '../../../utils/analysisReading.js';
+import { buildAnalysisReading, describeAnalysisMeasure } from '../../../utils/analysisReading.js';
+import { UnifiedFormatter } from '../../../utils/formatters.js';
 
 export function StatusBar({
   hoveredCellTelemetry,
-  unifiedChartSpec,
   pivotConfig,
   pivotResult,
   duckdbThreshold,
@@ -14,6 +14,8 @@ export function StatusBar({
   const rowCount = pivotResult?.totalCount || 0;
   const showRowBadge = rowCount >= duckdbThreshold;
   const analysisReading = buildAnalysisReading(pivotConfig);
+  const tableMetric = pivotResult?.valConfigs?.[0];
+  const tableTotal = tableMetric && pivotResult.displayMatrix?.[`__GRAND_TOTAL_ROW__@@__GRAND_TOTAL_COL__@@${tableMetric.id}`];
 
   return (
     <footer className="min-h-7 h-auto bg-[#EFECE1] dark:bg-[#191A17] border-t border-[#D6D4C8] dark:border-[#3E3D32] px-3 sm:px-4 py-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[10px] shrink-0 print:hidden">
@@ -44,11 +46,11 @@ export function StatusBar({
         ) : (
           <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-3 text-ink-muted min-w-0 flex-1">
             <span className="truncate" data-testid="overall-summary">
-              {unifiedChartSpec.kpiCards?.[0] ? (
+              {tableMetric ? (
                 <>
                   {t('总体结果：')}
-                  {unifiedChartSpec.kpiCards[0].title}{' '}
-                  <strong className="text-[#272822] dark:text-[#F8F8F2]">{unifiedChartSpec.kpiCards[0].formattedCurrent}</strong>
+                  {describeAnalysisMeasure(tableMetric)}{' '}
+                  <strong className="text-[#272822] dark:text-[#F8F8F2]">{UnifiedFormatter.formatValue(tableTotal?.display,tableMetric,{compact:false})}</strong>
                 </>
               ) : (
                 t('添加指标后显示总体结果')

@@ -20,6 +20,11 @@ for(const width of [360,768,1440])test(`dates: preserve source precision, explic
   for(const time of times)await expect(page.locator('#pivot-main-html-table')).toContainText(time);
   await ensureMobileShelves(page,width);
   if(width>=768)await page.getByRole('button',{name:'配置',exact:true}).click();
+  // Table grouping is an explicit sidebar operation; chart field edits no longer rewrite it.
+  if(width>=768)await page.getByRole('button',{name:'分栏',exact:true}).click();
+  await page.getByTestId('zone-rows').getByRole('button',{name:'移除字段',exact:true}).click();await ready(page);
+  await page.getByTestId('zone-columns').getByRole('button',{name:'移除字段',exact:true}).click();await ready(page);
+  await page.getByRole('button',{name:'+行 · 添加「RecordedAt」到行分组',exact:true}).press('Enter');await ready(page);
   const dateCard=page.getByTestId('zone-rows');
   await dateCard.getByTitle('分组设置',{exact:true}).click();
   const modal=page.getByRole('dialog',{name:'字段分组设置',exact:true});
@@ -40,10 +45,12 @@ for(const width of [360,768,1440])test(`dates: preserve source precision, explic
   const exported=await readFile(await(await dl).path(),'utf8');
   for(const time of times)expect(exported).toContain(time);
   await page.getByLabel('列字段',{exact:true}).selectOption('RecordedAt');await ready(page);
-  for(const time of times)await expect(page.locator('#pivot-main-html-table thead')).toContainText(time);
+  await expect(page.getByLabel('列字段',{exact:true})).toHaveValue('RecordedAt');
+  for(const time of times)await expect(page.locator('#pivot-main-html-table')).toContainText(time);
   // Sidebar manual additions use the same raw default after removing the column.
   await page.getByLabel('列字段',{exact:true}).selectOption('');await ready(page);
   if(width>=768)await page.getByRole('button',{name:'分栏',exact:true}).click();
+  await dateCard.getByRole('button',{name:'移除字段',exact:true}).click();await ready(page);
   await page.getByRole('button',{name:'+行 · 添加「RecordedAt」到行分组',exact:true}).press('Enter');await ready(page);
   for(const time of times)await expect(page.locator('#pivot-main-html-table')).toContainText(time);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
