@@ -24,6 +24,8 @@ for(const width of [360,768,1440])test(`analysis file: manually configure 100, s
   await page.setViewportSize({width,height:1100});await page.goto('/');
   await upload(page,csv(100));
   await page.getByRole('button',{name:'仅导入数据（清空当前透视）',exact:true}).click();await ready(page);
+  await expect(page.getByRole('button',{name:'复制完整透视表',exact:true})).toBeDisabled();
+  expect((await new AxeBuilder({page}).include('[aria-label="复制完整透视表"]').analyze()).violations).toEqual([]);
   await ensureMobileShelves(page,width);
   for(const name of ['+行 · 添加「Group」到行分组','+列 · 添加「Period」到列比较','+值 · 添加「Reading」到计算指标']) {
     await page.getByRole('button',{name,exact:true}).press('Enter');await ready(page);
