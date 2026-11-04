@@ -16,6 +16,7 @@ import { startImportTask } from '../../utils/workerTask';
 import { getMeasureDefaults, isMeasureField } from '../../utils/fieldSemantics.js';
 import { viewCompatibility } from '../../utils/viewCompatibility.js';
 import { datasetSchema } from '../../utils/viewCompatibility.js';
+import { resolveChartConfig } from '../../utils/chartConfig.js';
 import { createAnalysisFile, parseAnalysisFile } from '../../utils/analysisFile.js';
 import { buildPivotClipboard, writePivotClipboard } from '../../utils/pivotClipboard.js';
 import { updateConfigHistory } from '../../utils/configHistory.js';
@@ -229,6 +230,7 @@ export default function PivotWorkbench() {
   }, []);
 
   const applyRestoredView = useCallback((view, resetHistory = true) => {
+    view = {...view,csc:projectView(view).csc};
     if (resetHistory) replacePivotConfig(view.fullConfig);
     else setPivotConfig(view.fullConfig);
     if (view.cf) setCondFormat(view.cf);
@@ -686,11 +688,14 @@ export default function PivotWorkbench() {
   const resultIsCurrent = activeResults.dataset === currentDataset && activeResults.config === pivotConfig && activeResults.chartType === chartType && activeResults.chartSpecConfig === chartSpecConfig;
   const pivotResult = activeResults.pivotResult;
   const unifiedChartSpec = activeResults.unifiedChartSpec;
-  const chartAnalysisConfig = chartSpecConfig.analysisConfig || pivotConfig;
+  const chartAnalysisConfig = resolveChartConfig(pivotConfig,chartSpecConfig);
   const chartPivotResult = activeResults.chartPivotResult || pivotResult;
   const setChartAnalysisConfig = useCallback(updater => {
     if(isReadOnly)return;
-    setChartSpecConfig(previous => ({...previous,analysisConfig:typeof updater === 'function' ? updater(previous.analysisConfig || pivotConfig) : updater}));
+    setChartSpecConfig(previous => {
+      const base = previous.analysisConfig ? resolveChartConfig(pivotConfig,previous) : {...pivotConfig,filters:[]};
+      return {...previous,filterScope:'local',analysisConfig:typeof updater === 'function' ? updater(base) : updater};
+    });
   },[isReadOnly,pivotConfig]);
   const addChartMeasure = field => setChartAnalysisConfig(previous => ({...previous,values:[...previous.values,{id:'chart_'+Date.now(),field,showAs:'normal',...getMeasureDefaults(currentDataset?.fields?.find(item=>item.name===field) || {name:field,type:field==='__COUNT__'?'text':'number'})}]}));
 
@@ -1724,6 +1729,7 @@ export default function PivotWorkbench() {
               className={`bg-[#FFFDF7] dark:bg-[#272822] rounded-2xl border border-[#D6D4C8]/80 dark:border-[#3E3D32]/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] flex flex-col min-w-0 min-h-0 p-3.5 sm:p-5 apple-transition ${isChartFullscreen ? '' : 'w-full flex-1'} ${isPrintingReport ? 'h-auto' : ''}`}
             >
               <ChartStudio
+                analysisScope={{filteredCount:pivotResult.filteredCount,totalCount:pivotResult.totalCount}}
                 onResetChartAnalysis={() => setChartSpecConfig(previous=>({...previous,analysisConfig:undefined}))}
                 isReadOnly={isReadOnly}
                 requestDrillDown={requestChartDrillDown}

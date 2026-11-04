@@ -1,5 +1,9 @@
 // UI copy only: never translate dataset field names or record values.
 const english = {
+  "分析范围：": "Analysis scope: ",
+  "分析筛选同时应用于透视表和图表": "Analysis filters apply to both the pivot table and chart",
+  "图表内进一步筛选：": "Further filtered within chart: ",
+  "清除图表内筛选": "Clear chart-only filters",
   "图表独立配置": "Independent chart configuration",
   "沿用透视表配置": "Using table configuration",
   "使用透视表配置": "Use table configuration",

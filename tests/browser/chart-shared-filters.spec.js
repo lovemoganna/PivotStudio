@@ -1,0 +1,68 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+import AxeBuilder from '@axe-core/playwright';
+import {encodeView} from '../../src/utils/viewConfig.js';
+import {ensureMobileShelves} from './_mobileShelves.js';
+
+const config={rows:[{id:'r',field:'Region'}],columns:[{id:'c',field:'Period'}],values:[{id:'v',field:'Revenue',agg:'sum'}],filters:[{id:'f',field:'Region',selectedValues:['A']}]};
+const csv='Region,Counterparty,Side,Period,Revenue,Volume\nA,X,Buy,P1,10,1\nA,Y,Sell,P1,20,2\nB,X,Sell,P2,30,3\nB,Y,Buy,P2,40,4\nA,X,Buy,P2,50,5\nB,Z,Sell,P1,60,6';
+const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
+async function selectShared(page,selection) {
+  await page.getByTestId('zone-filters').getByRole('button',{name:/^(全部|\d+项)$/}).click();
+  const dialog=page.getByRole('dialog',{name:'字段筛选',exact:true});
+  if(['all','none'].includes(selection))await dialog.getByRole('button',{name:selection==='all'?'全选':'全不选',exact:true}).click();
+  else await dialog.getByLabel(selection,{exact:true}).locator('..').locator('..').getByRole('button',{name:'仅此项',exact:true}).click();
+  await page.keyboard.press('Escape');await ready(page);
+}
+for(const width of [360,768,1440])test(`shared filters stay authoritative after chart edits, local narrowing, empty selection and reopen at ${width}`,async({page},info)=>{
+  await page.setViewportSize({width,height:1150});await page.emulateMedia({reducedMotion:'reduce'});
+  await page.route('https://fonts.googleapis.com/**',route=>route.abort());await page.route('https://fonts.gstatic.com/**',route=>route.abort());
+  await page.goto('/#share_token='+encodeURIComponent(encodeView({fullConfig:config,csc:{showDataLabels:true}})));
+  await page.locator('input[type=file]').first().setInputFiles({name:'generic-scope.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();await ready(page);
+  await ensureMobileShelves(page,width);if(width>=768)await page.getByRole('button',{name:'配置',exact:true}).click();
+  const chart=page.locator('#pivot-chart-container');
+  await chart.getByRole('button',{name:/调整图表字段/}).click();
+  await chart.getByLabel('行字段',{exact:true}).selectOption('Counterparty');await ready(page);
+  await chart.getByLabel('列字段',{exact:true}).selectOption('');await ready(page);
+  await chart.getByLabel('值字段',{exact:true}).selectOption('Volume');await ready(page);
+  const totals=page.locator('#pivot-main-html-table tfoot td').last(),labels=chart.locator('.recharts-label-list text');
+  await expect(totals).toHaveText('80');await expect(labels).toHaveText(['6','2']);
+  await expect(chart.getByTestId('chart-filter-scope')).toContainText('3 / 6');
+  await selectShared(page,'B');await expect(totals).toHaveText('130');await expect(labels).toHaveText(['3','4','6']);
+  await page.getByRole('button',{name:'撤销',exact:true}).click();await ready(page);await expect(labels).toHaveText(['6','2']);
+  await page.getByRole('button',{name:'重做',exact:true}).click();await ready(page);await expect(labels).toHaveText(['3','4','6']);
+  // A chart-local selection only narrows the shared scope; it never rewrites the table.
+  await chart.getByRole('button',{name:'图表选项',exact:true}).click();await chart.getByRole('button',{name:'明细',exact:true}).click();await ready(page);
+  await chart.getByRole('button',{name:'关闭图表选项',exact:true}).click();
+  await chart.locator('.recharts-bar-rectangle').first().click();await ready(page);
+  await expect(labels).toHaveText(['3']);await expect(totals).toHaveText('130');
+  await selectShared(page,'A');await expect(totals).toHaveText('80');await expect(labels).toHaveText(['6']);
+  await expect(chart.getByTestId('chart-filter-scope')).toContainText('图表内进一步筛选：2');
+  await chart.getByRole('button',{name:'图表选项',exact:true}).click();await chart.getByRole('button',{name:'筛选',exact:true}).click();await ready(page);
+  await chart.getByRole('button',{name:'关闭图表选项',exact:true}).click();
+  await chart.locator('.recharts-bar-rectangle').first().click();
+  const details=page.getByRole('dialog',{name:'原始交易明细下钻',exact:true});
+  await expect(details).toContainText('2 条记录');await expect(details.getByRole('cell',{name:'B',exact:true})).toHaveCount(0);await page.keyboard.press('Escape');
+  await chart.getByRole('button',{name:'清除图表内筛选',exact:true}).click();await ready(page);
+  await expect(labels).toHaveText(['6','2']);await expect(totals).toHaveText('80');
+  await selectShared(page,'none');await expect(page.getByTestId('dataset-telemetry')).toContainText('0 / 6 行');
+  await expect(chart).toContainText('当前没有可展示的有效数值');await expect(chart.locator('.recharts-bar-rectangle')).toHaveCount(0);
+  await selectShared(page,'all');await expect(totals).toHaveText('210');await expect(labels).toHaveText(['9','6','6']);
+  await selectShared(page,'B');await expect(totals).toHaveText('130');
+  await page.getByTestId('zone-filters').getByRole('button',{name:'移除字段',exact:true}).click();await ready(page);
+  await expect(totals).toHaveText('210');await expect(labels).toHaveText(['9','6','6']);
+  await page.getByRole('button',{name:'撤销',exact:true}).click();await ready(page);await expect(totals).toHaveText('130');await expect(labels).toHaveText(['3','4','6']);
+  await page.getByRole('button',{name:'保存与复用',exact:true}).click();
+  const downloaded=page.waitForEvent('download');await page.getByRole('button',{name:'保存分析文件',exact:true}).click();
+  const buffer=await readFile(await(await downloaded).path()),saved=JSON.parse(buffer.toString());
+  expect(saved.view.fullConfig.filters[0].selectedValues).toEqual(['B']);expect(saved.view.csc.analysisConfig.filters).toEqual([]);
+  await page.reload();await page.getByRole('button',{name:'保存与复用',exact:true}).click();
+  await page.getByLabel('选择分析文件',{exact:true}).setInputFiles({name:'saved.pivotstudio.json',mimeType:'application/json',buffer});await ready(page);
+  await ensureMobileShelves(page,width);if(width>=768)await page.getByRole('button',{name:'配置',exact:true}).click();
+  await expect(totals).toHaveText('130');await expect(labels).toHaveText(['3','4','6']);
+  await selectShared(page,'A');await expect(totals).toHaveText('80');await expect(labels).toHaveText(['6','2']);
+  await expect(chart.getByTestId('chart-filter-scope')).toContainText('3 / 6');
+  expect((await new AxeBuilder({page}).include('#pivot-chart-container').analyze()).violations).toEqual([]);
+  await page.screenshot({path:info.outputPath('shared-analysis-scope.png'),animations:'disabled'});
+});

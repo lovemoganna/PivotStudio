@@ -91,6 +91,7 @@ test('heatmap: columns-only TopN and drilldown keep the selected column key',asy
   const detail=page.getByRole('dialog',{name:'原始交易明细下钻',exact:true});
   await expect(detail).toContainText('1 条记录');await expect(detail).toContainText('Group249');
   await page.keyboard.press('Escape');
+  const tableBeforeChartFilter=await page.locator('#pivot-main-html-table').innerText();
   await page.getByRole('button',{name:'图表选项',exact:true}).click();
   const modeChip = page.getByRole('button',{name:'明细',exact:true});
   await expect(modeChip).toBeVisible();
@@ -98,8 +99,14 @@ test('heatmap: columns-only TopN and drilldown keep the selected column key',asy
   await expect(page.getByRole('button',{name:'筛选',exact:true})).toBeVisible();
   await page.keyboard.press('Escape');
   await cells.first().click();await ready(page);
-  await expect(page.getByTestId('dataset-telemetry')).toContainText('1 / 250 行');
+  // Chart clicks narrow only the chart; the shared analysis scope stays intact.
+  await expect(page.getByTestId('dataset-telemetry')).toContainText('250 / 250 行');
+  await expect(page.locator('#pivot-main-html-table')).toHaveText(tableBeforeChartFilter,{useInnerText:true});
+  await expect(page.getByTestId('chart-filter-scope')).toContainText('图表内进一步筛选：1');
   await expect(page.locator('svg[data-chart-svg] [role=button]')).toHaveCount(1);
+  await page.getByRole('button',{name:'清除图表内筛选',exact:true}).click();await ready(page);
+  await expect(cells).toHaveCount(10);
+  await expect(page.locator('#pivot-main-html-table')).toHaveText(tableBeforeChartFilter,{useInnerText:true});
 });
 
 

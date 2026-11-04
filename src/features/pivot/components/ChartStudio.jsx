@@ -44,6 +44,7 @@ import { StoryShotDialog } from './modals/StoryShotDialog';
 import {aggregationChoiceLabel} from '../../../utils/aggregationChoice.js';
 
 export function ChartStudio({
+  analysisScope,
   onResetChartAnalysis,
   chartType,
   setChartType,
@@ -807,6 +808,14 @@ export function ChartStudio({
       </div>
 
       {/* Disclaimers & Context Warnings */}
+      {analysisScope && <div data-testid="chart-filter-scope" className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2 text-[11px] leading-5 text-ink-muted">
+        <span>{t('分析范围：')}{analysisScope.filteredCount ?? 0} / {analysisScope.totalCount ?? 0} {t('条记录')}</span>
+        <span>{t('分析筛选同时应用于透视表和图表')}</span>
+        {chartSpecConfig.analysisConfig && (pivotConfig.filters || []).length > 0 && <>
+          <span>{t('图表内进一步筛选：')}{pivotResult.filteredCount ?? 0} {t('条记录')}</span>
+          <button type="button" disabled={isReadOnly} onClick={()=>setPivotConfig(previous=>({...previous,filters:[]}))} className="text-ink-cyan px-2 py-0.5 border border-[#D6D4C8] dark:border-[#49483E] rounded">{t('清除图表内筛选')}</button>
+        </>}
+      </div>}
       {unifiedChartSpec.mergedColumnGroups && <p data-testid="chart-column-basis" className="text-xs leading-5 mb-2 text-ink-muted [overflow-wrap:anywhere]">{t('合并全部列分组，按所选指标的行总计绘图；筛选条件仍然生效。')}</p>}
       {unifiedChartSpec.aggregationBasis && <p data-testid="aggregation-basis" className="text-xs leading-5 mb-2 text-ink-muted [overflow-wrap:anywhere]">{t('图表按以下维度从原始记录重新聚合：')}{unifiedChartSpec.aggregationBasis}{t('；表格展开或折叠不会改变图表统计口径。')}</p>}
       {chartType === 'line' && unifiedChartSpec.derivedIssue && <p role="status" data-testid="derived-guidance" className="text-xs leading-5 mb-2 text-ink-orange">{t(unifiedChartSpec.derivedIssue)}</p>}

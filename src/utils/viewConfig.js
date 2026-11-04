@@ -1,3 +1,4 @@
+import {resolveChartConfig} from './chartConfig.js';
 // Explicit configuration projection prevents rows, sample records or arbitrary objects entering URLs.
 const pick = (source, keys) => Object.fromEntries(keys.filter((key) => source?.[key] !== undefined).map((key) => [key, source[key]]));
 const dimensionKeys = ['id','field','sort','dateGranularity','numberBin','excludedValues','selectedValues','excludeAll'];
@@ -34,7 +35,7 @@ export function projectView(source) {
     vm: ['split','chart','table'].includes(source?.vm) ? source.vm : 'split',
     ct: source?.ct || 'bar',
     cf: pick(source?.cf,['colorScale','showDataBar','customRuleEnabled','customRuleOp','customRuleValue','customRuleColor']),
-    csc: {...(chartAnalysis ? {analysisConfig:projectView({fullConfig:chartAnalysis}).fullConfig} : {}),...pick(source?.csc,['primaryValueId','secondaryValueId','sortMode','topN','missingValueMode','lineDerivedMetric','showDataLabels','dataLabelPosition','showAvgReferenceLine','clickLinkMode','histogramBins','stickyRowHeaders'])},
+    csc: {...(chartAnalysis ? {analysisConfig:projectView({fullConfig:resolveChartConfig(fullConfig,source.csc)}).fullConfig,filterScope:'local'} : {}),...pick(source?.csc,['primaryValueId','secondaryValueId','sortMode','topN','missingValueMode','lineDerivedMetric','showDataLabels','dataLabelPosition','showAvgReferenceLine','clickLinkMode','histogramBins','stickyRowHeaders'])},
     ts: pick(source?.ts,['density','colWidthMode','dataAlignment','showZebra','wrapText','showExtremes','customColWidths']),
   };
 }
