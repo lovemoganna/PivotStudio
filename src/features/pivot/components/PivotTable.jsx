@@ -364,6 +364,7 @@ export function PivotTable({
   const colExtremesMap = useMemo(() => {
     const map = {};
     if (!tableSettings.showExtremes) return map;
+    if (pivotResult.columnExtremes) return pivotResult.columnExtremes;
 
     for (const cGroup of pivotResult.allColGroups) {
       for (const vCfg of pivotResult.valConfigs) {
@@ -389,7 +390,7 @@ export function PivotTable({
       }
     }
     return map;
-  }, [pivotResult.allColGroups, pivotResult.valConfigs, pivotResult.tableRows, pivotResult.displayMatrix, tableSettings.showExtremes]);
+  }, [pivotResult.columnExtremes, pivotResult.allColGroups, pivotResult.valConfigs, pivotResult.tableRows, pivotResult.displayMatrix, tableSettings.showExtremes]);
 
   // Resize start handler
   const handleResizeStart = (e, colKey, currentWidth) => {

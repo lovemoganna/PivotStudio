@@ -640,8 +640,9 @@ export default function PivotWorkbench() {
         busyRef.current = false;
         setIsWorkerComputing(false);
         if (data.success) {
-          data.pivotResult.cellRecordsMap = new Map();
-          setActiveResults({ pivotResult: data.pivotResult, chartPivotResult:data.chartPivotResult, unifiedChartSpec: data.unifiedChartSpec, dataset: currentDataset, config: pivotConfig, chartType, chartSpecConfig });
+          if (data.pivotResult) data.pivotResult.cellRecordsMap = new Map();
+          worker.tableResultId = data.pivotResultId;
+          setActiveResults(previous => ({ pivotResult: data.pivotResult || previous.pivotResult, chartPivotResult:data.chartPivotResult, unifiedChartSpec: data.unifiedChartSpec, dataset: currentDataset, config: pivotConfig, chartType, chartSpecConfig }));
         } else { const message = `计算失败：${data.error}；请减少分组字段或拆分数据后重试`; setComputeError(message); showToast(message, 'error'); }
       };
       worker.onerror = (event) => {
@@ -651,7 +652,7 @@ export default function PivotWorkbench() {
         showToast('本地计算进程失败，可能内存不足；请减少分组字段、关闭其他标签页后重试', 'error');
       };
       worker.onmessageerror = worker.onerror;
-      worker.postMessage({ id, payload: { dataset: cachedDatasetRef.current === currentDataset ? undefined : currentDataset, pivotConfig, chartType, chartSpecConfig } });
+      worker.postMessage({ id, payload: { dataset: cachedDatasetRef.current === currentDataset ? undefined : currentDataset, pivotConfig, chartType, chartSpecConfig, tableResultId:worker.tableResultId } });
       cachedDatasetRef.current = currentDataset;
     } catch {
       stopCalculation();
