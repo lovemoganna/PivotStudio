@@ -1,4 +1,5 @@
 import { t } from '../../../i18n.js';
+import { categoryPage, categoryValueDomain } from '../../../utils/chartPagination.js';
 import React from 'react';
 import {
   Sliders, Maximize2, Minimize2, X, BookOpen, Pencil, Copy, Download,
@@ -48,7 +49,7 @@ export function ChartStudio({
   onResetChartAnalysis,
   chartType,
   setChartType,
-  unifiedChartSpec,
+  unifiedChartSpec: completeChartSpec,
   pivotResult,
   chartSpecConfig,
   setChartSpecConfig,
@@ -87,6 +88,26 @@ export function ChartStudio({
   onExportPNG,
   onExportSVG,
 }) {
+  const chartRootRef = React.useRef(null);
+  const [chartWidth, setChartWidth] = React.useState(960);
+  const [pageSelection, setPageSelection] = React.useState({key:'',index:0});
+  React.useEffect(() => {
+    const root = chartRootRef.current;
+    if (!root) return;
+    const observer = new ResizeObserver(([entry]) => setChartWidth(entry.contentRect.width));
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+  const pageKey = (completeChartSpec.items || []).map(item => item.rowKey).join('\0');
+  const page = categoryPage(completeChartSpec.items, completeChartSpec.seriesMetaList.length, chartWidth, pageSelection.key === pageKey ? pageSelection.index : 0, chartType);
+  React.useEffect(() => {
+    if (!highlightedRowKey) return;
+    const index = (completeChartSpec.items || []).findIndex(item => item.rowKey === highlightedRowKey || highlightedRowKey.startsWith(item.rowKey + '||'));
+    if (index >= 0) setPageSelection({key:pageKey,index:Math.floor(index/page.pageSize)});
+  }, [highlightedRowKey,pageKey,page.pageSize]);
+  const unifiedChartSpec = completeChartSpec;
+  const pageDomain = React.useMemo(() => categoryValueDomain(completeChartSpec.items, completeChartSpec.seriesMetaList.map(series=>series.key), chartType === 'stacked_bar'), [completeChartSpec,chartType]);
+  const pageSummary = page.paged ? `${t('显示分组')} ${page.start + 1}–${page.end} / ${page.total} · ${t('仅图表分页，表格与统计不变')}` : '';
   const labelPositions = getLabelPositions(chartType);
   const labelPosition = resolveLabelPosition(chartType, chartSpecConfig.dataLabelPosition);
   const rectLabelPosition = labelPosition === 'auto' ? 'top' : labelPosition;
@@ -125,9 +146,9 @@ export function ChartStudio({
   }, [unifiedChartSpec.items]);
 
   const barAxisMaxLabels = compactAxis ? 12 : 25;
-  const barTickInterval = (unifiedChartSpec.items?.length || 0) <= barAxisMaxLabels
+  const barTickInterval = page.items.length <= barAxisMaxLabels
     ? 0
-    : Math.max(0, Math.ceil((unifiedChartSpec.items?.length || 0) / barAxisMaxLabels) - 1);
+    : Math.max(0, Math.ceil(page.items.length / barAxisMaxLabels) - 1);
 
   const generalAxisMaxLabels = compactAxis ? 8 : 18;
   const generalTickInterval = (unifiedChartSpec.items?.length || 0) <= generalAxisMaxLabels
@@ -428,7 +449,7 @@ export function ChartStudio({
       : '';
 
   return (
-    <div data-highlighted-row={highlightedRowKey || ''} className="flex-1 flex flex-col h-full min-h-0">
+    <div ref={chartRootRef} data-highlighted-row={highlightedRowKey || ''} className="flex-1 flex flex-col h-full min-h-0">
       {chartResultQuestion ? (
         <div
           data-testid="result-reading"
@@ -861,6 +882,16 @@ export function ChartStudio({
         </div>
       )}
 
+      {page.paged && !unifiedChartSpec.renderLimit && <nav aria-label={t('图表分组分页')} className="flex flex-wrap items-center justify-between gap-2 mb-2 text-[11px] text-ink-muted shrink-0">
+        <div><span data-chart-page-summary={pageSummary} aria-live="polite">{pageSummary}</span>{chartSpecConfig.showAvgReferenceLine && <span className="block" data-chart-page-note>{t('均值线按全部分组计算')}</span>}</div>
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={page.index === 0} onClick={() => setPageSelection({key:pageKey,index:page.index-1})} className="min-h-8 px-3 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] text-ink-cyan">{t('上一页')}</button>
+          <select aria-label={t('选择图表页')} value={page.index} onChange={event=>setPageSelection({key:pageKey,index:Number(event.target.value)})} className="min-h-8 max-w-32 rounded-lg bg-transparent border border-[#D6D4C8] dark:border-[#49483E] px-2 text-[#272822] dark:text-[#F8F8F2]">
+            {Array.from({length:page.pages},(_,index)=><option key={index} value={index} className="bg-[#FFFDF7] dark:bg-[#272822]">{index+1} / {page.pages} · {index*page.pageSize+1}–{Math.min(page.total,(index+1)*page.pageSize)}</option>)}
+          </select>
+          <button type="button" disabled={page.index === page.pages-1} onClick={() => setPageSelection({key:pageKey,index:page.index+1})} className="min-h-8 px-3 rounded-lg border border-[#D6D4C8] dark:border-[#49483E] text-ink-cyan">{t('下一页')}</button>
+        </div>
+      </nav>}
       {/* Main Chart Canvas */}
       <div className="flex-1 w-full min-h-[280px] flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-b from-transparent to-[#EFECE1]/25 dark:to-[#1E1F1C]/35">
         {unifiedChartSpec.renderLimit ? (
@@ -1333,7 +1364,7 @@ export function ChartStudio({
               </BarChart>
             ) : (
               <BarChart
-                data={unifiedChartSpec.items}
+                data={page.items}
                 layout={chartType === 'horizontal_bar' ? 'vertical' : 'horizontal'}
                 margin={chartType === 'horizontal_bar' ? hbarMargin : cartesianMargin}
               >
@@ -1348,7 +1379,7 @@ export function ChartStudio({
                 <CartesianGrid strokeDasharray={CV.grid.dash} stroke={gridStroke} />
                 {chartType === 'horizontal_bar' ? (
                   <>
-                    <XAxis type="number" domain={zeroBaselineDomain} tick={valueTick} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
+                    <XAxis type="number" domain={page.paged ? pageDomain : zeroBaselineDomain} tick={valueTick} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)} tickFormatter={(v) => UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true })} />
                     <YAxis
                       type="category"
                       dataKey="name"
@@ -1367,7 +1398,7 @@ export function ChartStudio({
                       tick={renderCategoryAxisTick}
                     />
                     <YAxis
-                      domain={chartType === 'pct_stacked_bar' ? [0, 100] : zeroBaselineDomain} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)}
+                      domain={chartType === 'pct_stacked_bar' ? [0, 100] : page.paged ? pageDomain : zeroBaselineDomain} allowDecimals={allowsMetricDecimals(unifiedChartSpec.primaryValCfg)}
                       tick={valueTick}
                       tickFormatter={(v) => (chartType === 'pct_stacked_bar' ? `${v}%` : UnifiedFormatter.formatValue(v, unifiedChartSpec.primaryValCfg, { compact: true }))}
                     />
@@ -1412,7 +1443,7 @@ export function ChartStudio({
                         handleChartPointClick({ ...d, rowKey: targetRowKey, colKey: sm.colKey, seriesKey: sm.key });
                       }}
                     >
-                      {unifiedChartSpec.items.map((item) => <Cell key={item.rowKey} data-highlighted={highlightedRowKey === item.rowKey || (highlightedRowKey && typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(item.rowKey + '||'))} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : markStroke} strokeWidth={highlightedRowKey === item.rowKey ? CV.stroke.highlight : 0.75} fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== item.rowKey))} />)}
+                      {page.items.map((item) => <Cell key={item.rowKey} data-highlighted={highlightedRowKey === item.rowKey || (highlightedRowKey && typeof highlightedRowKey === 'string' && highlightedRowKey.startsWith(item.rowKey + '||'))} stroke={highlightedRowKey === item.rowKey ? CV.semantic.highlight : markStroke} strokeWidth={highlightedRowKey === item.rowKey ? CV.stroke.highlight : 0.75} fillOpacity={chartDimOpacity(Boolean(highlightedRowKey && highlightedRowKey !== item.rowKey))} />)}
                       {chartSpecConfig.showDataLabels && (
                         <LabelList
                           dataKey={sm.key}

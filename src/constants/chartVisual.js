@@ -131,9 +131,8 @@ export function chartMargin({ rotate = false, compact = false, dual = false, hor
     top: CV.margin.top,
     right: dual ? CV.margin.dualRight : CV.margin.right,
     left: horizontal ? CV.margin.categoryLeft : CV.margin.left,
-    bottom: rotate
-      ? (compact ? CV.margin.rotateBottomCompact : CV.margin.rotateBottom)
-      : CV.margin.bottom,
+    // XAxis already reserves the rotated labels' height; do not reserve it twice.
+    bottom: rotate ? 8 : CV.margin.bottom,
   };
 }
 

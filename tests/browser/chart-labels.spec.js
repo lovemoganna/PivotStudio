@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {encodeView} from '../../src/utils/viewConfig.js';
 
 const ready=page=>expect(page.getByTestId('pivot-workbench')).toHaveAttribute('data-calculation-status','idle');
 const chart=page=>page.locator('#pivot-chart-container');
@@ -8,7 +9,11 @@ async function close(page) { await page.getByRole('button',{name:'关闭图表�
 test.beforeEach(async({page})=>{
   await page.route('https://fonts.googleapis.com/**',r=>r.abort());
   await page.route('https://fonts.gstatic.com/**',r=>r.abort());
-  await page.goto('/?demo=retail'); await ready(page);
+  // Label geometry needs a bounded chart, independent of demo presets and date grain.
+  const fullConfig={rows:[{id:'r',field:'Group'}],columns:[{id:'c',field:'Period'}],filters:[],values:[{id:'amount',field:'Amount',agg:'sum'},{id:'units',field:'Units',agg:'sum'}]};
+  await page.goto('/#share_token='+encodeURIComponent(encodeView({fullConfig})));
+  await page.locator('input[type=file]').first().setInputFiles({name:'label-geometry.csv',mimeType:'text/csv',buffer:Buffer.from('Group,Period,Amount,Units\nA,P1,100,1\nA,P2,80,2\nB,P1,40,3\nB,P2,60,4\nC,P1,70,5\nC,P2,90,6')});
+  await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();await ready(page);
   await page.getByRole('button',{name:'仅图表',exact:true}).click();
 });
 

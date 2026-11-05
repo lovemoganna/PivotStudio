@@ -75,16 +75,50 @@ export async function exportChartImage(dataset, chartSpec, chartType, darkMode, 
     });
     const ns='http://www.w3.org/2000/svg';
     const svg=document.createElementNS(ns,'svg');
-    const legend = [...container.querySelectorAll('.recharts-legend-item-text')].map((node) => node.textContent).join(' · ');
-    const totalHeight = height + (chartSpec.scope ? 86 : 62);
+    const legend = [...container.querySelectorAll('.recharts-legend-item')].map(node => {
+      const icon = node.querySelector('.recharts-legend-icon') || node;
+      const styles = getComputedStyle(icon);
+      const fill = styles.fill === 'none' ? styles.stroke : styles.fill;
+      const gradientId = fill.match(/url\(["']?[^)]*#([^)'" ]+)["']?\)/)?.[1];
+      const stop = gradientId && source.querySelector(`[id="${CSS.escape(gradientId)}"] stop`);
+      return {text:node.querySelector('.recharts-legend-item-text')?.textContent || '',color:stop ? getComputedStyle(stop).stopColor : fill};
+    });
+    // Export the same visible page, with an explicit range and a compact SVG legend.
+    // HTML Recharts legends are outside its SVG and otherwise lose their swatches.
+    const measure = document.createElement('canvas').getContext('2d');
+    const font = '12px Arial, sans-serif';
+    if (measure) measure.font = font;
+    const textWidth = text => measure?.measureText(text).width || text.length * 8;
+    const wrap = (text, availableWidth = width-24) => {
+      const lines=[];let line='';
+      for (const char of text) { if (line && textWidth(line+char)>availableWidth) {lines.push(line);line='';} line+=char; }
+      if(line)lines.push(line);return lines;
+    };
+    const header = wrap(`${dataset?.name || '数据'} · ${chartSpec.primaryMeasureLabel || chartSpec.primarySeriesKey}`);
+    const notes = [container.querySelector('[data-chart-page-summary]')?.getAttribute('data-chart-page-summary'),container.querySelector('[data-chart-page-note]')?.textContent,chartSpec.scope && `Top ${chartSpec.scope.shown} / ${chartSpec.scope.total}; full table & KPIs`].filter(Boolean).flatMap(text=>wrap(text));
+    let legendX=12,legendY=0;
+    const legendItems=legend.flatMap(item=>{
+      const lines=wrap(item.text,width-54), result=[];
+      for(const [index,text] of lines.entries()){
+        const itemWidth=Math.min(width-24,textWidth(text)+30);
+        if(legendX>12 && legendX+itemWidth>width-12){legendX=12;legendY+=20;}
+        result.push({...item,text,x:legendX,y:legendY,swatch:index===0});legendX+=itemWidth;
+      }return result;
+    });
+    const headerHeight=header.length*18+12;
+    const legendHeight=legendItems.length ? legendY+24 : 0;
+    const totalHeight = headerHeight+height+legendHeight+notes.length*18+12;
     svg.setAttribute('xmlns',ns); svg.setAttribute('width',width); svg.setAttribute('height',totalHeight);
     svg.setAttribute('viewBox',`0 0 ${width} ${totalHeight}`);
     const background=document.createElementNS(ns,'rect'); background.setAttribute('width','100%'); background.setAttribute('height','100%'); background.setAttribute('fill',darkMode?'#272822':'#FFFDF7'); svg.appendChild(background);
-    const addText=(value,y)=>{const text=document.createElementNS(ns,'text');text.setAttribute('x','12');text.setAttribute('y',y);text.setAttribute('fill',darkMode?'#F8F8F2':'#272822');text.setAttribute('font-size','12');text.textContent=value;svg.appendChild(text);};
-    addText(`${dataset?.name || '数据'} · ${chartSpec.primarySeriesKey}`,20);
-    clone.setAttribute('y','30'); clone.setAttribute('width',width); clone.setAttribute('height',height); svg.appendChild(clone);
-    if(legend) addText(legend,height+52);
-    if(chartSpec.scope) addText(`Top ${chartSpec.scope.shown} / ${chartSpec.scope.total}; full table & KPIs`,height+76);
+    const addText=(value,y,x=12)=>{const text=document.createElementNS(ns,'text');text.setAttribute('x',x);text.setAttribute('y',y);text.setAttribute('fill',darkMode?'#F8F8F2':'#272822');text.setAttribute('font-size','12');text.setAttribute('font-family','Arial, sans-serif');text.textContent=value;svg.appendChild(text);};
+    header.forEach((line,index)=>addText(line,20+index*18));
+    clone.setAttribute('y',headerHeight); clone.setAttribute('width',width); clone.setAttribute('height',height); svg.appendChild(clone);
+    legendItems.forEach(item=>{
+      if(item.swatch){const marker=document.createElementNS(ns,'rect');marker.setAttribute('x',item.x);marker.setAttribute('y',headerHeight+height+item.y+3);marker.setAttribute('width','10');marker.setAttribute('height','10');marker.setAttribute('fill',item.color);svg.appendChild(marker);}
+      addText(item.text,headerHeight+height+item.y+13,item.x+14);
+    });
+    notes.forEach((line,index)=>addText(line,headerHeight+height+legendHeight+18+index*18));
     const blob=new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'});
     if(format==='svg') { downloadBlob(blob,`${dataset?.name || '数据'}_透视图表.svg`); }
     else {

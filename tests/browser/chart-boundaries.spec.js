@@ -11,6 +11,30 @@ const upload=(page,buffer,name='bounds.csv')=>page.locator('input[type=file]').f
 const confirm=async page=>{await expect(preview(page)).toBeVisible();await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();await expect(preview(page)).toHaveCount(0,{timeout:45000});await ready(page);};
 test.beforeEach(async({page})=>{await page.emulateMedia({reducedMotion:'reduce'});await page.route('https://fonts.googleapis.com/**',route=>route.abort());await page.route('https://fonts.gstatic.com/**',route=>route.abort());});
 
+for(const width of [360,1440])test(`dense bars: page through every category without changing the table at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:1100});
+  const config={rows:[{id:'r',field:'Account'}],columns:[{id:'c',field:'Series'}],values:[{id:'v',field:'Amount',agg:'sum'}],filters:[]};
+  await page.goto('/#share_token='+encodeURIComponent(encodeView({fullConfig:config})));
+  const names=Array.from({length:27},(_,i)=>`Account_${String(i).padStart(5,'0')}`);
+  await upload(page,'Account,Series,Amount\n'+names.flatMap((name,i)=>['A','B','C'].map((series,j)=>`${name},${series},${i*3+j}`)).join('\n'));await confirm(page);
+  const table=page.locator('#pivot-main-html-table'),before=await table.innerText();
+  const chart=page.locator('#pivot-chart-container'),nav=page.getByRole('navigation',{name:'图表分组分页',exact:true});
+  const scale=await chart.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').allTextContents();
+  const seen=[];
+  while(true){
+    seen.push(...await chart.locator('.recharts-xAxis .recharts-cartesian-axis-tick text title').allTextContents());
+    expect(await chart.locator('.recharts-yAxis .recharts-cartesian-axis-tick-value').allTextContents()).toEqual(scale);
+    if(await nav.getByRole('button',{name:'下一页',exact:true}).isDisabled())break;
+    await nav.getByRole('button',{name:'下一页',exact:true}).press('Enter');
+  }
+  expect(seen).toEqual(names);await expect(table).toHaveText(before,{useInnerText:true});
+  await nav.getByLabel('选择图表页',{exact:true}).selectOption('0');
+  await expect(nav.getByRole('button',{name:'上一页',exact:true})).toBeDisabled();
+  const dl=page.waitForEvent('download');await clickExport(page,'.SVG');const svg=await readFile(await(await dl).path(),'utf8');
+  const text=await page.evaluate(svg=>new DOMParser().parseFromString(svg,'image/svg+xml').documentElement.textContent,svg);
+  expect(text).toContain('显示分组');expect(text).toContain('表格与统计不变');expect(svg).toContain('rgb(249, 38, 114)');
+});
+
 for(const width of [360,1440])test(`chart boundary: explicit TopN keeps complete table and scoped exports at ${width}px`,async({page})=>{
   await page.setViewportSize({width,height:1000});
   const cfg={fullConfig:{rows:[{id:'r',field:'Group'}],columns:[],filters:[],values:[{id:'v',field:'Amount',agg:'sum',format:{decimals:0,currency:'',thousands:true}}]}};
