@@ -233,8 +233,14 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
   const groupCount = dataRows.length || pivotResult.leafColGroups?.length || 1;
   const requestedCount = chartSpecConfig?.topN > 0 ? Math.min(groupCount, chartSpecConfig.topN) : groupCount;
   const maximumGroups = chartType === 'heatmap' || chartType === 'funnel' ? 200 : 2000;
+  const maximumMarks = 2000;
+  const multiSeries = ['bar','horizontal_bar','stacked_bar','pct_stacked_bar','line','area','stacked_area','pct_area','heatmap'].includes(chartType);
+  const maximumSeries = 24;
+  const seriesExceeded = multiSeries && seriesMetaList.length > maximumSeries;
+  const markCount = requestedCount * (multiSeries ? Math.max(1, seriesMetaList.length) : 1);
+  const marksExceeded = markCount > maximumMarks;
   // Unbounded SVG marks can block input for tens of seconds. Require an explicit scope.
-  if (chartType !== 'histogram' && requestedCount > maximumGroups) {
+  if (chartType !== 'histogram' && (requestedCount > maximumGroups || marksExceeded || seriesExceeded)) {
     const series = seriesMetaList[0];
     const values = dataRows.length
       ? dataRows.map((row) => Number(pivotResult.displayMatrix[`${row.rowKey}@@${series.colKey}@@${series.valCfg.id}`]?.display ?? 0))
@@ -246,7 +252,11 @@ export function buildUnifiedChartSpec(dataset, pivotResult, chartType, chartSpec
       primaryStats: summarizeValues(values),
       hasColGroups,
       canStack: hasColGroups || (valConfigs.length > 1 && valConfigs.every((value) => UnifiedFormatter.inferUnit(value) === UnifiedFormatter.inferUnit(valConfigs[0]))),
-      renderLimit: { groupCount, maximum: maximumGroups } };
+      renderLimit: seriesExceeded
+        ? { kind: 'series', groupCount, seriesCount: seriesMetaList.length, maximum: maximumSeries }
+        : requestedCount > maximumGroups
+        ? { groupCount, maximum: maximumGroups }
+        : { kind: 'marks', groupCount, seriesCount: seriesMetaList.length, markCount, maximum: maximumMarks } };
   }
 
   const lastSeenBySeries = {};
