@@ -1447,7 +1447,12 @@ export function ChartStudio({
                       {chartSpecConfig.showDataLabels && (
                         <LabelList
                           dataKey={sm.key}
-                          content={(p) => renderSmartBarLabel({...p, value: chartType === 'pct_stacked_bar' ? `${Number(p.value).toFixed(1)}%` : UnifiedFormatter.formatValue(p.value, sm.valCfg, {compact:true})}, darkMode, chartType === 'horizontal_bar', labelPosition, sm.color)}
+                          content={(p) => {
+                            if (p.value === null || p.value === undefined || !Number.isFinite(Number(p.value))) return null;
+                            const active = unifiedChartSpec.seriesMetaList.filter(series => Number.isFinite(page.items[p.index]?.[series.key]));
+                            const labelRank = Math.max(0,active.findIndex(series=>series.key===sm.key));
+                            return renderSmartBarLabel({...p,rawValue:p.value,labelRank,stacked:isStacked,value:chartType === 'pct_stacked_bar' ? `${Number(p.value).toFixed(1)}%` : UnifiedFormatter.formatValue(p.value,sm.valCfg,{compact:true})},darkMode,chartType==='horizontal_bar',labelPosition,sm.color);
+                          }}
                         />
                       )}
                     </Bar>

@@ -83,3 +83,39 @@ test('labels: signed values retain correct rectangle placement and zero labels',
     }
   }
 });
+
+for(const width of [360,1440])test(`labels: narrow sparse bars show values and zero without labelling missing cells at ${width}`,async({page})=>{
+  await page.setViewportSize({width,height:1000});
+  const fullConfig={rows:[{field:'Account'}],columns:[{field:'Series'}],values:[{id:'v',field:'Amount',agg:'sum'}],filters:[]};
+  await page.goto('/#share_token='+encodeURIComponent(encodeView({fullConfig,csc:{showDataLabels:true,dataLabelPosition:'auto'}})));
+  const csv='Account,Series,Amount\n'+Array.from({length:27},(_,i)=>`Account_${i},S${i%5},${i===0?0:(i+1)*100}`).join('\n');
+  await page.locator('input[type=file]').first().setInputFiles({name:'sparse-labels.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();await ready(page);
+  await expect.poll(async()=>{
+    const categories=await chart(page).locator('.recharts-xAxis .recharts-cartesian-axis-tick text title').count();
+    return categories>0 && await labels(page).count()===categories;
+  }).toBe(true);
+  const text=await labels(page).allTextContents();expect(text).toContain('0');expect(text).not.toContain('-');
+  const widths=await chart(page).locator('.recharts-bar-rectangle path').evaluateAll(nodes=>nodes.map(node=>node.getBBox().width));
+  expect(Math.min(...widths)).toBeLessThan(18);
+  const download=page.waitForEvent('download');await page.getByRole('button',{name:'导出',exact:true}).click();await page.getByRole('menuitem',{name:'.SVG',exact:true}).click();
+  const {readFile}=await import('node:fs/promises');const svg=await readFile(await(await download).path(),'utf8');expect(svg).toContain('data-value-label');
+  await options(page);await page.getByRole('checkbox',{name:'显示数值标签',exact:true}).uncheck();await close(page);await expect(labels(page)).toHaveCount(0);
+});
+
+test('labels: crowded equal-height series have separated automatic labels',async({page})=>{
+  await page.setViewportSize({width:360,height:1100});
+  const fullConfig={rows:[{field:'Group'}],columns:[{field:'Series'}],values:[{id:'v',field:'Amount',agg:'sum'}],filters:[]};
+  await page.goto('/#share_token='+encodeURIComponent(encodeView({fullConfig,csc:{showDataLabels:true,dataLabelPosition:'auto'}})));
+  const csv='Group,Series,Amount\n'+Array.from({length:4},(_,i)=>Array.from({length:5},(_,j)=>`G${i},S${j},100`)).flat().join('\n');
+  await page.locator('input[type=file]').first().setInputFiles({name:'crowded-labels.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
+  await page.getByRole('button',{name:'确认导入并自动构建推荐透视',exact:true}).click();await ready(page);
+  await expect(labels(page)).toHaveCount(20);
+  const overlaps=await labels(page).evaluateAll(nodes=>{
+    const rects=nodes.map(node=>node.getBoundingClientRect());let overlaps=0;
+    for(let i=0;i<rects.length;i++)for(let j=i+1;j<rects.length;j++){
+      const a=rects[i],b=rects[j];if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)overlaps++;
+    }return overlaps;
+  });
+  expect(overlaps).toBe(0);
+});

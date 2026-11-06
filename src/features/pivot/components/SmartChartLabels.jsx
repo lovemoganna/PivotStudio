@@ -1,6 +1,7 @@
 import React from 'react';
 import { UnifiedFormatter, formatAxisTickLabel } from '../../../utils/formatters';
-import { CV, chartInk, chartLabelInk, seriesColor } from '../../../constants/chartVisual';
+import { CV, chartInk, chartLabelInk, chartPaper, seriesColor } from '../../../constants/chartVisual';
+import { autoBarLabelLayout } from '../../../utils/chartLabels.js';
 
 export function renderSmartPieLabel(props, primaryValCfg, darkMode, position = 'auto') {
   const { cx, cy, midAngle, innerRadius, outerRadius, value, percent, name, fill } = props;
@@ -74,64 +75,12 @@ export function renderSmartBarLabel(props, darkMode, isHorizontal = false, posit
     const inside = (position === 'inside' || position.startsWith('inside')) && Math.abs(width * height) > 0;
     return <text data-value-label="true" x={tx} y={ty} fill={inside ? chartLabelInk(markFill) : chartInk(darkMode)} textAnchor={anchor} dominantBaseline="central" fontSize={CV.typography.dataLabel} fontWeight={700} className="apple-font-mono">{textStr}</text>;
   }
-  const isNeg = textStr.startsWith('-');
-  const labelSize = CV.typography.dataLabel;
-  const outsideInk = chartInk(darkMode);
-
-  if (isHorizontal) {
-    if (Math.abs(height) < 12) return null;
-    if (isNeg) {
-      return (
-        <text data-value-label="true"
-          x={x + width / 2}
-          y={y + height / 2}
-          fill={chartLabelInk(markFill)}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={labelSize}
-          fontWeight={700}
-          className="apple-font-mono"
-        >
-          {textStr}
-        </text>
-      );
-    }
-    const placeInside = width > 68;
-    const tx = placeInside ? x + width - 6 : x + Math.max(0, width) + 6;
-    return (
-      <text data-value-label="true"
-        x={tx}
-        y={y + height / 2}
-        fill={placeInside ? chartLabelInk(markFill) : outsideInk}
-        textAnchor={placeInside ? 'end' : 'start'}
-        dominantBaseline="central"
-        fontSize={labelSize}
-        fontWeight={700}
-        className="apple-font-mono"
-      >
-        {textStr}
-      </text>
-    );
-  }
-
-  if (Math.abs(width) < 18) return null;
-  if (isNeg && Math.abs(height) < 18) return null;
-  const nearTopEdge = y < 18;
-  const ty = isNeg ? Math.max(y, y + height) - 9 : nearTopEdge ? y + 12 : y - 6;
-  const fillCol = isNeg || nearTopEdge ? chartLabelInk(markFill) : outsideInk;
-
-  return (
-    <text data-value-label="true"
-      x={x + width / 2}
-      y={ty}
-      fill={fillCol}
-      textAnchor="middle"
-      dominantBaseline="central"
-      fontSize={labelSize}
-      fontWeight={700}
-      className="apple-font-mono"
-    >
-      {textStr}
-    </text>
-  );
+  const placement = autoBarLabelLayout(props,isHorizontal);
+  if (!placement) return null;
+  return <text data-value-label="true" x={placement.x} y={placement.y}
+    fill={placement.inside ? chartLabelInk(markFill) : chartInk(darkMode)}
+    stroke={placement.inside ? 'none' : chartPaper(darkMode)} strokeWidth={3}
+    paintOrder="stroke" strokeLinejoin="round" pointerEvents="none"
+    textAnchor={placement.anchor} dominantBaseline="central" fontSize={placement.fontSize}
+    fontWeight={700} className="apple-font-mono">{textStr}</text>;
 }
