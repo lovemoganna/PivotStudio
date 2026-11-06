@@ -63,6 +63,13 @@ try{
     assert.equal(await clickText('全区零售经营测试集'),true,'load benchmark retail dataset from intro screen');
     await waitFor(async()=>await evaluate('!!document.getElementById("pivot-chart-container") && !!document.getElementById("pivot-main-html-table")'),'pivot work surface',12000);
   }
+  // Geometry checks need a drawable scope. Raw-date demo columns can legitimately
+  // exceed the chart series budget; remove chart columns through the real UI,
+  // preserving the complete table and all existing density/export assertions.
+  await evaluate('(() => { document.querySelector("button[aria-label^=\\"调整图表字段\\"]")?.click(); return true; })()');
+  await waitFor(async()=>await evaluate('!!document.querySelector("#pivot-chart-container select[aria-label=\\"列字段\\"]")'),'chart column editor');
+  await evaluate('(() => { const select=document.querySelector("#pivot-chart-container select[aria-label=\\"列字段\\"]"); select.value=""; select.dispatchEvent(new Event("change",{bubbles:true})); return true; })()');
+  await waitFor(async()=>await evaluate('document.querySelector("[data-testid=pivot-workbench]")?.dataset.calculationStatus==="idle" && !!document.querySelector("#pivot-chart-container .recharts-xAxis .recharts-cartesian-axis-tick")'),'bounded chart for responsive checks');
   const errors=[];
   for(const [name,width,height] of [['small-mobile',320,720],['mobile',390,844],['tablet',768,900],['laptop',1024,768],['desktop',1440,900],['wide',1920,1080]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});
